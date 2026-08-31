@@ -1,0 +1,51 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build output — dist/ is ~370 MB per build, never commit it.
+build/
+dist/
+*.spec.bak
+
+# CabinetNotarialZarai.spec is deliberately NOT ignored: it is the build
+# configuration (bundled stylesheet and ONNX models, excluded libraries) and
+# belongs in version control. `pyinstaller main.py` would regenerate a stub over
+# it and silently drop those settings — build with `python build_exe.py`.
+
+# ── THE LICENCE SIGNING KEY — NEVER COMMIT, NEVER SHIP ───────────────────────
+# Whoever holds this can mint valid licences for every installation that carries
+# the matching public key. Losing it is just as bad: licences can never be issued
+# again for those installs. Keep a backup somewhere offline.
+tools/zarai_licence_key.pem
+tools/issued_licences.log
+*.pem
+
+# The client's own activated licence, written into their data folder.
+licence.txt
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local runtime data — never commit the office's real records
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Generated exports and documents
+*.xlsx
+*.docx
+*.pdf
+
+# Logs
+*.log
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.m4a 

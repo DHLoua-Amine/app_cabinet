@@ -1,0 +1,443 @@
+/* styles.qss - Cabinet Notarial Zarai Premium Light Executive Theme */
+
+/* Global Settings */
+* {
+    font-family: "Segoe UI", "Inter", Roboto, "Helvetica Neue", sans-serif;
+}
+
+/* Global Window Background */
+QMainWindow, QWidget#ContentArea {
+    background-color: #f8fafc;
+    color: #0f172a;
+}
+
+/* Sidebar Styling */
+QFrame#Sidebar {
+    background-color: #f1f5f9;
+    border-right: 1px solid #e2e8f0;
+    min-width: 270px;
+    max-width: 270px;
+}
+
+/* Sidebar Title */
+QLabel#SidebarTitle {
+    color: #0f172a;
+    font-weight: 800;
+    font-size: 16px;
+    padding: 20px 15px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+/* Sidebar Buttons */
+QPushButton[class="SidebarButton"], QPushButton#SidebarButton {
+    background-color: transparent;
+    color: #475569;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+    margin: 4px 12px;
+}
+
+QPushButton[class="SidebarButton"]:hover, QPushButton#SidebarButton:hover {
+    background-color: #e2e8f0;
+    color: #0f172a;
+}
+
+QPushButton[class="SidebarButton"]:checked, QPushButton#SidebarButton:checked {
+    background-color: #ffffff;
+    color: #0f172a;
+    font-weight: 800;
+    border: 1px solid #e2e8f0;
+    border-left: 4px solid #3b82f6;
+}
+
+QPushButton[class="SidebarButton"]:disabled, QPushButton#SidebarButton:disabled {
+    color: #94a3b8;
+}
+
+/* Page Titles */
+QLabel.PageTitle {
+    color: #0f172a;
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 20px;
+    margin-top: 10px;
+}
+
+/* Section Containers / Cards */
+QFrame.Card, QFrame#ClientCard, QFrame#CardTotal, QFrame#CardProgress, QFrame#CardFinal {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+QLabel.CardTitle {
+    color: #334155;
+    font-size: 17px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+/* Inputs & Form Fields */
+QLineEdit, QComboBox, QDateEdit, QSpinBox, QTextEdit, QPlainTextEdit {
+    background-color: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    color: #0f172a;
+    padding: 10px 12px;
+    font-size: 14px;
+    selection-background-color: #bae6fd;
+    selection-color: #0f172a;
+}
+
+QLineEdit:focus, QComboBox:focus, QDateEdit:focus, QSpinBox:focus, QTextEdit:focus, QPlainTextEdit:focus {
+    border: 1px solid #3b82f6;
+    background-color: #ffffff;
+}
+
+/* App-wide: Remove up/down buttons from all QSpinBox & QDoubleSpinBox */
+QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
+    width: 0px;
+    height: 0px;
+    border: none;
+    background: transparent;
+}
+QSpinBox::up-arrow, QSpinBox::down-arrow, QDoubleSpinBox::up-arrow, QDoubleSpinBox::down-arrow {
+    image: none;
+    width: 0px;
+    height: 0px;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    color: #1e293b;
+    selection-background-color: #e2e8f0;
+    selection-color: #1e293b;
+    border: 1px solid #cbd5e1;
+    outline: none;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 20px;
+}
+
+QComboBox::down-arrow {
+    image: none; /* Can replace with a custom SVG arrow if available */
+}
+
+/* Labels */
+QLabel[class="FieldLabel"], QLabel {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Base Buttons */
+QPushButton {
+    background-color: #ffffff;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    min-height: 36px;
+}
+QPushButton:hover {
+    background-color: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+}
+QPushButton:pressed {
+    background-color: #e2e8f0;
+}
+
+/* Action Buttons */
+QPushButton[class="PrimaryButton"], QPushButton#PrimaryButton {
+    background-color: #2563eb;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-weight: 600;
+    font-size: 14px;
+    min-height: 38px;
+}
+
+QPushButton[class="PrimaryButton"]:hover, QPushButton#PrimaryButton:hover {
+    background-color: #1d4ed8;
+}
+
+QPushButton[class="PrimaryButton"]:pressed, QPushButton#PrimaryButton:pressed {
+    background-color: #1e40af;
+}
+
+QPushButton[class="SecondaryButton"], QPushButton#SecondaryButton {
+    background-color: #ffffff;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+    font-size: 13px;
+    min-height: 36px;
+}
+
+QPushButton[class="SecondaryButton"]:hover, QPushButton#SecondaryButton:hover {
+    background-color: #f8fafc;
+    border-color: #94a3b8;
+    color: #0f172a;
+}
+
+QPushButton[class="SecondaryButton"]:pressed, QPushButton#SecondaryButton:pressed {
+    background-color: #e2e8f0;
+}
+
+/* Special Button (e.g. Danger or specific actions) */
+QPushButton#DangerButton {
+    background-color: #ef4444;
+    color: white;
+    border: none;
+}
+QPushButton#DangerButton:hover {
+    background-color: #dc2626;
+}
+
+/* Status Notifications */
+QLabel.SuccessLabel {
+    color: #059669;
+    font-size: 13px;
+    font-weight: 700;
+}
+QLabel.ErrorLabel {
+    color: #dc2626;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* Tab Widget and Tab Bar Styling (Minimalist Streamlit Style) */
+QTabWidget::pane {
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    border-radius: 10px;
+    top: 0px;
+    padding: 4px;
+}
+
+/* Section tabs read as titles, not as text links: each one is a filled pill,
+   and the active section is a solid blue block. A thin underline was too quiet
+   to tell the notary which section is open at a glance. */
+QTabBar {
+    qproperty-drawBase: 0;
+    background: transparent;
+}
+QTabBar::tab {
+    background-color: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 11px 26px;
+    margin-right: 8px;
+    margin-bottom: 6px;
+    font-weight: 700;
+    font-size: 14px;
+    min-width: 110px;
+}
+QTabBar::tab:hover:!selected {
+    background-color: #e2e8f0;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+QTabBar::tab:selected {
+    background-color: #2563eb;
+    color: #ffffff;
+    border: 1px solid #1d4ed8;
+    font-weight: 800;
+}
+QTabBar::tab:disabled {
+    background-color: #f8fafc;
+    color: #cbd5e1;
+    border-color: #eef2f6;
+}
+
+/* Global QTableView and Tables styling */
+QTableView {
+    background-color: #ffffff;
+    color: #0f172a;
+    gridline-color: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    selection-background-color: #eff6ff;
+    selection-color: #1e3a8a;
+    alternate-background-color: #f8fafc;
+}
+
+QTableView::item {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+QTableView QTableCornerButton::section {
+    background-color: #ffffff;
+    border: none;
+}
+
+/* Headers Styling */
+QHeaderView::section {
+    background-color: #ffffff;
+    color: #64748b;
+    padding: 8px 10px;
+    border: none;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 600;
+    font-size: 12px;
+    text-align: left;
+}
+
+/* ScrollBar Styling */
+QScrollBar:vertical {
+    border: none;
+    background-color: transparent;
+    width: 8px;
+    margin: 0px;
+}
+
+QScrollBar::handle:vertical {
+    background-color: #cbd5e1;
+    min-height: 30px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background-color: #94a3b8;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    height: 0px;
+}
+
+QScrollBar:horizontal {
+    border: none;
+    background-color: transparent;
+    height: 8px;
+    margin: 0px;
+}
+
+QScrollBar::handle:horizontal {
+    background-color: #cbd5e1;
+    min-width: 30px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:horizontal:hover {
+    background-color: #94a3b8;
+}
+
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    width: 0px;
+}
+
+/* ── Calendar popup (QDateEdit with setCalendarPopup) ──────────────────────
+   A QCalendarWidget's day grid is a QTableView internally, so the global
+   "QTableView::item { padding: 8px 10px; border-bottom: ... }" rule above was
+   applied to every day cell. Seven padded columns no longer fit the popup, which
+   squeezed the numbers together and overlapped them. These rules reset the cell
+   metrics for the calendar only and leave data tables untouched. */
+QCalendarWidget {
+    background-color: #ffffff;
+    min-width: 320px;
+    min-height: 280px;
+}
+
+QCalendarWidget QWidget#qt_calendar_navigationbar {
+    background-color: #1e3a8a;
+    min-height: 34px;
+}
+
+QCalendarWidget QToolButton {
+    color: #ffffff;
+    background-color: transparent;
+    border: none;
+    margin: 2px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: 600;
+    min-height: 26px;
+}
+
+QCalendarWidget QToolButton:hover {
+    background-color: #2547a5;
+    border-radius: 4px;
+}
+
+QCalendarWidget QMenu {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+QCalendarWidget QSpinBox {
+    padding: 2px 4px;
+    font-size: 13px;
+}
+
+/* The day grid itself */
+QCalendarWidget QAbstractItemView {
+    background-color: #ffffff;
+    color: #0f172a;
+    border: none;
+    border-radius: 0px;
+    gridline-color: transparent;
+    outline: none;
+    selection-background-color: #3b82f6;
+    selection-color: #ffffff;
+    font-size: 13px;
+}
+
+/* Reset the inherited data-table cell padding: this is what broke the layout */
+QCalendarWidget QAbstractItemView::item {
+    padding: 0px;
+    margin: 0px;
+    border: none;
+    border-bottom: none;
+}
+
+/* The selected day must fill its cell. Without an explicit selected rule the
+   highlight collapsed to a thin bar and hid the day number underneath it. */
+QCalendarWidget QAbstractItemView::item:selected {
+    background-color: #3b82f6;
+    color: #ffffff;
+    border-radius: 4px;
+}
+
+QCalendarWidget QTableView {
+    border: none;
+    border-radius: 0px;
+    alternate-background-color: #ffffff;
+}
+
+QCalendarWidget QTableView::item {
+    padding: 0px;
+    border: none;
+    border-bottom: none;
+}
+
+/* Weekday header row */
+QCalendarWidget QWidget {
+    alternate-background-color: #ffffff;
+}
+
+QCalendarWidget QHeaderView::section {
+    background-color: #ffffff;
+    color: #64748b;
+    padding: 2px;
+    border: none;
+    font-weight: 600;
+    font-size: 12px;
+}

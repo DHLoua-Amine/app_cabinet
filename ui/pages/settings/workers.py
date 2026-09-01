@@ -45,6 +45,38 @@ class UpdateCheckThread(QThread):
             self.finished.emit(None)
 
 
+class UpdateDownloadThread(QThread):
+    progress = Signal(int)
+    finished = Signal(bool, str, str)  # (success, zip_path_or_err_msg, err_type)
+
+    def __init__(self, update_info: dict):
+        super().__init__()
+        self.update_info = update_info
+
+    def run(self):
+        from updater import download_and_verify_update
+        try:
+            d_url = self.update_info.get("download_url", "")
+            s_url = self.update_info.get("sha256_url", "")
+            asset_api_url = self.update_info.get("asset_api_url", "")
+            sha256_api_url = self.update_info.get("sha256_api_url", "")
+
+            zip_path = download_and_verify_update(
+                download_url=d_url,
+                sha256_url=s_url,
+                asset_api_url=asset_api_url,
+                sha256_api_url=sha256_api_url,
+                progress_callback=self.progress.emit
+            )
+            self.finished.emit(True, zip_path, "")
+        except ValueError as val_err:
+            self.finished.emit(False, str(val_err), "sha256_mismatch")
+        except ConnectionError as conn_err:
+            self.finished.emit(False, str(conn_err), "network_error")
+        except Exception as e:
+            self.finished.emit(False, str(e), "general_error")
+
+
 class ArchiveImportThread(QThread):
     finished = Signal(dict)
     
@@ -67,3 +99,4 @@ class ArchiveImportThread(QThread):
                 "faces_extracted": 0,
                 "logs": [f" خطأ غير متوقع أثناء الاستيراد: {str(e)}"]
             })
+

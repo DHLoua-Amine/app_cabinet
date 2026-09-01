@@ -3,10 +3,21 @@
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
-    binaries=[],
+    pathex=['.', 'core'],
     datas=[('assets', 'assets'), ('core/models', 'core/models')],
-    hiddenimports=[],
+    hiddenimports=[
+        'ui.pages.settings_page',
+        'ui.pages.register_page',
+        'ui.pages.clients_page',
+        'ui.pages.accounting_page',
+        'ui.pages.fiche_client_page',
+        'ui.pages.home_page',
+        'ui.pages.scanner_page',
+        'ui.pages.presence_page',
+        'ui.pages.settings.workers',
+    ],
+
+
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

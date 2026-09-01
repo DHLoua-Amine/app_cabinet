@@ -125,6 +125,13 @@ def _now() -> str:
 
 
 def get_user(username: str) -> dict | None:
+    import reception
+    if reception.is_remote():
+        u = str(username).strip().lower()
+        if u in (DEFAULT_ADMIN, DEFAULT_SECRETARY):
+            r = ROLE_ADMIN if u == DEFAULT_ADMIN else ROLE_SECRETARY
+            return {"username": u, "role": r, "display_name": "", "must_change": 0}
+        return None
     init_user_store()
     with _cursor() as c:
         row = c.execute(
@@ -134,6 +141,15 @@ def get_user(username: str) -> dict | None:
 
 
 def list_users() -> list:
+    import reception
+    if reception.is_remote():
+        import office_profile
+        prof = office_profile.load()
+        notary_disp = office_profile.display_name(prof) or "عدل الإشهاد"
+        return [
+            {"username": DEFAULT_ADMIN, "role": permissions.ROLE_ADMIN, "display_name": notary_disp},
+            {"username": DEFAULT_SECRETARY, "role": permissions.ROLE_SECRETARY, "display_name": "الكاتبة / Secrétaire"}
+        ]
     init_user_store()
     with _cursor() as c:
         rows = c.execute(
@@ -143,6 +159,9 @@ def list_users() -> list:
 
 
 def user_count() -> int:
+    import reception
+    if reception.is_remote():
+        return 2
     init_user_store()
     with _cursor() as c:
         return c.execute(f"SELECT COUNT(*) AS n FROM {_USERS_TABLE}").fetchone()["n"]

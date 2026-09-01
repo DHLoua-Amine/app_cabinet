@@ -3,10 +3,17 @@ import os
 import traceback
 from pathlib import Path
 
-# Add core and root directories to path for imports
-BASE_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE_DIR))
-sys.path.insert(0, str(BASE_DIR / "core"))
+# Add core and root directories to path for imports (supports PyInstaller frozen mode)
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys.executable).resolve().parent
+    MEI_DIR = Path(getattr(sys, '_MEIPASS', BASE_DIR))
+    sys.path.insert(0, str(MEI_DIR))
+    sys.path.insert(0, str(MEI_DIR / "core"))
+else:
+    BASE_DIR = Path(__file__).resolve().parent
+    sys.path.insert(0, str(BASE_DIR))
+    sys.path.insert(0, str(BASE_DIR / "core"))
+
 
 
 # ── Nothing below this line may fail silently ────────────────────────────────

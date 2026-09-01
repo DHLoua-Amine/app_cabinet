@@ -35,11 +35,19 @@ import camera as camera_core
 from ui.services.camera_service import CameraService, CameraState
 from ui.components.camera_status_bar import CameraStatusBar, DetectionToast
 
-# The eight page modules are imported inside _create_page(), not here. Importing them all
-# up front dragged in pandas, reportlab and openpyxl and cost several seconds before the
-# window appeared, even though only the Accueil page is visible at launch.
+# Static import hints for PyInstaller AST module collector (hidden from runtime execution)
+if False:
+    import ui.pages.settings_page
+    import ui.pages.register_page
+    import ui.pages.clients_page
+    import ui.pages.accounting_page
+    import ui.pages.fiche_client_page
+    import ui.pages.home_page
+    import ui.pages.scanner_page
+    import ui.pages.presence_page
 
 class MainWindow(QMainWindow):
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.resize(1350, 900)
@@ -405,11 +413,14 @@ class MainWindow(QMainWindow):
 
     def open_fiche_client(self, client_id):
         fiche = self._get_page("fiche")
-        fiche.client_id = client_id
-        fiche.is_new = (client_id is None or client_id == "" or client_id == "NEW")
-
-        if fiche.is_new:
+        is_new = (client_id is None or client_id == "" or client_id == "NEW")
+        if is_new:
+            fiche.client_id = reception.generate_client_id()
+            fiche.is_new = True
             fiche.init_empty_client()
+        else:
+            fiche.client_id = client_id
+            fiche.is_new = False
         
         fiche.load_client_data()
 

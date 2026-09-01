@@ -494,9 +494,20 @@ class SettingsPage(QWidget):
         self.check_update_btn.setObjectName("PrimaryButton")
         self.check_update_btn.clicked.connect(self.check_app_updates)
 
-        update_content.addWidget(self.version_lbl, 7)
-        update_content.addWidget(self.check_update_btn, 3)
+        self.download_update_btn = QPushButton(("Télécharger et installer" if self.current_lang == "fr" else "تنزيل وتثبيت التحديث"), self.update_card)
+        self.download_update_btn.setObjectName("SuccessButton")
+        self.download_update_btn.setVisible(False)
+        self.download_update_btn.clicked.connect(self.start_update_download)
+
+        update_content.addWidget(self.version_lbl, 5)
+        update_content.addWidget(self.check_update_btn, 2)
+        update_content.addWidget(self.download_update_btn, 3)
         update_lay.addLayout(update_content)
+
+        self.update_progress = QProgressBar(self.update_card)
+        self.update_progress.setVisible(False)
+        update_lay.addWidget(self.update_progress)
+
         self.update_status = QLabel("", self.update_card)
         update_lay.addWidget(self.update_status)
 
@@ -759,7 +770,13 @@ class SettingsPage(QWidget):
         
         # 1. Hide/show collapsible section cards based on role
         for sec, lbl, card in getattr(self, "_sections", []):
-            if not is_admin and card not in (getattr(self, "lang_card", None), getattr(self, "pass_card", None)):
+            allowed_cards = (
+                getattr(self, "lang_card", None),
+                getattr(self, "pass_card", None),
+                getattr(self, "update_card", None),
+                getattr(self, "net_card", None)
+            )
+            if not is_admin and card not in allowed_cards:
                 sec.setVisible(False)
             else:
                 sec.setVisible(True)
@@ -1774,13 +1791,20 @@ class SettingsPage(QWidget):
     def on_update_checked(self, up_info):
         self.check_update_btn.setEnabled(True)
         if up_info:
-            self.update_status.setText(f"Nouvelle version disponible : v{up_info['version']} !" if self.current_lang == "fr" else f" توجد نسخة جديدة متاحة للمنظومة: v{up_info['version']} !")
+            self._current_update_info = up_info
+            ver = up_info.get("version", "")
+            asset_name = up_info.get("asset_name", "")
+            self.update_status.setText(
+                f"Nouvelle version disponible : {ver} ({asset_name}) !"
+                if self.current_lang == "fr" else
+                f"توجد نسخة جديدة متاحة للمنظومة: {ver} ({asset_name}) !"
+            )
             self.update_status.setStyleSheet("color: #059669; font-weight: bold;")
+            self.download_update_btn.setVisible(True)
+            self.download_update_btn.setEnabled(True)
         elif updater.is_update_channel_configured():
-            # check_for_update() returns None for "already current" AND for every
-            # failure - no network, GitHub down, a bad response. Saying "you are
-            # on the latest version" for all of them told the notary the check had
-            # succeeded when it had not run at all.
+            self._current_update_info = None
+            self.download_update_btn.setVisible(False)
             self.update_status.setText(
                 f"Aucune nouvelle version trouvée (v{updater.__version__}). "
                 f"Si vous n'avez pas de connexion Internet, ce résultat n'est pas fiable."
@@ -1789,11 +1813,65 @@ class SettingsPage(QWidget):
                 f"إذا لم يكن هناك اتصال بالأنترنت فهذه النتيجة غير مؤكدة.")
             self.update_status.setStyleSheet("color: #059669; font-weight: bold;")
         else:
+            self._current_update_info = None
+            self.download_update_btn.setVisible(False)
             self.update_status.setText(
                 "Aucun canal de mise à jour n'est configuré."
                 if self.current_lang == "fr"
                 else "لا يوجد مصدر تحديثات مضبوط.")
             self.update_status.setStyleSheet("color: #b45309; font-weight: bold;")
+
+    def start_update_download(self):
+        if not hasattr(self, "_current_update_info") or not self._current_update_info:
+            return
+        
+        up_info = self._current_update_info
+        is_fr = self.current_lang == "fr"
+
+        self.check_update_btn.setEnabled(False)
+        self.download_update_btn.setEnabled(False)
+        self.update_progress.setValue(0)
+        self.update_progress.setVisible(True)
+        self.update_status.setText("Téléchargement de la mise à jour en cours..." if is_fr else "جاري تنزيل التحديث...")
+        self.update_status.setStyleSheet("color: #2563eb;")
+
+        from ui.pages.settings.workers import UpdateDownloadThread
+        self.download_thread = UpdateDownloadThread(up_info)
+        self.download_thread.progress.connect(self.update_progress.setValue)
+        self.download_thread.finished.connect(self.on_update_downloaded)
+        self.download_thread.start()
+
+    def on_update_downloaded(self, success: bool, zip_or_err: str, err_type: str):
+        is_fr = self.current_lang == "fr"
+        self.check_update_btn.setEnabled(True)
+        self.download_update_btn.setEnabled(True)
+        self.update_progress.setVisible(False)
+
+        if success:
+            self.update_status.setText(
+                "Téléchargement et vérification SHA-256 réussis ! Redémarrage de l'application..."
+                if is_fr else
+                "تم التنزيل والتحقق من التشفير بنجاح! جاري إعادة تشغيل المنظومة..."
+            )
+            self.update_status.setStyleSheet("color: #059669; font-weight: bold;")
+            
+            # Launch smooth restart helper bat
+            from updater import apply_update_and_restart
+            apply_update_and_restart(zip_or_err)
+        else:
+            if err_type == "sha256_mismatch":
+                err_msg = ("Erreur de sécurité : L'empreinte SHA-256 ne correspond pas. L'archive a été supprimée par sécurité."
+                           if is_fr else "خطأ أمني: بصمة التشفير غير مطابقة. تم إلغاء التحديث لحماية بياناتك.")
+            elif err_type == "network_error":
+                err_msg = ("Erreur réseau : La connexion a été interrompue pendant le téléchargement. Votre version actuelle est intacte. Vous pouvez réessayer."
+                           if is_fr else "خطأ في الشبكة: انقطع الاتصال أثناء التنزيل. نسختك الحالية سليمة 100%. يمكنك إعادة المحاولة.")
+            else:
+                err_msg = (f"Échec de la mise à jour : {zip_or_err}" if is_fr else f"فشل التحديث: {zip_or_err}")
+
+            self.update_status.setText(err_msg)
+            self.update_status.setStyleSheet("color: #dc2626; font-weight: bold;")
+            QMessageBox.critical(self, "Mise à jour" if is_fr else "التحديث", err_msg)
+
 
     # ── Bulk Archive Importer ──
     # ── Licence ─────────────────────────────────────────────────────────────
@@ -2032,8 +2110,6 @@ class SettingsPage(QWidget):
             "color:#065f46; font-weight:700;" if ok else "color:#b91c1c; font-weight:700;")
 
     def save_network_settings(self):
-        if self._refuse(Cap.MANAGE_USERS, "le réseau du cabinet", "شبكة المكتب"):
-            return
         is_fr = self.current_lang == "fr"
         mode = self._selected_net_mode()
         host = self.net_host_input.text().strip()

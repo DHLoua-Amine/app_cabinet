@@ -78,9 +78,66 @@ def is_update_channel_configured(repo_owner_repo=None) -> bool:
     return bool(repo) and "OWNER" not in repo and "/" in repo
 
 
+class _PrivateRepoRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """
+    Custom redirect handler that strips GitHub Bearer Authorization header when redirecting
+    to external S3/CDN storage URLs (to prevent AWS S3 HTTP 400 InvalidArgument errors).
+    """
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        new_req = super().redirect_request(req, fp, code, msg, headers, newurl)
+        if new_req and "api.github.com" not in newurl.lower():
+            new_req.headers.pop("Authorization", None)
+            new_req.headers.pop("authorization", None)
+        return new_req
+
+
+def get_github_token() -> str:
+    """
+    Retrieves the GitHub Personal Access Token for private repository releases.
+    Order of precedence:
+    1. Environment variable `GITHUB_UPDATE_TOKEN`.
+    2. Token string or base64 encoded token in version module (`ENCODED_GITHUB_TOKEN`).
+    """
+    token = os.environ.get("GITHUB_UPDATE_TOKEN", "").strip()
+    if token:
+        return token
+    try:
+        import version as _v
+        raw = getattr(_v, "ENCODED_GITHUB_TOKEN", "").strip()
+        if raw:
+            if raw.startswith("github_pat_") or raw.startswith("ghp_"):
+                return raw
+            import base64
+            try:
+                decoded = base64.b64decode(raw.encode("ascii")).decode("utf-8").strip()
+                if decoded.startswith("github_pat_") or decoded.startswith("ghp_"):
+                    return decoded
+                return decoded
+            except Exception:
+                return raw
+    except Exception:
+        pass
+    return ""
+
+
+
+def make_github_request(url: str, is_asset_download: bool = False) -> urllib.request.Request:
+    """
+    Prepares a urllib.request.Request with proper User-Agent, Authorization Bearer token
+    (if configured), and Accept header for GitHub REST API or asset downloads.
+    """
+    token = get_github_token()
+    headers = {"User-Agent": "CabinetNotarialZarai-AutoUpdater"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    if is_asset_download:
+        headers["Accept"] = "application/octet-stream"
+    return urllib.request.Request(url, headers=headers)
+
+
 def check_for_update(repo_owner_repo=None, current_version: str = __version__) -> dict | None:
     """
-    Vérifie l'existence d'une nouvelle version sur GitHub Releases (API publique REST).
+    Vérifie l'existence d'une nouvelle version sur GitHub Releases (API REST).
     Ne bloque jamais l'application en cas d'absence d'Internet (Timeout 5s).
     """
     if repo_owner_repo is None:
@@ -91,13 +148,14 @@ def check_for_update(repo_owner_repo=None, current_version: str = __version__) -
         return None
 
     url = f"https://api.github.com/repos/{repo_owner_repo}/releases/latest"
-    req = urllib.request.Request(
-        url,
-        headers={"User-Agent": "CabinetNotarialZarai-AutoUpdater"}
-    )
+    req = make_github_request(url)
 
     try:
-        with urllib.request.urlopen(req, timeout=5, context=_ssl_ctx()) as response:
+        opener = urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=_ssl_ctx()),
+            _PrivateRepoRedirectHandler()
+        )
+        with opener.open(req, timeout=5) as response:
             if response.status != 200:
                 log_startup_event(f"Échec API GitHub (Status Code {response.status}).")
                 return None
@@ -119,23 +177,31 @@ def check_for_update(repo_owner_repo=None, current_version: str = __version__) -
         return None
 
     download_url = ""
+    asset_api_url = ""
     asset_name = ""
     asset_size = 0
     sha256_url = ""
+    sha256_api_url = ""
 
     assets = data.get("assets", [])
-    for asset in assets:
+    # Prioritize .exe assets over .zip if available
+    for asset in sorted(assets, key=lambda a: 0 if a.get("name", "").lower().endswith(".exe") else 1):
         name = asset.get("name", "").lower()
-        if name.endswith(".zip"):
+        if name.endswith(".exe") or name.endswith(".zip"):
             download_url = asset.get("browser_download_url", "")
+            asset_api_url = asset.get("url", "")
             asset_name = asset.get("name", "")
             asset_size = asset.get("size", 0)
+            if name.endswith(".exe"):
+                break
         elif "sha256" in name:
             sha256_url = asset.get("browser_download_url", "")
+            sha256_api_url = asset.get("url", "")
 
-    if not download_url:
-        log_startup_event(f"Mise à jour {tag_name} détectée mais aucun binaire .zip trouvé.")
+    if not download_url and not asset_api_url:
+        log_startup_event(f"Mise à jour {tag_name} détectée mais aucun binaire .exe ou .zip trouvé.")
         return None
+
 
     log_startup_event(f" NOUVELLE MISE À JOUR TROUVÉE : {tag_name} (Asset: {asset_name}, Taille: {asset_size} bytes).")
 
@@ -143,7 +209,9 @@ def check_for_update(repo_owner_repo=None, current_version: str = __version__) -
         "version": tag_name,
         "changelog": data.get("body", "Mise à jour disponible."),
         "download_url": download_url,
+        "asset_api_url": asset_api_url,
         "sha256_url": sha256_url,
+        "sha256_api_url": sha256_api_url,
         "asset_name": asset_name,
         "asset_size": asset_size
     }
@@ -180,48 +248,73 @@ def prompt_user_update(update_info: dict) -> bool:
         return True
 
 
-def download_and_verify_update(download_url: str, sha256_url: str = "") -> str:
+def download_and_verify_update(download_url: str, sha256_url: str = "", asset_api_url: str = "", sha256_api_url: str = "", progress_callback=None) -> str:
     """
-    Télécharge l'archive .zip de mise à jour ET vérifie son empreinte SHA256 si disponible.
+    Télécharge le binaire .exe ou l'archive .zip de mise à jour ET vérifie son empreinte SHA256 si disponible.
+    Prend en charge les dépôts publics et privés (via asset_api_url).
     """
     temp_dir = Path(tempfile.gettempdir()) / "cabinet_notarial_update"
     temp_dir.mkdir(parents=True, exist_ok=True)
-    zip_path = temp_dir / "update.zip"
+    
+    ext = ".exe" if (download_url and download_url.lower().endswith(".exe")) else ".zip"
+    file_path = temp_dir / f"update{ext}"
 
-    log_startup_event(f"Début du téléchargement du zip depuis : {download_url}")
+    # Prefer asset_api_url for private repo asset downloads if token is available
+    target_url = asset_api_url if (asset_api_url and get_github_token()) else download_url
+    log_startup_event(f"Début du téléchargement du binaire/zip depuis : {target_url}")
 
-    req = urllib.request.Request(download_url, headers={"User-Agent": "CabinetNotarialZarai-AutoUpdater"})
+    req = make_github_request(target_url, is_asset_download=bool(asset_api_url and get_github_token()))
     hasher = hashlib.sha256()
 
-    with urllib.request.urlopen(req, timeout=60, context=_ssl_ctx()) as response, open(zip_path, 'wb') as out_file:
-        while True:
-            buffer = response.read(65536)
-            if not buffer:
-                break
-            hasher.update(buffer)
-            out_file.write(buffer)
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=_ssl_ctx()),
+        _PrivateRepoRedirectHandler()
+    )
+
+    try:
+        with opener.open(req, timeout=60) as response, open(file_path, 'wb') as out_file:
+            content_length = response.headers.get('Content-Length')
+            total_bytes = int(content_length) if content_length and content_length.isdigit() else 0
+            downloaded_bytes = 0
+
+            while True:
+                buffer = response.read(65536)
+                if not buffer:
+                    break
+                hasher.update(buffer)
+                out_file.write(buffer)
+                downloaded_bytes += len(buffer)
+                if progress_callback and total_bytes > 0:
+                    percent = int((downloaded_bytes / total_bytes) * 100)
+                    progress_callback(percent)
+    except Exception as download_err:
+        file_path.unlink(missing_ok=True)
+        log_startup_event(f"Échec du téléchargement réseau : {download_err}")
+        raise ConnectionError(f"Coupure réseau ou problème de téléchargement: {download_err}")
 
     downloaded_hash = hasher.hexdigest().lower()
     log_startup_event(f"Téléchargement terminé. SHA256 calculé : {downloaded_hash}")
 
-    # Vérification du SHA256 via SHA256SUMS.txt si fourni
-    if sha256_url:
+    # Checksum verification
+    target_sha_url = sha256_api_url if (sha256_api_url and get_github_token()) else sha256_url
+    if target_sha_url:
         try:
-            req_sum = urllib.request.Request(sha256_url, headers={"User-Agent": "CabinetNotarialZarai-AutoUpdater"})
-            with urllib.request.urlopen(req_sum, timeout=10, context=_ssl_ctx()) as resp:
+            req_sum = make_github_request(target_sha_url, is_asset_download=bool(sha256_api_url and get_github_token()))
+            with opener.open(req_sum, timeout=15) as resp:
                 sum_text = resp.read().decode('utf-8')
                 expected_hash = sum_text.split()[0].lower()
                 if downloaded_hash != expected_hash:
                     log_startup_event(f" ERREUR CRITIQUE SÉCURITÉ : SHA256 Discordant ! Attendu: {expected_hash}, Obtenu: {downloaded_hash}")
-                    zip_path.unlink(missing_ok=True)
+                    file_path.unlink(missing_ok=True)
                     raise ValueError("SHA256 Checksum Mismatch! Transmission aborted for security.")
                 log_startup_event("Vérification SHA256 validée à 100% !")
         except Exception as e:
-            if "SHA256" in str(e):
+            if "SHA256 Checksum Mismatch" in str(e):
+                file_path.unlink(missing_ok=True)
                 raise
-            log_startup_event("Avertissement : Fichier SHA256SUMS.txt introuvable ou illisible sur la release, validation par zipfile::OpenRead.")
+            log_startup_event(f"Avertissement : Fichier SHA256SUMS.txt non validé ({e}), validation par ouverture de fichier.")
 
-    return str(zip_path)
+    return str(file_path)
 
 
 def get_current_pid_and_install_dir() -> tuple[int, str]:
@@ -264,7 +357,7 @@ def apply_update_and_restart(zip_path: str, install_dir: str = None, current_pid
     1. Fermeture douce du processus avec vérification `tasklist`.
     2. Vérification d'espace disque disponible avant sauvegarde.
     3. Sauvegarde de l'ancienne version avant écrasement.
-    4. Test d'intégrité ZIP et Rollback automatique si échec.
+    4. Remplacement direct .exe ou extraction ZIP et Rollback automatique si échec.
     """
     if not install_dir or not current_pid:
         pid, path_dir = get_current_pid_and_install_dir()
@@ -280,7 +373,19 @@ def apply_update_and_restart(zip_path: str, install_dir: str = None, current_pid
     vbs_path = temp_dir / "run_silent_update.vbs"
     backup_dir = temp_dir / f"CabinetNotarialZarai_backup_v{__version__}"
 
-    log_startup_event(f"Préparation du script d'installation helper (Dossier Cible : '{install_dir}')...")
+    file_p = Path(zip_path).resolve()
+    is_exe = str(file_p).lower().endswith(".exe")
+
+    target_exe_name = Path(sys.executable).name if getattr(sys, 'frozen', False) else "CabinetNotarialZarai.exe"
+    
+    if is_exe:
+        integrity_cmd = f'if exist "{file_p}" ( exit 0 ) else ( exit 1 )'
+        install_cmd = f'copy /Y "{file_p}" "{install_dir}\\{target_exe_name}"'
+    else:
+        integrity_cmd = f'powershell -Command "try {{ $null = [System.IO.Compression.ZipFile]::OpenRead(\'{file_p}\'); exit 0 }} catch {{ exit 1 }}"'
+        install_cmd = f'powershell -Command "Expand-Archive -Path \'{file_p}\' -DestinationPath \'{install_dir}\' -Force"'
+
+    log_startup_event(f"Préparation du script d'installation helper (Cible : '{install_dir}', Mode : {'EXE' if is_exe else 'ZIP'})...")
 
     bat_content = f"""@echo off
 title Auto-Update Helper — {APP_NAME}
@@ -311,18 +416,18 @@ if %errorlevel% neq 0 (
     echo [ERREUR DISQUE] Espace disque insuffisant pour créer la sauvegarde et extraire la mise à jour !
     msg %username% "Erreur de mise à jour: Espace disque insuffisant sur votre PC. Libérez de l'espace et réessayez."
     cd /d "{install_dir}"
-    if exist "CabinetNotarialZarai.exe" ( start "" "CabinetNotarialZarai.exe" ) else ( start /b py -3 -m streamlit run app.py --server.port=8501 )
+    if exist "{target_exe_name}" ( start "" "{target_exe_name}" ) else ( start /b py -3 main.py )
     del "{script_path}"
     exit
 )
 
-:: ÉTAPE 3 : VÉRIFICATION D'INTÉGRITÉ NATIVE POWERSHELL AVANT EXTRACTION
-powershell -Command "try {{ $null = [System.IO.Compression.ZipFile]::OpenRead('{zip_path}'); exit 0 }} catch {{ exit 1 }}"
+:: ÉTAPE 3 : VÉRIFICATION D'INTÉGRITÉ AVANT DÉPLOIEMENT
+{integrity_cmd}
 if %errorlevel% neq 0 (
-    echo [ERREUR CRITIQUE] Le fichier ZIP téléchargé est corrompu ! Annulation.
-    msg %username% "Erreur de mise à jour: Archive corrompue. L'application va redémarrer sur la version actuelle."
+    echo [ERREUR CRITIQUE] Fichier de mise à jour corrompu ! Annulation.
+    msg %username% "Erreur de mise à jour: Fichier corrompu. L'application va redémarrer sur la version actuelle."
     cd /d "{install_dir}"
-    if exist "CabinetNotarialZarai.exe" ( start "" "CabinetNotarialZarai.exe" ) else ( start /b py -3 -m streamlit run app.py --server.port=8501 )
+    if exist "{target_exe_name}" ( start "" "{target_exe_name}" ) else ( start /b py -3 main.py )
     del "{script_path}"
     exit
 )
@@ -332,22 +437,22 @@ if exist "{backup_dir}" rmdir /S /Q "{backup_dir}"
 mkdir "{backup_dir}" >nul 2>&1
 xcopy /E /I /Y /Q "{install_dir}" "{backup_dir}" >nul 2>&1
 
-:: EXTRACTION DE LA NOUVELLE VERSION OVERWRITE
-powershell -Command "Expand-Archive -Path '{zip_path}' -DestinationPath '{install_dir}' -Force"
+:: ÉCRASEMENT / DEPLOIEMENT DE LA NOUVELLE VERSION
+{install_cmd}
 if %errorlevel% neq 0 (
-    echo [ERREUR EXTRACTION] Échec de l'extraction. Restauration de la sauvegarde précédente...
+    echo [ERREUR DEPLOIEMENT] Échec de l'installation. Restauration de la sauvegarde précédente...
     xcopy /E /I /Y /Q "{backup_dir}" "{install_dir}" >nul 2>&1
-    msg %username% "Échec d'extraction: Votre ancienne version a été restaurée automatiquement."
+    msg %username% "Échec de l'installation: Votre ancienne version a été restaurée automatiquement."
 )
 
 :: RELANCEMENT SÉCURISÉ DE L'APPLICATION
 cd /d "{install_dir}"
-if exist "CabinetNotarialZarai.exe" (
-    start "" "CabinetNotarialZarai.exe"
+if exist "{target_exe_name}" (
+    start "" "{target_exe_name}"
 ) else if exist "Lancer_Application.bat" (
     start "" "Lancer_Application.bat"
 ) else (
-    start /b py -3 -m streamlit run app.py --server.port=8501
+    start /b py -3 main.py
 )
 
 :: SUPPRESSION DU BACKUP TEMPORAIRE APRÈS SUCCÈS

@@ -133,6 +133,8 @@ class FicheClientPage(QWidget):
         self.load_client_data()
 
     def init_empty_client(self):
+        if not getattr(self, "client_id", None) or self.client_id == "NEW":
+            self.client_id = reception.generate_client_id()
         self.client_data = {
             "client_id": self.client_id,
             "nom": "", "prenom": "", "full_name": "",

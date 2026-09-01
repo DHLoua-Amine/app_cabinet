@@ -124,15 +124,128 @@ class LoginDialog(QDialog):
         self.forgot_btn.setProperty("class", "SecondaryButton")
         self.forgot_btn.clicked.connect(self.forgot_password)
 
+        self.net_btn = QPushButton(
+            self.tr("🌐 Réseau", "🌐 شبكة المكتب"), self)
+        self.net_btn.setProperty("class", "SecondaryButton")
+        self.net_btn.setToolTip(self.tr("Lier cet ordinateur au serveur du cabinet", "ربط هذا الجهاز بشبكة المكتب"))
+        self.net_btn.clicked.connect(self.open_network_dialog)
+
         self.quit_btn = QPushButton(self.tr("Quitter", "خروج"), self)
         self.quit_btn.clicked.connect(self.reject)
 
         btns.addWidget(self.login_btn, 2)
         btns.addWidget(self.forgot_btn, 2)
+        btns.addWidget(self.net_btn, 2)
         btns.addWidget(self.quit_btn, 1)
         lay.addLayout(btns)
 
         self._maybe_first_run()
+
+    def open_network_dialog(self):
+        import config
+        from PySide6.QtWidgets import QApplication
+        cfg = config.load_network_config()
+        
+        box = QDialog(self)
+        box.setModal(True)
+        box.setWindowTitle(self.tr("Réseau du Cabinet (Lier au Serveur)", "إعدادات شبكة المكتب"))
+        box.setMinimumWidth(440)
+        v = QVBoxLayout(box)
+        v.setSpacing(12)
+
+        hint = QLabel(self.tr(
+            "Configurez la connexion au PC serveur du Notaire pour partager la base de données :",
+            "قم بربط هذا الجهاز بجهاز الأستاذ (الخادم) لمشاركة قاعدة البيانات :"), box)
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color:#475569; font-size:12px;")
+        v.addWidget(hint)
+
+        # Mode
+        mode_row = QHBoxLayout()
+        mode_row.addWidget(QLabel(self.tr("Mode :", "الوضع :"), box))
+        mode_combo = QComboBox(box)
+        mode_combo.addItems([
+            self.tr("Autonome (Un seul poste)", "مستقل — جهاز واحد"),
+            self.tr("Poste de travail (Connecté au serveur)", "جهاز عمل — متصل بالخادم")
+        ])
+        if cfg.get("mode") == config.MODE_WORKSTATION:
+            mode_combo.setCurrentIndex(1)
+        else:
+            mode_combo.setCurrentIndex(0)
+        mode_row.addWidget(mode_combo, 1)
+        v.addLayout(mode_row)
+
+        # Host
+        host_row = QHBoxLayout()
+        host_row.addWidget(QLabel(self.tr("Adresse IP du serveur :", "عنوان الخادم IP :"), box))
+        host_input = QLineEdit(box)
+        host_input.setText(cfg.get("host") or "")
+        host_input.setPlaceholderText("ex: 192.168.1.15")
+        host_row.addWidget(host_input, 1)
+        v.addLayout(host_row)
+
+        # Token
+        token_row = QHBoxLayout()
+        token_row.addWidget(QLabel(self.tr("Clé d'accès / Token :", "مفتاح الدخول :"), box))
+        token_input = QLineEdit(box)
+        token_input.setText(cfg.get("token") or "")
+        token_row.addWidget(token_input, 1)
+        v.addLayout(token_row)
+
+        status_lbl = QLabel("", box)
+        status_lbl.setWordWrap(True)
+        v.addWidget(status_lbl)
+
+        btn_row = QHBoxLayout()
+        save_btn = QPushButton(self.tr("Tester & Enregistrer", "اختبار الاتصال والحفظ"), box)
+        save_btn.setProperty("class", "PrimaryButton")
+        cancel_btn = QPushButton(self.tr("Annuler", "إلغاء"), box)
+        cancel_btn.clicked.connect(box.reject)
+
+        def do_save():
+            is_workstation = (mode_combo.currentIndex() == 1)
+            target_mode = config.MODE_WORKSTATION if is_workstation else config.MODE_STANDALONE
+            host = host_input.text().strip()
+            token = token_input.text().strip()
+            port = config.DEFAULT_DB_PORT
+
+            if is_workstation:
+                if not host or not token:
+                    status_lbl.setText(self.tr("L'adresse IP et la clé sont obligatoires !", "العنوان والمفتاح ضروريان !"))
+                    status_lbl.setStyleSheet("color:#dc2626; font-weight:bold;")
+                    return
+                status_lbl.setText(self.tr("Vérification de la connexion au serveur...", "جاري فحص الاتصال بالخادم..."))
+                status_lbl.setStyleSheet("color:#2563eb; font-weight:bold;")
+                QApplication.processEvents()
+
+                from db_client import probe
+                ok, msg = probe(host, port, token)
+                if not ok:
+                    status_lbl.setText(self.tr(f"Impossible de joindre le serveur : {msg}", f"لم يستجب الخادم : {msg}"))
+                    status_lbl.setStyleSheet("color:#dc2626; font-weight:bold;")
+                    return
+
+            config.save_network_config({
+                "mode": target_mode,
+                "host": host,
+                "port": port,
+                "token": token
+            })
+            QMessageBox.information(
+                box, self.tr("Réseau du cabinet", "شبكة المكتب"),
+                self.tr("Configuration enregistrée avec succès !", "تم حفظ الإعدادات بنجاح!"))
+            box.accept()
+            self.status.setText("")
+            self._reload_accounts()
+            self._maybe_first_run()
+
+        save_btn.clicked.connect(do_save)
+        btn_row.addStretch()
+        btn_row.addWidget(save_btn)
+        btn_row.addWidget(cancel_btn)
+        v.addLayout(btn_row)
+
+        box.exec()
 
     def _reload_accounts(self):
         self.user_combo.clear()

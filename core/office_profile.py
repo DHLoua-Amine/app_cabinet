@@ -50,6 +50,12 @@ FIELDS = [
      "المحكمة بالفرنسية", "Tribunal (français)"),
     ("address_fr",      "",
      "العنوان بالفرنسية", "Adresse (français)"),
+    ("jaliss_title",   "الأستاذ",
+     "لقب الجليس (عدل الإشهاد الثاني)", "Titre du co-notaire"),
+    ("jaliss_name",    "",
+     "اسم ولقب الجليس (عدل الإشهاد الثاني)", "Nom du co-notaire"),
+    ("jaliss_cin",     "",
+     "رقم بطاقة تعريف الجليس", "CIN du co-notaire"),
 ]
 
 DEFAULTS = {k: d for k, d, _ar, _fr in FIELDS}

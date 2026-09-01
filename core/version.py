@@ -8,7 +8,7 @@ APP_NAME    = "Cabinet Notarial"
 # ── GitHub ────────────────────────────────────────────────────────────────────
 GITHUB_REPO_RELEASES = "DHLoua-Amine/app_cabinet"  # Dépôt officiel des mises à jour
 UPDATE_MODE          = "confirm"   # "confirm" | "silent" | "forced"
-ENCODED_GITHUB_TOKEN = "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"
+ENCODED_GITHUB_TOKEN = "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"
 
 
 # ── Licence ───────────────────────────────────────────────────────────────────

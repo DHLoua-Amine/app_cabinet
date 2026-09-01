@@ -109,7 +109,7 @@ class MainWindow(QMainWindow):
             ("home", "الرئيسية والكاميرا", "Accueil & Caméra", True),
             ("register", "سجل الملفات", "Registre des Dossiers", True),
             ("clients", "دليل الحرفاء", "Répertoire des Clients", True),
-            ("fiche", "بطاقة حريف", "Fiche Client", False),
+            ("fiche", "بطاقة حريف", "Fiche Client", True),
             ("presence", "سجل الحضور والزيارات", "Journal de Présence", True), # Enabled
             ("compta", "المحاسبة والمالية", "Comptabilité", True),
             ("scanner", "الماسح والتلخيص الذكي", "Scanner IA", True),

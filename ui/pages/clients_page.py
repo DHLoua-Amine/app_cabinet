@@ -99,11 +99,13 @@ class ClientCard(QFrame):
         badge_layout = QHBoxLayout()
         dossiers_lbl = "dossier(s)" if self.lang == "fr" else "ملف(ات)"
         self.badge_lbl = QLabel(f" {self.case_count} {dossiers_lbl}", self)
-        self.badge_lbl.setStyleSheet("""            QLabel {
+        self.badge_lbl.setFixedHeight(26)
+        self.badge_lbl.setStyleSheet("""
+            QLabel {
                 background-color: #e0f2fe;
                 color: #0369a1;
-                padding: 4px 8px;
-                border-radius: 4px;
+                padding: 2px 10px;
+                border-radius: 6px;
                 font-weight: bold;
                 font-size: 11px;
             }
@@ -400,6 +402,10 @@ class ClientsPage(QWidget):
             col = idx % columns_count
             self.grid_layout.addWidget(card, row, col)
             self.grid_widgets.append(card)
+
+        # Add stretch at the bottom row to prevent cards from stretching vertically
+        last_row = ((len(clients) - 1) // columns_count) + 1 if clients else 0
+        self.grid_layout.setRowStretch(last_row, 1)
 
         # 3. Update count label
         count = len(clients)

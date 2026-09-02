@@ -101,6 +101,16 @@ def get_github_token() -> str:
     token = os.environ.get("GITHUB_UPDATE_TOKEN", "").strip()
     if token:
         return token
+    # Le jeton vit dans un module local ignore par git (voir secrets_local.py).
+    # version.py est suivi par git : y ecrire un secret le publie.
+    try:
+        import secrets_local as _sl
+        local = getattr(_sl, 'GITHUB_TOKEN', '').strip()
+        if local:
+            return local
+    except Exception:
+        pass          # fichier absent : les mises a jour sont simplement inactives
+
     try:
         import version as _v
         raw = getattr(_v, "ENCODED_GITHUB_TOKEN", "").strip()

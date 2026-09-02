@@ -55,3 +55,9 @@ dist/
 dist_installer/
 *.zip
 *.exe 
+
+# ── LE JETON GITHUB — NE JAMAIS COMMITTER ────────────────────────────────────
+# Le depot des releases est prive, donc l'application embarque un jeton pour
+# telecharger ses mises a jour. Il est bundle dans l'exe, mais un secret pousse
+# sur GitHub est un secret public : le precedent l'a ete dans trois commits.
+core/secrets_local.py

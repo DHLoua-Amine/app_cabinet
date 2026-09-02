@@ -2,13 +2,16 @@
 version.py — Fichier officiel de versionnage de l'application Cabinet Notarial Zarai.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.4"
 APP_NAME    = "Cabinet Notarial"
 
 # ── GitHub ────────────────────────────────────────────────────────────────────
 GITHUB_REPO_RELEASES = "DHLoua-Amine/app_cabinet"  # Dépôt officiel des mises à jour
 UPDATE_MODE          = "confirm"   # "confirm" | "silent" | "forced"
-ENCODED_GITHUB_TOKEN = "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"
+ENCODED_GITHUB_TOKEN = ""   # ← VIDE, ET DOIT LE RESTER.
+# Le jeton vit dans core/secrets_local.py, ignore par git. Un jeton ecrit
+# ici part sur GitHub au prochain push : c'est exactement ce qui est
+# arrive au precedent, publie dans trois commits.
 
 
 # ── Licence ───────────────────────────────────────────────────────────────────

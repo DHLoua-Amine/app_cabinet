@@ -13,7 +13,7 @@
 ; ============================================================================
 
 #define MonNom        "Cabinet Notarial Zarai"
-#define MaVersion     "1.0.0"
+#define MaVersion     "1.0.4"
 #define MonExe        "CabinetNotarialZarai.exe"
 #define ReglePareFeu  "Cabinet Notarial Zarai (partage reseau)"
 #define PortReseau    "8765"

@@ -6,6 +6,7 @@ a = Analysis(
     pathex=['.', 'core'],
     datas=[('assets', 'assets'), ('core/models', 'core/models')],
     hiddenimports=[
+        'secrets_local',
         'ui.pages.settings_page',
         'ui.pages.register_page',
         'ui.pages.clients_page',

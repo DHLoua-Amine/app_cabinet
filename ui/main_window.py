@@ -30,6 +30,10 @@ class _LibraryWarmupThread(QThread):
 
 import auth
 import permissions
+# open_fiche_client() allocates the id for a brand-new client. Without this the
+# button raised NameError, Qt swallowed it, and "Nouveau client" did nothing at
+# all — no page, no message, no trace for the notary.
+import reception
 from permissions import Cap
 import camera as camera_core
 from ui.services.camera_service import CameraService, CameraState
@@ -330,6 +334,15 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     # A page that cannot be built must not stop the others, and must not
                     # surface as a dialog the user did not ask for.
+                    # console=False dans le build : un print ne va nulle part.
+                    # L'echec doit atterrir dans le journal, sinon la page
+                    # devient inutilisable sans laisser la moindre trace.
+                    try:
+                        import reception
+                        reception.log_system_error(
+                            f"could not pre-build page {key}", e)
+                    except Exception:
+                        pass
                     print(f"[warmup] could not pre-build {key}: {type(e).__name__}: {e}")
                     self._pages[key] = None
                 QTimer.singleShot(self.WARMUP_INTERVAL_MS, self._warm_next_page)
@@ -378,6 +391,18 @@ class MainWindow(QMainWindow):
         if toast is not None and toast.isVisible():
             toast._reposition()
 
+    def _sync_nav_buttons(self):
+        """Remet les boutons en accord avec la page reellement affichee.
+
+        L'ancien code faisait `btn.setChecked(k == self.content_area.currentIndex())`,
+        qui compare une cle de page ('scanner') a un entier : toujours faux, donc
+        tous les boutons se decochaient au lieu de designer la page ouverte.
+        """
+        courante = self.content_area.currentWidget()
+        cle = next((k for k, p in self._pages.items() if p is courante), None)
+        for k, btn in self.nav_buttons.items():
+            btn.setChecked(k == cle)
+
     def switch_page(self, key):
         if not self.may_open(key):
             # Reached only if something bypasses the hidden button - a shortcut, a
@@ -389,14 +414,42 @@ class MainWindow(QMainWindow):
                 "Accès refusé" if is_fr else "الدخول مرفوض",
                 ("Cette section est réservée au notaire."
                  if is_fr else "هذا القسم مخصص للأستاذ فقط."))
-            for k, btn in self.nav_buttons.items():
-                btn.setChecked(k == self.content_area.currentIndex())
+            self._sync_nav_buttons()
+            return
+
+        # La page est construite AVANT de toucher aux boutons. Auparavant le
+        # bouton etait coche d'abord : quand la construction echouait,
+        # l'exception remontait, setCurrentWidget n'etait jamais appele, et
+        # l'utilisateur voyait le bouton « Scanner » selectionne au-dessus de
+        # la page precedente — la Comptabilite. Aucun message, aucune trace.
+        try:
+            page = self._get_page(key)
+        except Exception as e:
+            self._pages.pop(key, None)   # ne pas garder un demi-etat
+            import traceback
+            try:
+                import reception
+                reception.log_system_error(f'could not open page {key}', e)
+            except Exception:
+                pass
+            is_fr = self.current_lang == 'fr'
+            libelle = dict((k2, ar) for k2, ar, fr, _a in self.nav_items).get(key, key)
+            if is_fr:
+                libelle = dict((k2, fr) for k2, ar, fr, _a in self.nav_items).get(key, key)
+            QMessageBox.critical(
+                self,
+                'Page indisponible' if is_fr else 'تعذّر فتح الصفحة',
+                (f"La page « {libelle} » n'a pas pu s'ouvrir."
+                 f"  {type(e).__name__}: {e}"
+                 if is_fr else
+                 f'تعذّر فتح صفحة « {libelle} ».  {type(e).__name__}: {e}'))
+            # Les boutons restent sur la page reellement affichee.
+            self._sync_nav_buttons()
             return
 
         for k, btn in self.nav_buttons.items():
             btn.setChecked(k == key)
 
-        page = self._get_page(key)
         self.content_area.setCurrentWidget(page)
         self._sync_camera_preview(key)
 

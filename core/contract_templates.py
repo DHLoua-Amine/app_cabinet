@@ -22,9 +22,7 @@ CONTRACT_CATEGORIES = {
         "إشهاد بالحوز",
         "معاوضة",
         "عقد كراء توثيقي",
-        "عقد رهن عقاري",
-        "كتب تكميلي",
-        "كتب توضيحي"
+        "عقد رهن عقاري"
     ],
     "الأحوال الشخصية والتركات": [
         "عقد صداق وزواج",
@@ -56,8 +54,6 @@ CONTRACT_TYPES = {
     "معاوضة": "معاوضة",
     "عقد كراء توثيقي": "عقد كراء توثيقي",
     "عقد رهن عقاري": "عقد رهن عقاري",
-    "كتب تكميلي": "كتب تكميلي",
-    "كتب توضيحي": "كتب توضيحي",
     "عقد صداق وزواج": "عقد صداق وزواج",
     "توكيل": "توكيل",
     "تكليف وتوكيل": "تكليف وتوكيل",
@@ -76,6 +72,27 @@ CONTRACT_TYPES = {
 # The header and footer are no longer literals naming one notary: they are
 # rendered from the office profile, which the office fills in from Paramètres.
 # Kept as module attributes so existing callers keep working.
+# ── Deux actes retirés du menu, volontairement ───────────────────────────────
+# كتب تكميلي (acte complémentaire) et كتب توضيحي (acte explicatif) étaient
+# proposés au notaire mais n'avaient AUCUNE branche dans
+# build_multi_party_contract_text(). Aucun des drapeaux is_* ne correspondant à
+# leur libellé, ils retombaient sur la branche par défaut — celle de la vente —
+# et produisaient mot pour mot un acte de vente : rôles البائع / المشتري,
+# clause « باع واحال », prix encaissé. Un notaire demandant un acte explicatif
+# obtenait donc un acte déclarant une cession et un prix.
+#
+# Ils sont retirés plutôt que réécrits : ces deux actes se réfèrent à un acte
+# antérieur qu'ils complètent ou clarifient, et leur formulation consacrée n'a
+# pas été vérifiée auprès d'un notaire. Inventer une clause plausible dans un
+# logiciel notarial est plus dangereux que ne pas proposer le type.
+#
+# Pour les rétablir : remettre leur libellé dans CONTRACT_CATEGORIES et
+# CONTRACT_TYPES ci-dessus, ET ajouter la branche correspondante dans
+# build_multi_party_contract_text() — sans quoi le repli sur la vente
+# recommencera silencieusement.
+_ACTES_RETIRES = ("كتب تكميلي", "كتب توضيحي")
+
+
 def _office_header():
     import office_profile
     return office_profile.header_html()

@@ -1037,6 +1037,16 @@ class FicheClientPage(QWidget):
         # Prepare date string
         bdate = f"{self.dob_day.currentText()}/{self.dob_month.currentText()}/{self.dob_year.currentText()}"
 
+        # A client was found in a real office database carrying the literal id
+        # "NEW" — the placeholder, saved as though it were an identifier. Its
+        # card then opened a blank form instead of that person's file, because
+        # "NEW" is exactly what the New-client button emits. Whatever let the
+        # placeholder through has been closed upstream; this is the last line of
+        # defence, so it can never reach the clients table again.
+        if not self.client_id or str(self.client_id).strip().upper() == "NEW":
+            self.client_id = reception.generate_client_id()
+            self.client_data["client_id"] = self.client_id
+
         # Write to DB using core module (Requirement 4 check)
         try:
             success = reception.update_client_civil_status(

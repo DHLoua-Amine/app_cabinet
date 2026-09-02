@@ -102,9 +102,16 @@ def downsample_wav_to_16k_mono(audio_bytes: bytes) -> tuple[bytes, str]:
         return audio_bytes, "audio/wav"
 
 
-# How long one REST attempt may take. Audio is uploaded inline, so its
-# deadline has to cover the upload as well as the model's own work.
-TEXT_TIMEOUT_S = 15
+# How long one REST attempt may take.
+#
+# 15 s was chosen for a text prompt and it was wrong for both cases. Audio has
+# to cover the upload as well as the model's work. Text uploads instantly but
+# the model still has to WRITE the answer, and this prompt asks for a JSON
+# carrying every dictated article in full — on a two-minute dictation that is
+# thousands of tokens, and it measured 105 s. The deadline was expiring on the
+# generation, both REST attempts were wasted, and the SDK fallback silently did
+# the work. Neither number was ever about the network.
+TEXT_TIMEOUT_S = 120
 AUDIO_TIMEOUT_S = 120
 
 

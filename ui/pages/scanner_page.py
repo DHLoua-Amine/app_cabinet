@@ -1088,9 +1088,37 @@ class ScannerPage(QWidget):
         # Always reload AI settings first so ocr_api_key is guaranteed fresh on upload
         self.reload_ai_engine()
 
-        # Trigger instant background pre-OCR as soon as front card is uploaded
+        # Every upload used to fire a full scan, so a card given front-then-back
+        # cost TWO calls: one on the front alone, then one on both faces whose
+        # result overwrote the first. The front-only call was pure waste — a
+        # measured ~50 s each, and it also read no job and no address, since
+        # those are printed on the back.
+        #
+        # The scan now waits for the uploads to settle. Adding the back within
+        # the window restarts the delay, so the pair leaves as a single call
+        # carrying both faces.
         if p_list[idx].get("front_bytes") and self.ocr_api_key:
-            self.trigger_background_cin_ocr(p_type, idx)
+            self._schedule_background_cin_ocr(p_type, idx)
+
+    # How long to wait for a second face before scanning. Long enough to pick a
+    # file from a dialog, short enough that the pre-scan still finishes while the
+    # notary chooses the act type.
+    OCR_SETTLE_MS = 2000
+
+    def _schedule_background_cin_ocr(self, p_type, idx):
+        """Runs one scan once the uploads for this party have stopped arriving."""
+        from PySide6.QtCore import QTimer
+        if not hasattr(self, "_ocr_timers"):
+            self._ocr_timers = {}
+        key = (p_type, idx)
+        timer = self._ocr_timers.get(key)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(lambda k=key: self.trigger_background_cin_ocr(*k))
+            self._ocr_timers[key] = timer
+        # restart: a second face arriving cancels the scan the first one queued
+        timer.start(self.OCR_SETTLE_MS)
 
     def trigger_background_cin_ocr(self, p_type, idx):
         p_list = self.p1_parties if p_type == "p1" else self.p2_parties

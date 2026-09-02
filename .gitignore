@@ -48,4 +48,10 @@ data/
 .idea/
 .DS_Store
 Thumbs.db
-*.m4a 
+*.m4a
+
+build/
+dist/
+dist_installer/
+*.zip
+*.exe 

@@ -129,6 +129,22 @@ class ClientCard(QFrame):
         self.open_btn.clicked.connect(lambda: self.open_fiche.emit(self.client_id))
         card_layout.addWidget(self.open_btn)
 
+        # The whole card looks like one clickable tile — a photograph, a name, a
+        # dossier count — but only this small button used to react. Clicking the
+        # name did nothing at all, which reads as "this client is broken" rather
+        # than "you missed the button". The card now opens the file wherever it
+        # is clicked, and shows the hand cursor so it looks like what it is.
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mouseReleaseEvent(self, event):
+        # Release, not press: a click that starts on the card and ends outside it
+        # is a cancelled click, and must not open anything.
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.position().toPoint()):
+            self.open_fiche.emit(self.client_id)
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
     def load_profile_pic(self):
         # Resolve pic path
         pic_path = self.client_data.get("profile_pic_path", "") or self.client_data.get("profile_pic", "")

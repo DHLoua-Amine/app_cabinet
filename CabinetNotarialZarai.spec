@@ -21,7 +21,23 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    # Rien de tout cela n'est importe par l'application : verifie par recherche
+    # sur core/, ui/ et main.py. Sans ces exclusions PyInstaller embarque torch
+    # (320 Mo), pyarrow (80 Mo), scipy (73 Mo) et matplotlib, tires par des
+    # dependances transitives — le dossier passait a 995 Mo, a copier sur
+    # chaque poste du cabinet.
+    excludes=[
+        "torch", "torchaudio", "torchvision",
+        "tensorflow", "tensorboard", "keras",
+        "pyarrow",
+        "scipy",
+        "matplotlib",
+        "sqlalchemy",
+        "IPython", "notebook", "jupyter", "jupyter_core", "nbconvert",
+        "tkinter",
+        "PyQt5", "PyQt6", "PySide2",
+        "pytest", "sphinx",
+    ],
     noarchive=False,
     optimize=0,
 )

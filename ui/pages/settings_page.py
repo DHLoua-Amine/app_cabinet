@@ -2130,7 +2130,34 @@ class SettingsPage(QWidget):
                     if is_fr else "العنوان والمفتاح ضروريان لجهاز العمل.")
                 self.net_status.setStyleSheet("color:#b91c1c; font-weight:700;")
                 return
+            # Meme garde que sur l'ecran de connexion : une faute d'un chiffre
+            # dans l'adresse ne doit pas couter un delai d'expiration puis un
+            # message qui ressemble a un probleme de pare-feu.
+            niveau, remarque, suggestion = config.verifier_adresse_serveur(host)
+            if niveau == 'erreur':
+                if suggestion:
+                    rep = QMessageBox.question(
+                        self,
+                        'Adresse du serveur' if is_fr else 'عنوان الخادم',
+                        remarque + ('  Utiliser ' + suggestion + ' ?' if is_fr
+                                    else '  هل نستعمل ' + suggestion + ' ؟'),
+                        QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                    if rep == QMessageBox.StandardButton.Yes:
+                        host = suggestion
+                        self.net_host_input.setText(suggestion)
+                    else:
+                        self.net_status.setText(remarque)
+                        self.net_status.setStyleSheet("color:#b91c1c; font-weight:700;")
+                        return
+                else:
+                    self.net_status.setText(remarque)
+                    self.net_status.setStyleSheet("color:#b91c1c; font-weight:700;")
+                    return
+            elif niveau == 'attention':
+                self.net_status.setText(remarque)
+                self.net_status.setStyleSheet("color:#b45309; font-weight:700;")
             from db_client import probe
+
             ok, msg = probe(host, port, token)
             if not ok:
                 QMessageBox.warning(

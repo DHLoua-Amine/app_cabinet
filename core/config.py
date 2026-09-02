@@ -304,6 +304,122 @@ def save_network_config(cfg: dict) -> bool:
         return False
 
 
+# ── Verification de l'adresse du serveur ─────────────────────────────────────
+# Un cabinet a perdu une heure sur ceci : le notaire etait sur 192.168.43.94 et
+# la secretaire avait saisi 192.162.43.94 — un seul chiffre. L'application
+# repondait « no answer from 192.162.43.94:8765 (TimeoutError) », ce qui est
+# exact et parfaitement inutile : ca ressemble a un pare-feu, a un serveur
+# eteint, a n'importe quoi sauf a une faute de frappe.
+#
+# La machine qui saisit l'adresse connait son propre reseau. Si l'adresse tapee
+# n'y appartient pas, on peut le dire AVANT d'attendre un delai d'expiration, et
+# meme proposer la correction.
+
+_BLOCS_PRIVES = ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+
+
+def _adresses_locales() -> list:
+    """Les adresses IPv4 de cette machine, hors boucle locale."""
+    import socket
+    trouvees = []
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            probe.connect(("10.255.255.255", 1))
+            trouvees.append(probe.getsockname()[0])
+        finally:
+            probe.close()
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith("127.") and ip not in trouvees:
+                trouvees.append(ip)
+    except Exception:
+        pass
+    return trouvees
+
+
+def est_adresse_privee(hote: str) -> bool:
+    """True si l'adresse appartient a un reseau local (RFC 1918) ou a la machine."""
+    try:
+        import ipaddress
+        a = ipaddress.ip_address(str(hote).strip())
+    except Exception:
+        return False
+    if a.is_loopback or a.is_link_local:
+        return True
+    import ipaddress as _ip
+    return any(a in _ip.ip_network(b) for b in _BLOCS_PRIVES)
+
+
+def verifier_adresse_serveur(hote: str) -> tuple:
+    """
+    Examine l'adresse saisie AVANT toute tentative de connexion.
+
+    Retourne (niveau, message, suggestion) ou niveau vaut :
+        "ok"      — rien a signaler
+        "attention" — l'adresse est douteuse, la connexion echouera sans doute
+        "erreur"  — l'adresse est inutilisable telle quelle
+
+    `suggestion` est une adresse corrigee quand on peut la deviner, sinon "".
+    """
+    h = (hote or "").strip()
+    if not h:
+        return ("erreur", "Aucune adresse saisie.", "")
+
+    try:
+        import ipaddress
+        ipaddress.ip_address(h)
+    except Exception:
+        # Un nom de machine reste possible sur un domaine ; on n'interdit pas.
+        return ("ok", "", "")
+
+    locales = [x for x in _adresses_locales() if est_adresse_privee(x)]
+
+    if not est_adresse_privee(h):
+        # Cas le plus courant : une faute de frappe dans un 192.168.x.x. On
+        # cherche l'adresse locale dont elle ne differe que d'un caractere.
+        for mienne in locales:
+            a, b = h.split("."), mienne.split(".")
+            if len(a) == len(b) == 4:
+                differents = [i for i in range(4) if a[i] != b[i]]
+                if len(differents) == 1:
+                    i = differents[0]
+                    # meme longueur et un seul chiffre change => faute de frappe
+                    if len(a[i]) == len(b[i]) and sum(
+                            1 for x, y in zip(a[i], b[i]) if x != y) == 1:
+                        propose = ".".join(
+                            b[:i] + [b[i]] + a[i + 1:]) if i < 3 else mienne
+                        propose = ".".join(
+                            [b[j] if j <= i else a[j] for j in range(4)])
+                        return ("erreur",
+                                f"{h} n'est pas une adresse de réseau local. "
+                                f"Cet ordinateur est sur le réseau {mienne}. "
+                                f"Vouliez-vous écrire {propose} ?",
+                                propose)
+        return ("erreur",
+                f"{h} n'est pas une adresse de réseau local. Une adresse de "
+                f"cabinet commence par 192.168., 10. ou 172.16. à 172.31."
+                + (f" Cet ordinateur est sur le réseau {locales[0]}."
+                   if locales else ""),
+                "")
+
+    # L'adresse est privee : est-elle sur le MEME sous-reseau que nous ?
+    if locales:
+        prefixe = ".".join(h.split(".")[:3])
+        miens = {".".join(x.split(".")[:3]) for x in locales}
+        if prefixe not in miens:
+            autres = ", ".join(sorted(miens))
+            return ("attention",
+                    f"{h} n'est pas sur le même réseau que cet ordinateur "
+                    f"({autres}.x). Les deux machines doivent être sur le même "
+                    f"Wi-Fi ou le même routeur.",
+                    "")
+    return ("ok", "", "")
+
+
 def generate_db_token() -> str:
     """A shared secret for the office LAN. Readable enough to be typed once."""
     import secrets

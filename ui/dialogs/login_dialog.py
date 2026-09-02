@@ -214,6 +214,36 @@ class LoginDialog(QDialog):
                     status_lbl.setText(self.tr("L'adresse IP et la clé sont obligatoires !", "العنوان والمفتاح ضروريان !"))
                     status_lbl.setStyleSheet("color:#dc2626; font-weight:bold;")
                     return
+                # Une faute d'un seul chiffre dans l'adresse ne ressortait
+                # qu'apres le delai d'expiration, sous la forme « no answer
+                # ... (TimeoutError) » — ce qui ressemble a un pare-feu ferme
+                # ou a un serveur eteint. Cette machine connait son propre
+                # reseau : elle peut le dire immediatement et proposer la
+                # correction.
+                niveau, remarque, suggestion = config.verifier_adresse_serveur(host)
+                if niveau == 'erreur':
+                    status_lbl.setText(remarque)
+                    status_lbl.setStyleSheet('color:#dc2626; font-weight:bold;')
+                    if suggestion:
+                        question = remarque + '\n\n' + self.tr(
+                            'Utiliser ' + suggestion + ' ?',
+                            'هل نستعمل ' + suggestion + ' ؟')
+                        rep = QMessageBox.question(
+                            box, self.tr('Adresse du serveur', 'عنوان الخادم'),
+                            question,
+                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                        if rep == QMessageBox.StandardButton.Yes:
+                            host_input.setText(suggestion)
+                            host = suggestion
+                        else:
+                            return
+                    else:
+                        return
+                elif niveau == 'attention':
+                    status_lbl.setText(remarque)
+                    status_lbl.setStyleSheet('color:#b45309; font-weight:bold;')
+                    QApplication.processEvents()
+
                 status_lbl.setText(self.tr("Vérification de la connexion au serveur...", "جاري فحص الاتصال بالخادم..."))
                 status_lbl.setStyleSheet("color:#2563eb; font-weight:bold;")
                 QApplication.processEvents()
@@ -221,9 +251,18 @@ class LoginDialog(QDialog):
                 from db_client import probe
                 ok, msg = probe(host, port, token)
                 if not ok:
-                    status_lbl.setText(self.tr(f"Impossible de joindre le serveur : {msg}", f"لم يستجب الخادم : {msg}"))
-                    status_lbl.setStyleSheet("color:#dc2626; font-weight:bold;")
+                    # Constater l'echec ne suffit pas : dire quoi verifier.
+                    aide = self.tr(
+                        'Verifiez que le PC du notaire est allume, que son application '
+                        'est ouverte, et que les deux ordinateurs sont sur le meme Wi-Fi.',
+                        'تأكد أن جهاز الأستاذ مشغّل، وأن تطبيقه مفتوح، وأن الجهازين '
+                        'على نفس شبكة الواي فاي.')
+                    status_lbl.setText(
+                        self.tr('Impossible de joindre le serveur : ', 'لم يستجب الخادم : ')
+                        + str(msg) + '\n' + aide)
+                    status_lbl.setStyleSheet('color:#dc2626; font-weight:bold;')
                     return
+
 
             config.save_network_config({
                 "mode": target_mode,

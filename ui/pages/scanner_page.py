@@ -25,6 +25,15 @@ from ui.components.collapsible_box import CollapsibleSection
 
 
 # ── Unified Asynchronous Pipeline Thread ──
+# Duree maximale d'attente d'un pre-scan de CIN deja lance, en secondes.
+# Auparavant l'attente etait un join() sans limite : quand le scan n'aboutissait
+# pas (reseau coupe, cles refusees), la generation restait bloquee indefiniment,
+# barre de progression tournante et aucun message. Passe ce delai on continue
+# sans la carte, et le notaire saisit les champs a la main.
+# 95 s = les 80 s du pire cas d'une cle (2 modeles x 40 s) plus une marge.
+OCR_JOIN_TIMEOUT_S = 95
+
+
 class UnifiedPipelineThread(QThread):
     finished = Signal(dict)
     
@@ -87,7 +96,20 @@ class UnifiedPipelineThread(QThread):
                         t_curr = time.perf_counter() - t_global_start
                         sys.stdout.write(f"[TIMING {t_curr:.2f}s] Party 1 Card {idx+1}: Background pre-scan active - joining active thread...\n")
                         sys.stdout.flush()
-                        p1["ocr_thread"].join()
+                        p1["ocr_thread"].join(timeout=OCR_JOIN_TIMEOUT_S)
+                        if p1["ocr_thread"].is_alive():
+                            # Le fil tourne encore : on l'abandonne plutot que
+                            # de bloquer la generation entiere sur une carte.
+                            results["warnings"].append(
+                                f"بطاقة الطرف الأول {idx+1}: تعذّرت قراءتها خلال {OCR_JOIN_TIMEOUT_S} ثانية — يُرجى إدخال البيانات يدويًا.")
+                            try:
+                                from system_guardian import log_system_error
+                                log_system_error(
+                                    f"pre-scan CIN abandonne apres {OCR_JOIN_TIMEOUT_S}s (p1 carte {idx+1})",
+                                    TimeoutError("le fil de pre-scan ne rendait pas la main"))
+                            except Exception:
+                                pass
+
                         t_wait_dur = time.perf_counter() - t_wait_start
                         t_curr = time.perf_counter() - t_global_start
                         if p1.get("extracted") and p1["extracted"].get("full_name"):
@@ -117,7 +139,20 @@ class UnifiedPipelineThread(QThread):
                         t_curr = time.perf_counter() - t_global_start
                         sys.stdout.write(f"[TIMING {t_curr:.2f}s] Party 2 Card {idx+1}: Background pre-scan active - joining active thread...\n")
                         sys.stdout.flush()
-                        p2["ocr_thread"].join()
+                        p2["ocr_thread"].join(timeout=OCR_JOIN_TIMEOUT_S)
+                        if p2["ocr_thread"].is_alive():
+                            # Le fil tourne encore : on l'abandonne plutot que
+                            # de bloquer la generation entiere sur une carte.
+                            results["warnings"].append(
+                                f"بطاقة الطرف الثاني {idx+1}: تعذّرت قراءتها خلال {OCR_JOIN_TIMEOUT_S} ثانية — يُرجى إدخال البيانات يدويًا.")
+                            try:
+                                from system_guardian import log_system_error
+                                log_system_error(
+                                    f"pre-scan CIN abandonne apres {OCR_JOIN_TIMEOUT_S}s (p2 carte {idx+1})",
+                                    TimeoutError("le fil de pre-scan ne rendait pas la main"))
+                            except Exception:
+                                pass
+
                         t_wait_dur = time.perf_counter() - t_wait_start
                         t_curr = time.perf_counter() - t_global_start
                         if p2.get("extracted") and p2["extracted"].get("full_name"):

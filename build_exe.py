@@ -58,7 +58,7 @@ def build_executable():
 
     try:
         subprocess.run(
-            [sys.executable, "-m", "PyInstaller", "--noconfirm", str(SPEC)],
+            [sys.executable, "-m", "PyInstaller", "--noconfirm", "--distpath", str(BASE_DIR / "dist"), str(SPEC)],
             check=True, cwd=str(BASE_DIR))
     except subprocess.CalledProcessError as e:
         print(f"Erreur lors de la compilation : {e}")

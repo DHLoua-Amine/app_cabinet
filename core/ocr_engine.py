@@ -211,6 +211,25 @@ def _classify_network_failure(ex: Exception) -> tuple:
     return ("server", str(ex))
 
 
+def _log_ocr_failure(failure: tuple, key_count: int, ou: str) -> None:
+    """Ecrit l'echec dans system_errors.log.
+
+    Sans ceci un scan qui echoue ne laisse AUCUNE trace : le notaire voit la
+    barre tourner, l'appel finit par abandonner, et il ne reste rien pour
+    savoir si la cause etait le reseau, le quota ou une cle invalide.
+    C'est exactement ce qui s'est produit le 3 septembre 2026 : trois minutes
+    d'attente, journal vide.
+    """
+    try:
+        from system_guardian import log_system_error
+        genre, detail = failure
+        log_system_error(
+            f"OCR {ou} : echec ({genre}) apres {key_count} cle(s)",
+            RuntimeError(str(detail)[:800]))
+    except Exception:
+        pass          # journaliser ne doit jamais casser le scan
+
+
 def _render_failure(failure: tuple, key_count: int = 1) -> str:
     """Turns a (kind, detail) failure into one clear Arabic sentence for the notary."""
     kind, detail = failure if failure else ("server", "")
@@ -271,6 +290,11 @@ def _call_gemini_vision(image_bytes: bytes, api_key: str, model_name: str, promp
     ]
 
     last_failure = ("server", "")
+    # Une panne reseau ne se repare pas en changeant de cle : si la premiere
+    # tentative expire ou ne joint personne, les huit suivantes expireront
+    # pareil. A 40 s par essai et deux modeles par cle, neuf cles font douze
+    # minutes d'attente pour un resultat connu d'avance.
+    reseau_mort = False
 
     for key_idx, current_key in enumerate(keys):
         clean_k = current_key.strip().strip("'").strip('"')
@@ -315,10 +339,16 @@ def _call_gemini_vision(image_bytes: bytes, api_key: str, model_name: str, promp
                     continue
             except Exception as ex_rest:
                 last_failure = _classify_network_failure(ex_rest)
+                if last_failure[0] in ("offline", "timeout"):
+                    reseau_mort = True
+                    break
 
+        if reseau_mort:
+            break
         if key_failed:
             continue  # Move straight to next key in key pool!
 
+    _log_ocr_failure(last_failure, len(keys), "carte simple")
     return {"success": False, "transcription": None, "error": _render_failure(last_failure, len(keys))}
 
 
@@ -354,6 +384,11 @@ def _call_gemini_vision_dual(front_bytes: bytes, back_bytes: bytes, api_key: str
     ]
 
     last_failure = ("server", "")
+    # Une panne reseau ne se repare pas en changeant de cle : si la premiere
+    # tentative expire ou ne joint personne, les huit suivantes expireront
+    # pareil. A 40 s par essai et deux modeles par cle, neuf cles font douze
+    # minutes d'attente pour un resultat connu d'avance.
+    reseau_mort = False
 
     for key_idx, current_key in enumerate(keys):
         clean_k = current_key.strip().strip("'").strip('"')
@@ -382,10 +417,16 @@ def _call_gemini_vision_dual(front_bytes: bytes, back_bytes: bytes, api_key: str
                     continue
             except Exception as ex_rest:
                 last_failure = _classify_network_failure(ex_rest)
+                if last_failure[0] in ("offline", "timeout"):
+                    reseau_mort = True
+                    break
 
+        if reseau_mort:
+            break
         if key_failed:
             continue
 
+    _log_ocr_failure(last_failure, len(keys), "carte recto/verso")
     return {"success": False, "transcription": "", "error": _render_failure(last_failure, len(keys))}
 
 

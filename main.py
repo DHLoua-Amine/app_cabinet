@@ -81,8 +81,62 @@ def _show_fatal(title: str, body: str, detail: str = "") -> None:
         except Exception:
             # (c) Safe: the stderr fallback below is the last resort.
             pass
-    if not shown:
-        print(f"{title}\n{full}", file=sys.stderr)
+def _install_global_exception_hooks():
+    """Installs sys.excepthook and threading.excepthook to prevent silent crashes under --noconsole."""
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        err_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+        try:
+            from system_guardian import log_system_error
+            log_system_error(f"Unhandled Exception: {exc_type.__name__}", exc_value)
+        except Exception:
+            pass
+        _show_fatal(
+            "DATLY — Erreur inattendue / خطأ غير متوقع",
+            "Une erreur est survenue et l'application a dû s'arrêter.\n"
+            "حدث خطأ غير متوقع وأدى إلى توقف التطبيق.",
+            f"{exc_type.__name__}: {exc_value}\n\n{err_msg}"
+        )
+
+    sys.excepthook = handle_exception
+
+    import threading
+    # Un fil de fond qui meurt laissait le notaire devant une fonction morte sans
+    # le moindre signe : le print ci-dessous part sur un stderr qui n'existe pas
+    # sous console=False. On le previent, mais UNE SEULE FOIS par type d'erreur —
+    # un fil en boucle produirait sinon une avalanche de fenetres modales.
+    _deja_signalees = set()
+
+    def handle_thread_exception(args):
+        err_msg = "".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback))
+        try:
+            from system_guardian import log_system_error
+            log_system_error(f"Unhandled Thread Exception in {args.thread.name}: {args.exc_type.__name__}", args.exc_value)
+        except Exception:
+            pass
+        print(f"[Thread Error] {args.thread.name}: {args.exc_value}\n{err_msg}", file=sys.stderr)
+
+        cle = (args.exc_type.__name__, str(args.exc_value)[:120])
+        if cle in _deja_signalees:
+            return
+        _deja_signalees.add(cle)
+        try:
+            # _show_fatal passe par MessageBoxW de Win32, qui n'exige ni boucle Qt
+            # ni fil principal : appelable tel quel depuis un fil de fond.
+            _show_fatal(
+                "DATLY — Une tâche de fond a échoué / فشلت مهمة في الخلفية",
+                "Une tâche s'est interrompue. L'application reste utilisable, mais "
+                "cette fonction risque de ne plus répondre.\n"
+                "توقفت إحدى المهام. يمكنك مواصلة العمل، لكن هذه الوظيفة قد لا تستجيب.",
+                f"{args.thread.name} — {args.exc_type.__name__}: {args.exc_value}\n\n{err_msg}")
+        except Exception:
+            pass          # prevenir ne doit jamais aggraver la panne
+
+    threading.excepthook = handle_thread_exception
+
+_install_global_exception_hooks()
 
 
 FATAL_TITLE = "Cabinet Notarial — Erreur de démarrage / خطأ في بدء التشغيل"

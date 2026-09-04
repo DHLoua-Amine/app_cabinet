@@ -12,8 +12,8 @@ class CamConnectThread(QThread):
         self.ip_url = ip_url
         
     def run(self):
-        from camera import check_ip_reachable
-        res = check_ip_reachable(self.ip_url, timeout=0.3)
+        from camera import probe_camera_stream
+        res = probe_camera_stream(self.ip_url, timeout=2.5)
         self.finished.emit(res)
 
 

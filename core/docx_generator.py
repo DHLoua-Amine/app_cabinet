@@ -19,6 +19,66 @@ except ImportError:
     DOCX_AVAILABLE = False
 
 
+# Chaine de repli des polices arabes, de la plus souhaitable a la plus sure.
+#
+# « Simplified Arabic » etait ecrite en dur. Elle est livree avec Microsoft
+# Office, PAS avec Windows : sur le poste d'un notaire sans Office, Word
+# substituait une police au hasard. Le texte restait juste — un .docx stocke
+# de l'Unicode, jamais des glyphes — mais l'acte ne ressemblait plus a rien.
+#
+# On choisit donc, au moment de generer, la premiere police REELLEMENT
+# installee sur la machine du notaire. Arial ferme la marche : presente sur
+# tout Windows depuis toujours, et correcte en arabe.
+CHAINE_POLICES_ARABES = (
+    "Simplified Arabic",
+    "Traditional Arabic",
+    "Arabic Typesetting",
+    "Amiri",
+    "Segoe UI",
+    "Arial",
+)
+
+_police_retenue = None
+
+
+def polices_installees():
+    """Noms des polices connues de Windows, en minuscules."""
+    noms = set()
+    try:
+        import winreg
+        for ruche, chemin in ((winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts"),
+                              (winreg.HKEY_CURRENT_USER, r"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Fonts")):
+            try:
+                with winreg.OpenKey(ruche, chemin) as k:
+                    for i in range(winreg.QueryInfoKey(k)[1]):
+                        nom = winreg.EnumValue(k, i)[0]
+                        noms.add(nom.split(" (")[0].strip().lower())
+            except OSError:
+                continue
+    except Exception:
+        pass
+    return noms
+
+
+def police_arabe():
+    """La premiere police de la chaine qui existe sur cette machine.
+
+    Calculee une fois par session : lire le registre a chaque paragraphe d'un
+    acte de trente pages couterait cher pour un resultat invariable."""
+    global _police_retenue
+    if _police_retenue:
+        return _police_retenue
+    dispo = polices_installees()
+    for nom in CHAINE_POLICES_ARABES:
+        if not dispo or nom.lower() in dispo:
+            # `not dispo` : registre illisible. On garde le premier choix plutot
+            # que de degrader sur une simple panne de lecture.
+            _police_retenue = nom
+            return nom
+    _police_retenue = CHAINE_POLICES_ARABES[-1]
+    return _police_retenue
+
+
 def set_rtl(paragraph):
     """Sets Right-to-Left paragraph formatting for Arabic text in docx."""
     pPr = paragraph._p.get_or_add_pPr()
@@ -27,7 +87,8 @@ def set_rtl(paragraph):
     pPr.append(bidi)
 
 
-def set_run_font(run, font_name="Simplified Arabic", size_pt=14, bold=False, color_rgb=(0, 0, 0)):
+def set_run_font(run, font_name=None, size_pt=14, bold=False, color_rgb=(0, 0, 0)):
+    font_name = font_name or police_arabe()
     """Sets exact font, size, weight, and bidi properties for a run of Arabic text."""
     run.font.name = font_name
     run.font.size = Pt(size_pt)
@@ -44,7 +105,8 @@ def set_run_font(run, font_name="Simplified Arabic", size_pt=14, bold=False, col
     rPr.append(rFonts)
 
 
-def format_legal_paragraph(paragraph, text, font_name="Simplified Arabic", base_size=14):
+def format_legal_paragraph(paragraph, text, font_name=None, base_size=14):
+    font_name = font_name or police_arabe()
     """
     Parses text and applies bolding to key legal keywords (e.g. الطرف الأول, الفصل الأول...)
     and sets Full Justification and RTL alignment.
@@ -93,7 +155,7 @@ def create_notary_deed_docx(contract_title: str, contract_text: str, output_path
         title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         title_p.paragraph_format.space_after = Pt(12)
         run = title_p.add_run(contract_title)
-        set_run_font(run, font_name="Simplified Arabic", size_pt=18, bold=True)
+        set_run_font(run, font_name=police_arabe(), size_pt=18, bold=True)
 
     # Process paragraphs
     lines = contract_text.split("\n")
@@ -102,7 +164,7 @@ def create_notary_deed_docx(contract_title: str, contract_text: str, output_path
         if not clean_line:
             continue
         p = doc.add_paragraph()
-        format_legal_paragraph(p, clean_line, font_name="Simplified Arabic", base_size=14)
+        format_legal_paragraph(p, clean_line, font_name=police_arabe(), base_size=14)
 
     doc.save(output_path)
     print(f"[DOCX Generator] Created: {output_path}")

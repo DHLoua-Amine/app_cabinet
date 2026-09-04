@@ -1,8 +1,17 @@
+import sys
+import os
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 import cv2
 import numpy as np
+import threading
 from typing import List, Dict, Tuple, Optional
 
-from config import resource_path
+from core.config import resource_path
 
 # The ONNX models ship with the application; in a packaged build they live in
 # the PyInstaller bundle, not beside this module.
@@ -18,12 +27,14 @@ YUNET_PATH = MODELS_DIR / "face_detection_yunet_2023mar.onnx"
 SFACE_PATH = MODELS_DIR / "face_recognition_sface_2021dec.onnx"
 
 _global_face_engine_instance = None
+_global_face_engine_lock = threading.Lock()
 
 def get_global_face_engine():
     global _global_face_engine_instance
-    if _global_face_engine_instance is None:
-        _global_face_engine_instance = FaceEngine()
-    return _global_face_engine_instance
+    with _global_face_engine_lock:
+        if _global_face_engine_instance is None:
+            _global_face_engine_instance = FaceEngine()
+        return _global_face_engine_instance
 
 class FaceEngine:
     def __init__(self, score_threshold: float = 0.8, nms_threshold: float = 0.3, top_k: int = 5000):
@@ -32,6 +43,7 @@ class FaceEngine:
         self.top_k = top_k
         self.detector = None
         self.recognizer = None
+        self._lock = threading.Lock()
         self._init_models()
 
     def _init_models(self):
@@ -42,59 +54,69 @@ class FaceEngine:
                     self.score_threshold, self.nms_threshold, self.top_k
                 )
                 self.recognizer = cv2.FaceRecognizerSF.create(str(SFACE_PATH), "")
-                from system_guardian import log_system_error
             except Exception as e:
                 from system_guardian import log_system_error
                 log_system_error("FaceEngine Model Load Failed", e)
 
     def detect_and_extract(self, frame_bgr: np.ndarray) -> List[Dict]:
-        if frame_bgr is None or self.detector is None:
+        if frame_bgr is None:
             return []
         
-        orig_h, orig_w = frame_bgr.shape[:2]
+        with self._lock:
+            if self.detector is None or self.recognizer is None:
+                return []
 
-        # Fast Downscale to 640px max width for 5X faster YuNet inference
-        max_dim = 640
-        if max(orig_h, orig_w) > max_dim:
-            scale = max_dim / float(max(orig_h, orig_w))
-            target_w = int(orig_w * scale)
-            target_h = int(orig_h * scale)
-            resized_frame = cv2.resize(frame_bgr, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
-        else:
-            scale = 1.0
-            resized_frame = frame_bgr
-            target_w, target_h = orig_w, orig_h
+            try:
+                orig_h, orig_w = frame_bgr.shape[:2]
 
-        self.detector.setInputSize((target_w, target_h))
-        _, faces = self.detector.detect(resized_frame)
+                # Fast Downscale to 640px max width for 5X faster YuNet inference
+                max_dim = 640
+                if max(orig_h, orig_w) > max_dim:
+                    scale = max_dim / float(max(orig_h, orig_w))
+                    target_w = int(orig_w * scale)
+                    target_h = int(orig_h * scale)
+                    resized_frame = cv2.resize(frame_bgr, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                else:
+                    scale = 1.0
+                    resized_frame = frame_bgr
+                    target_w, target_h = orig_w, orig_h
 
-        results = []
-        if faces is not None:
-            for face in faces:
-                # Scale face detection output back to original full resolution
-                scaled_face = face.copy()
-                if scale != 1.0:
-                    scaled_face[0:14] = scaled_face[0:14] / scale
+                self.detector.setInputSize((target_w, target_h))
+                _, faces = self.detector.detect(resized_frame)
 
-                bbox = scaled_face[0:4].astype(int)
-                x, y, bw, bh = bbox
-                x1, y1 = max(0, x), max(0, y)
-                x2, y2 = min(orig_w, x + bw), min(orig_h, y + bh)
-                if x2 - x1 < 25 or y2 - y1 < 25:
-                    continue
+                results = []
+                if faces is not None:
+                    for face in faces:
+                        # Scale face detection output back to original full resolution
+                        scaled_face = face.copy()
+                        if scale != 1.0:
+                            scaled_face[0:14] = scaled_face[0:14] / scale
 
-                # Align & crop using full-resolution original frame for maximum SFace feature accuracy
-                aligned = self.recognizer.alignCrop(frame_bgr, scaled_face)
-                embedding = self.recognizer.feature(aligned).flatten()
-                crop = frame_bgr[y1:y2, x1:x2].copy()
+                        bbox = scaled_face[0:4].astype(int)
+                        x, y, bw, bh = bbox
+                        x1, y1 = max(0, x), max(0, y)
+                        x2, y2 = min(orig_w, x + bw), min(orig_h, y + bh)
+                        if x2 - x1 < 25 or y2 - y1 < 25:
+                            continue
 
-                results.append({
-                    "bbox": (x1, y1, x2, y2),
-                    "crop": crop,
-                    "embedding": embedding,
-                    "face_row": scaled_face
-                })
-        return results
+                        # Align & crop using full-resolution original frame for maximum SFace feature accuracy
+                        aligned = self.recognizer.alignCrop(frame_bgr, scaled_face)
+                        embedding = self.recognizer.feature(aligned).flatten()
+                        crop = frame_bgr[y1:y2, x1:x2].copy()
+
+                        results.append({
+                            "bbox": (x1, y1, x2, y2),
+                            "crop": crop,
+                            "embedding": embedding,
+                            "face_row": scaled_face
+                        })
+                return results
+            except (cv2.error, Exception) as e:
+                from system_guardian import log_system_error
+                log_system_error("FaceEngine OpenCV C++ Exception - Resetting Models", e)
+                # Re-initialize models to clear corrupted OpenCV C++ DNN BlobManager
+                self._init_models()
+                return []
 
     def match_face(
         self,
@@ -105,7 +127,7 @@ class FaceEngine:
     ) -> Tuple[Optional[str], float]:
         if threshold is None:
             try:
-                import config
+                from core import config
                 threshold = float(config.get_setting("face_match_threshold", 0.363))
             except Exception:
                 threshold = 0.363

@@ -1,3 +1,4 @@
+import os
 import socket
 import threading
 import time
@@ -6,21 +7,111 @@ import numpy as np
 
 def check_ip_reachable(ip_url: str, timeout: float = 1.5) -> bool:
     """Socket test to prevent OpenCV network freezes on offline IP cameras."""
-    if not isinstance(ip_url, str) or not (ip_url.startswith("http://") or ip_url.startswith("https://") or ip_url.startswith("rtsp://")):
+    if not isinstance(ip_url, str):
         return True
+    ip_str = str(ip_url).strip()
+    if not ip_str:
+        return False
+    if ip_str.isdigit():
+        return True  # USB camera index like 0, 1
+    
     try:
-        clean = ip_url.replace("http://", "").replace("https://", "").replace("rtsp://", "").split("/")[0]
-        if ":" in clean:
-            host, port = clean.split(":")
-            port = int(port)
+        clean = ip_str
+        for proto in ("http://", "https://", "rtsp://", "rtp://"):
+            if clean.lower().startswith(proto):
+                clean = clean[len(proto):]
+                break
+        if "@" in clean:
+            clean = clean.split("@")[-1]
+        host_port = clean.split("/")[0].split("?")[0]
+        if ":" in host_port:
+            host, port_s = host_port.split(":")
+            port = int(port_s)
         else:
-            host = clean
-            port = 80
+            host = host_port
+            port = 554 if ip_str.lower().startswith("rtsp://") else 80
+        
         s = socket.create_connection((host, port), timeout=timeout)
         s.close()
         return True
     except Exception:
         return False
+
+
+def probe_camera_stream(source, timeout: float = 2.5) -> bool:
+    """
+    Real probe function: tests if the camera/URL returns a valid video frame!
+    Used by Settings page test button so it NEVER lies to the user.
+    """
+    if source is None:
+        return False
+    if isinstance(source, int) or (isinstance(source, str) and source.isdigit()):
+        try:
+            dev_idx = int(source)
+            cap = cv2.VideoCapture(dev_idx, cv2.CAP_ANY)
+            if cap and cap.isOpened():
+                ret, frame = cap.read()
+                cap.release()
+                return ret and frame is not None
+            return False
+        except Exception:
+            return False
+    
+    src = str(source).strip()
+    if not src:
+        return False
+    
+    if not src.startswith("http://") and not src.startswith("https://") and not src.startswith("rtsp://"):
+        src = "http://" + src
+    
+    if not check_ip_reachable(src, timeout=1.2):
+        return False
+
+    is_http = src.startswith("http://") or src.startswith("https://")
+    try:
+        os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "fflags;nobuffer|flags;low_delay|max_delay;0"
+        cap = cv2.VideoCapture(src, cv2.CAP_FFMPEG if is_http else cv2.CAP_ANY)
+        if cap and cap.isOpened():
+            start_t = time.time()
+            while time.time() - start_t < timeout:
+                ret, frame = cap.read()
+                if ret and frame is not None:
+                    cap.release()
+                    return True
+                time.sleep(0.05)
+            cap.release()
+    except Exception as e:
+        print(f"[Camera Probe] Error probing {src}: {e}")
+    
+    if is_http:
+        try:
+            base_url = src.rsplit('/', 1)[0]
+            shot_url = f"{base_url}/shot.jpg"
+            import urllib.request
+            req = urllib.request.urlopen(shot_url, timeout=timeout)
+            # Un simple « plus de 100 octets » suffisait a declarer le succes.
+            # Sur un reseau avec portail captif, ou derriere un routeur qui repond
+            # a toute adresse, la page d'erreur renvoyee passait pour une camera :
+            # le notaire lisait « connecte » sur n'importe quelle adresse.
+            statut = getattr(req, "status", None) or req.getcode()
+            if statut != 200:
+                return False
+            type_contenu = (req.headers.get("Content-Type") or "").lower()
+            if not type_contenu.startswith("image/"):
+                return False
+            img_bytes = req.read()
+            if len(img_bytes) < 100:
+                return False
+            # En-tete JPEG (FF D8 FF) ou PNG : une page HTML servie avec un
+            # Content-Type menteur ne passera pas cette derniere porte.
+            if img_bytes[:3] == b"\xff\xd8\xff" or img_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+                return True
+            return False
+        except Exception:
+            pass
+
+    return False
+
 
 _active_camera_instance = None
 

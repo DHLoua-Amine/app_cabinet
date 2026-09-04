@@ -65,6 +65,14 @@ class AudioRecorder(QObject):
             self.recorder = QMediaRecorder()
             self.session.setRecorder(self.recorder)
 
+            # Le peripherique est relache tant qu'on n'enregistre pas.
+            # Auparavant la session gardait le micro ouvert du demarrage de
+            # l'application a sa fermeture : une deuxieme instance - ou tout
+            # autre logiciel - ne pouvait plus l'ouvrir, et l'enregistrement
+            # produisait un conteneur vide sans la moindre erreur.
+            self.session.setAudioInput(None)
+
+
             # Configure default high-quality audio recording format
             media_format = QMediaFormat()
             # Under Windows, AAC inside M4A is natively supported and lightweight
@@ -90,7 +98,44 @@ class AudioRecorder(QObject):
             return
         self.is_recording = False
         self._stop_finalise_timer()
-        self.error_occurred.emit(error_string or "Erreur d'enregistrement audio / خطأ في التسجيل الصوتي")
+        self._relacher_peripherique()
+
+        # Qt rend des messages anglais que le notaire ne peut pas exploiter.
+        # Le plus frequent, « No valid stream found for encoding », signifie que
+        # le micro n'a fourni aucun flux : presque toujours une autre instance
+        # de l'application, ou un autre logiciel, qui le tient deja.
+        brut = (error_string or "").strip()
+        if "no valid stream" in brut.lower() or "stream" in brut.lower():
+            message = ("لم يوفّر المايكروفون أي تدفّق صوتي. غالبًا لأنّه مستعمل من طرف "
+                       "برنامج آخر أو نسخة أخرى من التطبيق. أغلقها ثم أعد المحاولة. "
+                       "(Micro occupe par une autre application)")
+        else:
+            message = ("تعذّر تسجيل الصوت. يرجى التأكّد من المايكروفون وإعادة المحاولة. "
+                       f"(Erreur d'enregistrement : {brut or 'inconnue'})")
+        self._journaliser("erreur QMediaRecorder", brut or str(error))
+        self.error_occurred.emit(message)
+
+    def _diagnostiquer_peripherique(self):
+        """Rend (disponible, message) avant de lancer une dictee.
+
+        Ne refuse que sur le cas certain - aucun micro branche. Tout autre
+        signal (peripherique occupe, erreur d'ouverture) s'est revele peu
+        fiable a la mesure et ferait perdre des dictees valides ; c'est le
+        message de fin, base sur la duree capturee, qui nomme la cause."""
+        try:
+            dev = QMediaDevices.defaultAudioInput()
+            if dev.isNull():
+                return False, ("لا يوجد مايكروفون على هذا الحاسوب. "
+                               "(Aucun microphone detecte sur ce PC)")
+            # On NE sonde PAS le peripherique pour refuser la dictee : mesure
+            # faite le 3 septembre 2026, QAudioSource rend OpenError alors que
+            # le micro est disponible (partage WASAPI, sonde juste apres une
+            # liberation). Bloquer la-dessus empeche des dictees valides.
+            # Seule l'absence totale de micro est un refus sur.
+            return True, ""
+        except Exception:
+            # La sonde ne doit jamais empecher d'essayer d'enregistrer.
+            return True, ""
 
     def start(self):
         if self.is_recording:
@@ -102,7 +147,16 @@ class AudioRecorder(QObject):
             )
             return
 
+        disponible, pourquoi = self._diagnostiquer_peripherique()
+        if not disponible:
+            self._journaliser("micro indisponible au demarrage de la dictee", pourquoi)
+            self.error_occurred.emit(pourquoi)
+            return
+
         try:
+            # Le micro n'est pris QUE pendant l'enregistrement (voir init_recorder).
+            self.session.setAudioInput(self.audio_input)
+
             # Prepare temporary output path in user workspace
             temp_dir = Path(QDir.tempPath()) / "CabinetZarai"
             temp_dir.mkdir(parents=True, exist_ok=True)
@@ -137,6 +191,24 @@ class AudioRecorder(QObject):
             self.is_recording = False
             self.error_occurred.emit(str(e))
 
+    def _relacher_peripherique(self):
+        """Rend le micro au systeme des que la dictee est finie."""
+        try:
+            if self.session is not None:
+                self.session.setAudioInput(None)
+        except Exception:
+            pass
+
+    def _journaliser(self, titre, detail=""):
+        """Ecrit dans system_errors.log. Sans ceci un echec de dictee ne laisse
+        aucune trace : impossible ensuite de savoir si le micro etait absent,
+        occupe, ou simplement muet."""
+        try:
+            from system_guardian import log_system_error
+            log_system_error(f"Dictee : {titre}", RuntimeError(str(detail)[:500]))
+        except Exception:
+            pass
+
     def stop(self):
         if not self.is_recording or not self.recorder:
             return
@@ -144,6 +216,7 @@ class AudioRecorder(QObject):
         try:
             self.recorder.stop()
             self.is_recording = False
+            self._duree_enregistree = self.recorder.duration()
             # Do NOT emit yet: the container is still being written.
             self._begin_finalise_watch()
         except Exception as e:
@@ -248,6 +321,7 @@ class AudioRecorder(QObject):
         if self._stable_ticks >= 2:
             self._stop_finalise_timer()
             print(f"[AudioRecorder] Enregistrement finalise ({size} octets) : {self.output_path}")
+            self._relacher_peripherique()
             self.recording_stopped.emit(self.output_path)
             return
 
@@ -256,9 +330,22 @@ class AudioRecorder(QObject):
             if size >= self.MIN_VALID_BYTES:
                 # Usable audio, just slow to settle — hand it over.
                 print(f"[AudioRecorder] Finalisation lente, fichier accepte ({size} octets).")
+                self._relacher_peripherique()
                 self.recording_stopped.emit(self.output_path)
             else:
-                self.error_occurred.emit(
-                    "تعذّر حفظ التسجيل الصوتي بشكل كامل. يرجى إعادة التسجيل. "
-                    "(Le fichier audio n'a pas pu être finalisé)"
-                )
+                # Le message doit nommer la cause : « non finalise » ne dit au
+                # notaire ni ce qui s'est passe ni quoi faire. Une duree restee
+                # a zero signifie que le peripherique n'a livre aucun echantillon
+                # - micro occupe ou muet - et non que l'ecriture a echoue.
+                duree = getattr(self, "_duree_enregistree", 0)
+                if duree <= 0:
+                    message = ("لم يلتقط المايكروفون أي صوت. تأكّد من عدم استعماله "
+                               "من طرف برنامج آخر أو نسخة أخرى من التطبيق، ثم أعد المحاولة. "
+                               "(Aucun son capte - micro probablement occupe)")
+                else:
+                    message = ("التسجيل قصير جدًا. يرجى التحدّث لثانيتين على الأقل. "
+                               "(Enregistrement trop court)")
+                self._journaliser(
+                    f"fichier inexploitable ({size} octets, duree {duree} ms)", message)
+                self._relacher_peripherique()
+                self.error_occurred.emit(message)

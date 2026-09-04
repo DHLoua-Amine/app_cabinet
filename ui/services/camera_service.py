@@ -39,6 +39,10 @@ class CameraService(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._thread = None
+        # Les fils qui refusent de s'arreter dans le delai imparti. On GARDE une
+        # reference tant qu'ils vivent : la lacher detruit l'objet C++ sous un fil
+        # encore en cours d'execution, ce qui fait planter l'application.
+        self._retires = []
         self._source = None
         self._state = CameraState.OFF
         self._detail = ""
@@ -106,6 +110,36 @@ class CameraService(QObject):
         self._set_state(CameraState.CONNECTING, str(source))
         return True
 
+    def _retirer(self, fil):
+        """Met un fil de cote au lieu de lacher sa reference.
+
+        Ses signaux sont debranches d'abord : un fil agonisant ne doit plus
+        pousser d'images ni de changements d'etat vers une interface qui est
+        deja passee a la camera suivante.
+        """
+        if fil is None:
+            return
+        for sig in ("frame_ready", "connection_status", "client_detected", "finished"):
+            try:
+                getattr(fil, sig).disconnect()
+            except Exception:
+                pass          # deja debranche, ou objet C++ parti
+        if fil in self._retires:
+            return
+        self._retires.append(fil)
+        try:
+            # Quand il finit pour de bon, on peut enfin le laisser partir.
+            fil.finished.connect(lambda f=fil: self._oublier(f))
+        except Exception:
+            pass
+
+    def _oublier(self, fil):
+        """Libere un fil mis de cote, une fois qu'il a reellement termine."""
+        try:
+            self._retires.remove(fil)
+        except ValueError:
+            pass
+
     def stop(self, timeout_ms: int = 3000) -> bool:
         """Stops the camera for good. Called on application close."""
         self._stopping = True
@@ -113,6 +147,10 @@ class CameraService(QObject):
         ok = True
         if self._thread:
             ok = self._thread.stop(timeout_ms=timeout_ms)
+            if not ok:
+                # Il tourne encore : le lacher ici detruirait son objet C++ en
+                # pleine execution. On le met de cote jusqu'a sa vraie fin.
+                self._retirer(self._thread)
             self._thread = None
         self._set_state(CameraState.OFF, "")
         return ok
@@ -176,5 +214,15 @@ class CameraService(QObject):
     def _retry(self):
         if self._stopping:
             return
+        # Ce chemin lachait la reference SANS meme demander l'arret. Un fil dont
+        # la camera a disparu peut tres bien tourner encore.
+        ancien = self._thread
         self._thread = None
+        if ancien is not None and ancien.isRunning():
+            try:
+                ancien.stop(timeout_ms=1500)
+            except Exception:
+                pass
+            if ancien.isRunning():
+                self._retirer(ancien)
         self.start(self._source)

@@ -1,0 +1,94 @@
+{
+  "passed": [
+    {
+      "name": "DB Schema Check",
+      "details": "Found main tables: ['clients', 'check_ins', 'sqlite_sequence', 'monthly_visit_stats', 'system_settings', 'cases', 'case_payments', 'client_services', 'expenses', 'salaries', 'record_edits', 'app_users', 'fees']"
+    },
+    {
+      "name": "DB Client Columns",
+      "details": "All parentage & CIN fields present: ['father_name', 'grandfather_name', 'cin_issue_date', 'cin_issue_place']"
+    },
+    {
+      "name": "Client Create Test",
+      "details": "Created test client_id: TEST_5112082"
+    },
+    {
+      "name": "Client Retrieval by ID",
+      "details": "Retrieved client successfully: اختبار حريف بن أحمد بن محمد الفرشيشي"
+    },
+    {
+      "name": "Client Cleanup",
+      "details": "Deleted test client TEST_5112082"
+    },
+    {
+      "name": "Price Formatter (5000 TND)",
+      "details": "Output: 'خمسة آلاف دينار (5000)'"
+    },
+    {
+      "name": "Licensing Subsystem",
+      "details": "Fingerprint: 55A9-D661-5F..., Status: active"
+    },
+    {
+      "name": "Remote License Check",
+      "details": "Active: True, Msg: Mode hors-ligne"
+    },
+    {
+      "name": "System Guardian",
+      "details": "Logging function executed without exception"
+    },
+    {
+      "name": "UI Instantiation: HomePage",
+      "details": "Successfully created HomePage"
+    },
+    {
+      "name": "UI Instantiation: PresencePage",
+      "details": "Successfully created PresencePage"
+    },
+    {
+      "name": "UI Instantiation: RegisterPage",
+      "details": "Successfully created RegisterPage"
+    },
+    {
+      "name": "RegisterPage Table Model",
+      "details": "Rows in model: 1"
+    },
+    {
+      "name": "RegisterPage Action",
+      "details": "Fiche client context action verified"
+    },
+    {
+      "name": "UI Instantiation: FicheClientPage",
+      "details": "Successfully created FicheClientPage"
+    },
+    {
+      "name": "FicheClientPage Tab Civil",
+      "details": "Civil tab exists and initialized"
+    },
+    {
+      "name": "UI Instantiation: ScannerPage",
+      "details": "Successfully created ScannerPage"
+    },
+    {
+      "name": "UI Instantiation: SettingsPage",
+      "details": "Successfully created SettingsPage"
+    },
+    {
+      "name": "UI Instantiation: AccountingPage",
+      "details": "Successfully created AccountingPage"
+    },
+    {
+      "name": "UI Instantiation: ClientsPage",
+      "details": "Successfully created ClientsPage"
+    },
+    {
+      "name": "UI Instantiation: MainWindow",
+      "details": "Successfully created MainWindow"
+    },
+    {
+      "name": "OCR Name Assembly",
+      "details": "Assembled: 'علي بن محمد بن البشير الفرجاني'"
+    }
+  ],
+  "failed": [],
+  "warnings": []
+}

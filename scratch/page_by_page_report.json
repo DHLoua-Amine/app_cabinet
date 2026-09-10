@@ -1,0 +1,120 @@
+{
+  "passed": 19,
+  "failed": 0,
+  "details": [
+    {
+      "status": "PASS",
+      "page": "HomePage (1/9)",
+      "feature": "Instantiation",
+      "msg": "HomePage created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "HomePage (1/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "PresencePage (2/9)",
+      "feature": "Instantiation",
+      "msg": "PresencePage created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "PresencePage (2/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "RegisterPage (3/9)",
+      "feature": "Instantiation",
+      "msg": "RegisterPage created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "RegisterPage (3/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "FicheClientPage (4/9)",
+      "feature": "Instantiation",
+      "msg": "FicheClientPage created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "FicheClientPage (4/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "ScannerPage (5/9)",
+      "feature": "Instantiation",
+      "msg": "ScannerPage created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "ScannerPage (5/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "SettingsPage (6/9)",
+      "feature": "Instantiation",
+      "msg": "SettingsPage created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "SettingsPage (6/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "AccountingPage (7/9)",
+      "feature": "Instantiation",
+      "msg": "AccountingPage created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "AccountingPage (7/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "ClientsPage (8/9)",
+      "feature": "Instantiation",
+      "msg": "ClientsPage created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "ClientsPage (8/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "MainWindow (9/9)",
+      "feature": "Instantiation",
+      "msg": "MainWindow created cleanly"
+    },
+    {
+      "status": "PASS",
+      "page": "MainWindow (9/9)",
+      "feature": "Overall Page Status",
+      "msg": "100% OK"
+    },
+    {
+      "status": "PASS",
+      "page": "TunisianFaridaDialog Component",
+      "feature": "Inheritance Calculator",
+      "msg": "Dialog initialized cleanly"
+    }
+  ]
+}

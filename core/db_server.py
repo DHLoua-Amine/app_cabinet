@@ -846,14 +846,45 @@ class DatabaseServer:
                             "error": ("schema changes are not permitted from a "
                                       f"workstation (refused: {head})")}
 
+            if op == "sync_photo":
+                import os
+                filename = os.path.basename(str(msg.get("filename") or ""))
+                raw = decode_value(msg.get("data"))
+                if filename and isinstance(raw, (bytes, bytearray)):
+                    from config import PROFILES_DIR
+                    PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+                    dest = PROFILES_DIR / filename
+                    with open(dest, "wb") as f:
+                        f.write(bytes(raw))
+                    try:
+                        import reception
+                        reception.clear_db_caches()
+                    except Exception:
+                        pass
+                    return {"ok": True}
+                return {"ok": False, "error": "invalid photo sync packet"}
+
             if op == "execute":
-                cur = db.execute(msg.get("sql") or "",
-                                 decode_params(msg.get("params")))
+                sql = msg.get("sql") or ""
+                cur = db.execute(sql, decode_params(msg.get("params")))
+                if is_write(sql):
+                    try:
+                        import reception
+                        reception.clear_db_caches()
+                    except Exception:
+                        pass
                 return self._result(cur)
 
             if op == "executemany":
+                sql = msg.get("sql") or ""
                 seq = [decode_params(p) for p in (msg.get("seq") or [])]
-                cur = db.executemany(msg.get("sql") or "", seq)
+                cur = db.executemany(sql, seq)
+                if is_write(sql):
+                    try:
+                        import reception
+                        reception.clear_db_caches()
+                    except Exception:
+                        pass
                 return {"ok": True, "rows": None, "cols": None,
                         "rowcount": cur.rowcount, "lastrowid": cur.lastrowid}
 
@@ -867,6 +898,69 @@ class DatabaseServer:
 
             if op == "ping":
                 return {"ok": True}
+
+            if op == "get_cache_gen":
+                gen = 0
+                try:
+                    import reception
+                    gen = reception._cache_generation
+                except Exception:
+                    pass
+                return {"ok": True, "gen": gen}
+
+            if op == "get_photo":
+                import os
+                path_str = str(msg.get("path") or msg.get("filename") or "")
+                filename = os.path.basename(path_str)
+                if filename:
+                    from config import PROFILES_DIR
+                    dest = PROFILES_DIR / filename
+                    if dest.exists() and dest.is_file():
+                        with open(dest, "rb") as f:
+                            raw_bytes = f.read()
+                        return {"ok": True, "data": encode_value(raw_bytes), "filename": filename}
+                return {"ok": False, "error": "photo not found"}
+
+            if op == "get_unknown_visitors":
+                if not hasattr(self, "unknown_visitors"):
+                    self.unknown_visitors = {}
+                visitors = list(self.unknown_visitors.values())
+                return {"ok": True, "visitors": visitors}
+
+            if op == "push_unknown_visitor":
+                visitor = msg.get("visitor")
+                if visitor and isinstance(visitor, dict) and visitor.get("client_id"):
+                    if not hasattr(self, "unknown_visitors"):
+                        self.unknown_visitors = {}
+                    self.unknown_visitors[visitor["client_id"]] = visitor
+                    return {"ok": True}
+                return {"ok": False, "error": "invalid visitor packet"}
+
+            if op == "purge_unknown_visitor":
+                client_ids = msg.get("client_ids") or []
+                if not hasattr(self, "unknown_visitors"):
+                    self.unknown_visitors = {}
+                for cid in client_ids:
+                    self.unknown_visitors.pop(cid, None)
+                return {"ok": True}
+
+            if op == "push_live_detection":
+                det = msg.get("detection")
+                if det and isinstance(det, dict):
+                    if not hasattr(self, "live_detections"):
+                        self.live_detections = []
+                    self.live_detections.append(det)
+                    if len(self.live_detections) > 20:
+                        self.live_detections = self.live_detections[-20:]
+                    return {"ok": True}
+                return {"ok": False, "error": "invalid detection packet"}
+
+            if op == "get_live_detection":
+                if not hasattr(self, "live_detections"):
+                    self.live_detections = []
+                since = msg.get("since", 0)
+                recent = [d for d in self.live_detections if d.get("ts", 0) > since]
+                return {"ok": True, "detections": recent}
 
             return {"ok": False, "error": f"unknown op {op!r}"}
         except Exception as e:

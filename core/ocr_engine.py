@@ -122,13 +122,70 @@ def inspect_card_image(image_bytes: bytes) -> dict:
     return result
 
 
-def optimize_image_for_api(image_bytes: bytes, max_dim: int = 1200) -> bytes:
+def auto_crop_card_bounding_box(pil_img: Image.Image) -> Image.Image:
     """
-    Normalises a card photo for the vision API: applies the EXIF orientation a phone
-    camera records, converts to RGB, and caps the longest side to keep payloads small.
+    Automatically detects a small document/card inside a large scanned A4 page or photo,
+    crops tightly around the card boundaries, and returns the zoomed high-res card.
+    """
+    try:
+        cv_img = np.array(pil_img)
+        if len(cv_img.shape) == 3 and cv_img.shape[2] == 3:
+            gray = cv2.cvtColor(cv_img, cv2.COLOR_RGB2GRAY)
+        elif len(cv_img.shape) == 3 and cv_img.shape[2] == 4:
+            gray = cv2.cvtColor(cv_img, cv2.COLOR_RGBA2GRAY)
+        else:
+            gray = cv_img
 
-    Raises ValueError when the bytes are not a decodable image, so unreadable files
-    are refused up front instead of being base64-encoded and sent as image/jpeg.
+        h, w = gray.shape
+        if h < 100 or w < 100:
+            return pil_img
+
+        # 1. Canny edge detection & dilation to detect card borders on white/dark backgrounds
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blurred, 30, 120)
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
+        dilated = cv2.dilate(edges, kernel, iterations=2)
+        
+        # 2. Find external contours
+        contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if not contours:
+            return pil_img
+
+        total_area = w * h
+        best_box = None
+        max_area = 0
+
+        for cnt in contours:
+            area = cv2.contourArea(cnt)
+            # Card must be between 1.5% and 90% of total image area (e.g. card on A4 page)
+            if 0.015 * total_area < area < 0.90 * total_area:
+                x, y, bw, bh = cv2.boundingRect(cnt)
+                aspect = float(bw) / bh if bh > 0 else 0
+                # Bounding box aspect ratio check for ID cards (0.4 to 2.8)
+                if 0.4 < aspect < 2.8 and area > max_area:
+                    max_area = area
+                    best_box = (x, y, bw, bh)
+
+        if best_box:
+            x, y, bw, bh = best_box
+            # Add 4% margin padding around cropped card
+            pad_x = int(bw * 0.04)
+            pad_y = int(bh * 0.04)
+            x1 = max(0, x - pad_x)
+            y1 = max(0, y - pad_y)
+            x2 = min(w, x + bw + pad_x)
+            y2 = min(h, y + bh + pad_y)
+            return pil_img.crop((x1, y1, x2, y2))
+    except Exception:
+        pass
+    return pil_img
+
+
+def optimize_image_for_api(image_bytes: bytes, max_dim: int = 2000) -> bytes:
+    """
+    Normalises a card photo for the vision API: applies EXIF orientation,
+    automatically detects and crops small cards on scanned pages, converts to RGB,
+    and caps the longest side to 2000px for crystal-clear AI reading.
     """
     try:
         pil_img = Image.open(io.BytesIO(image_bytes))
@@ -140,12 +197,13 @@ def optimize_image_for_api(image_bytes: bytes, max_dim: int = 1200) -> bytes:
         # Phone photos of a card are usually stored un-rotated with an EXIF tag.
         pil_img = ImageOps.exif_transpose(pil_img)
     except Exception:
-        # (c) Safe. Not every image carries EXIF orientation; the original
-        # orientation is then already correct.
         pass
 
     if pil_img.mode != "RGB":
         pil_img = pil_img.convert("RGB")
+
+    # Auto-crop small card on scanned page to zoom into text
+    pil_img = auto_crop_card_bounding_box(pil_img)
 
     w, h = pil_img.size
     if max(w, h) > max_dim:
@@ -153,7 +211,7 @@ def optimize_image_for_api(image_bytes: bytes, max_dim: int = 1200) -> bytes:
         pil_img = pil_img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
 
     buf = io.BytesIO()
-    pil_img.save(buf, format="JPEG", quality=80)
+    pil_img.save(buf, format="JPEG", quality=90)
     return buf.getvalue()
 
 

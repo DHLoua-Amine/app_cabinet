@@ -162,10 +162,15 @@ class VideoCaptureThread:
             if not src.endswith("/video") and not src.startswith("rtsp") and not src.endswith("/shot.jpg") and not src.endswith("/mjpeg"):
                 src = src.rstrip("/") + "/video"
 
-        is_http = isinstance(src, str) and (src.startswith("http://") or src.startswith("https://"))
+        is_http = isinstance(src, str) and (
+            src.startswith("http://") or src.startswith("https://")
+        )
+        is_network = is_http or (isinstance(src, str) and (
+            src.startswith("rtsp://") or src.startswith("rtp://")
+        ))
 
         # Fast non-blocking socket test to prevent OpenCV 30s network locks
-        if is_http and not check_ip_reachable(src, timeout=1.5):
+        if is_network and not check_ip_reachable(src, timeout=1.5):
             self.running = False
             self.failed = True
             return
@@ -173,8 +178,8 @@ class VideoCaptureThread:
         # Engine 1: Try OpenCV VideoCapture first with FFMPEG nobuffer & low_delay flags
         try:
             import os
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "fflags;nobuffer|flags;low_delay|max_delay;0"
-            self.cap = cv2.VideoCapture(src, cv2.CAP_FFMPEG if is_http else cv2.CAP_ANY)
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;0"
+            self.cap = cv2.VideoCapture(src, cv2.CAP_FFMPEG if is_network else cv2.CAP_ANY)
             if self.cap:
                 self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         except Exception as e:
@@ -189,8 +194,7 @@ class VideoCaptureThread:
         if self.cap and self.cap.isOpened():
             probe_deadline = time.time() + self.FIRST_FRAME_TIMEOUT_S
             while self.running and time.time() < probe_deadline:
-                self.cap.grab()
-                ret, frame = self.cap.retrieve()
+                ret, frame = self.cap.read()
                 if ret and frame is not None:
                     cv_worked = True
                     self.ret = True
@@ -203,12 +207,10 @@ class VideoCaptureThread:
                 time.sleep(0.03)
 
         if cv_worked:
-            # OpenCV is streaming cleanly with Zero-Lag Frame Drain
+            # OpenCV is streaming cleanly
             consecutive_failures = 0
             while self.running and self.cap and self.cap.isOpened():
-                # Flush internal buffer queue to grab latest real-time frame
-                self.cap.grab()
-                ret, frame = self.cap.retrieve()
+                ret, frame = self.cap.read()
                 if ret and frame is not None:
                     h, w = frame.shape[:2]
                     if w > 640:
@@ -295,12 +297,28 @@ def get_saved_camera_source():
             data = json.loads(CAM_CONFIG_FILE.read_text(encoding="utf-8"))
             return data.get("camera_source", 0)
         except Exception as read_err:
-            # (b) A corrupt camera_config.json silently falls back to USB camera 0,
-            # so an office using an IP camera loses it with no explanation.
             from system_guardian import log_system_error
             log_system_error("could not read the saved camera source; "
                              "falling back to the default device", read_err)
     return 0
+
+def get_saved_secondary_camera_source():
+    if CAM_CONFIG_FILE.exists():
+        try:
+            data = json.loads(CAM_CONFIG_FILE.read_text(encoding="utf-8"))
+            return data.get("camera_source_2", "")
+        except Exception:
+            pass
+    return ""
+
+def get_saved_tertiary_camera_source():
+    if CAM_CONFIG_FILE.exists():
+        try:
+            data = json.loads(CAM_CONFIG_FILE.read_text(encoding="utf-8"))
+            return data.get("camera_source_3", "")
+        except Exception:
+            pass
+    return ""
 
 def has_saved_camera_source() -> bool:
     """
@@ -359,9 +377,38 @@ def set_saved_camera_source(source):
         CAM_CONFIG_FILE.write_text(json.dumps(data), encoding="utf-8")
         return True
     except Exception as write_err:
-        # (a)/(b) This is the same shape as the USB backup path bug: Paramètres
-        # reported the camera address as saved while the write had failed, and the
-        # office's IP camera reverted on the next launch.
         from system_guardian import log_system_error
         log_system_error("could not save the camera source", write_err)
+        return False
+
+def set_saved_secondary_camera_source(source):
+    data = {}
+    if CAM_CONFIG_FILE.exists():
+        try:
+            data = json.loads(CAM_CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    data["camera_source_2"] = source
+    try:
+        CAM_CONFIG_FILE.write_text(json.dumps(data), encoding="utf-8")
+        return True
+    except Exception as write_err:
+        from system_guardian import log_system_error
+        log_system_error("could not save the secondary camera source", write_err)
+        return False
+
+def set_saved_tertiary_camera_source(source):
+    data = {}
+    if CAM_CONFIG_FILE.exists():
+        try:
+            data = json.loads(CAM_CONFIG_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            data = {}
+    data["camera_source_3"] = source
+    try:
+        CAM_CONFIG_FILE.write_text(json.dumps(data), encoding="utf-8")
+        return True
+    except Exception as write_err:
+        from system_guardian import log_system_error
+        log_system_error("could not save the tertiary camera source", write_err)
         return False

@@ -205,7 +205,15 @@ TEMPLATE_ZAWADJ = """الحمد لله في يوم {day_words} من {hijri_date}
 
 TEMPLATE_TAWKEEL = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} أقام التوكيل التوثيقي الموكل: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. لفائدة الوكيل: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على التوكيل: الفصل الأول: وكل الموكل الوكيل المذكور في القيام بكافة الإجراءات التوثيقية والإدارية والقانونية الخاصة بـ {property_desc}. الفصل الثاني: للوكيل حق التوقيع والتمثيل أمام كافة الإدارات والقباضات المالية والمحاكم وحافظ الملكية العقارية. وأبرم التوكيل وتلي فوافقا وأمضيا والله الموفق."""
 
-TEMPLATE_HOJJAT_WAFAT = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} حرر إشهاد حجة الوفاة وتخريج الفريضة الشرعية بناء على البحث الشرعي وشهادة الشاهدين المكلفين وطالب الإشهاد: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. والمتضمن إثبات وفاة الهالك الموروث المرحوم: {party2_name} المتوفى بتاريخ {party2_birthdate} بـ {party2_birthplace}. اتفقوا على المحرر الآتي: الفصل الأول: ثبوت وفاة الهالك المذكور وانحصار ورثته الشرعيين وحقوقهم الفريضية في {property_desc}. الفصل الثاني: صافي التركة ومنابات الورثة التقديرية بـ {price_words} ({price_num} دينار). الفصل الثالث: أصل الفريضة الشرعية وتوزيع السهام انجر عن تركة الهالك {ownership_origin}. وأبرم الإشهاد وتلي فوافقوا وأمضوا ورسم بدفتر مسودات أولهما والله الموفق."""
+TEMPLATE_HOJJAT_WAFAT = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block}.
+حضَرَ لدينا نحن:
+{party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr} بوصفه(ا) مصرحاً بالوفاة.
+كما حضَرَ لدينا الشاهدان الإثنين المكلفان شرعاً وقانوناً:
+الأول: السيد ........................
+والثاني: السيد ........................
+وذكَرا أنهما يعرفان الهالك(ة) المرحوم(ة): {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr} معرفة تامة وشَهِدا بأنه(ا) توفي(ت) بـ {party2_birthplace} بتاريخ {party2_birthdate} حسبما هو مضمن برسم وفاته(ا) عدد ................ المحرر من ضابط الحالة المدنية ببلدية ................ .
+وقَد ترَك(ت) ورثته(ا) الشرعيين الآتي ذكرهم: {property_desc} ولا غَير.
+هذا ما تم تلقيه وتلي فوافقوا وأمضوا ورسم بدفتر مسودات أولهما صحيفة ................ تحت عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."""
 
 TEMPLATE_WASSIYA = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} حرر هذا الإشهاد بالوصية الصادرة عن الموصي: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. لفائدة الموصى له: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على الوصية: الفصل الأول: أوصى الموصي بعد وفاته وخروجاً من الثلث الشرعي بجميع {property_desc}. الفصل الثاني: قيمة الموصى به تقديرياً بـ {price_words} ({price_num} دينار). الفصل الثالث: انجرار ملكية الموصى به {ownership_origin}. وأبرم العقد وتلي فوافقا وأمضيا والله الموفق."""
 
@@ -213,11 +221,11 @@ TEMPLATE_TAKHAROUJ = """الحمد لله في يوم {day_words} من {hijri_da
 
 TEMPLATE_COMPANY = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} أقيم القانون الأساسي لتأسيس الشركة بين الشركاء المؤسسين: الشريك الأول: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. الشريك الثاني: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقوا على تأسيس شركة ذات مسؤولية محدودة: الفصل الأول: موضوع الشركة وغرضها التجاري والصناعي هو {property_desc}. الفصل الثاني: رأس مال الشركة المحدد قدره بـ {price_words} ({price_num} دينار) مقسم إلى حصص متساوية بين الشركاء. وأبرم العقد وتلي فوافقوا وأمضوا والله الموفق."""
 
-TEMPLATE_FONDS_COMMERCE = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} انعقد بين البائع للأصل التجاري: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. والمشتري للأصل التجاري: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على بيع الأصل التجاري: الفصل الأول: باع واحيل للأصل التجاري بجميع عناصر المادية والمعنوية الكائن بـ {property_desc}. الفصل الثاني: تم البيع نظير ثمن جملي قدره {price_words} ({price_num} دينار). الفصل الثالث: انجرار ملكية الأصل التجاري {ownership_origin}. وأبرم العقد وتلي فوافقا وأمضيا والله الموفق."""
+TEMPLATE_FONDS_COMMERCE = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} انعقد بين البائع للأصل التجاري: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. والمشتري للأصل التجاري: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على بيع الأصل التجاري: الفصل الأول: باع واحيل للأصل التجاري بجميع عناصر المادية والمعنوية الكائن بـ {property_desc}. الفصل الثاني: تم البيع نظير مبلغ جملي قدره {price_words} ({price_num} دينار). الفصل الثالث: انجرار ملكية الأصل التجاري {ownership_origin}. وأبرم العقد وتلي فوافقا وأمضيا والله الموفق."""
 
 TEMPLATE_IKRAR_DAIN = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} انعقد بين المدين المقر بالدين: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. والدائن المقر له بالدين: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على الإقرار بالدين والتعهد بالوفاء: الفصل الأول: أقر اعترف المدين بذمته الشاغلة بمبلغ الدين المستحق للدائن بسبب {property_desc}. الفصل الثاني: مبلغ الدين المحرر قدره {price_words} ({price_num} دينار) يتعهد المدين بوفائه في التاريخ المحدد. وأبرم الإشهاد وتلي فوافقا وأمضيا والله الموفق."""
 
-TEMPLATE_WAAD_BAY3 = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} انعقد بين الطرف الأول الواعد بالبيع: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. الطرف الثاني الموعود له بالبيع: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على عقد الوعد بالبيع التوثيقي: الفصل الأول: وعد والتزم الواعد بالبيع بأن يبيع وينقل ملكية العقار التالي {property_desc} لفائدة الموعود له بالبيع الذي قبل ذلك. الفصل الثاني: تم هذا الوعد بالبيع نظير ثمن جملي قدره {price_words} ({price_num} دينار). الفصل الثالث: انجرار الملكية {ownership_origin}. وأبرم العقد بين طرفيه وتلي فوافقا وأمضيا واقتطعت فيه بطاقة نقل عدد ................ خالص معلوم نقلها بالقباضة المالية بـ{tax_office} بتاريخ ................ وصل عدد ................م. ورسم بدفتر مسودات أولهما صحيفة ................ عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."""
+TEMPLATE_WAAD_BAY3 = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} انعقد بين الطرف الأول الواعد بالبيع: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. الطرف الثاني الموعود له بالبيع: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على عقد الوعد بالبيع التوثيقي: الفصل الأول: وعد والتزم الواعد بالبيع بأن يبيع وينقل ملكية العقار التالي {property_desc} لفائدة الموعود له بالبيع الذي قبل ذلك. الفصل الثاني: تم هذا الوعد بالبيع نظير مبلغ جملي قدره {price_words} ({price_num} دينار). الفصل الثالث: انجرار الملكية {ownership_origin}. وأبرم العقد بين طرفيه وتلي فوافقا وأمضيا واقتطعت فيه بطاقة نقل عدد ................ خالص معلوم نقلها بالقباضة المالية بـ{tax_office} بتاريخ ................ وصل عدد ................م. ورسم بدفتر مسودات أولهما صحيفة ................ عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."""
 
 TEMPLATE_ISKAT = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} انعقد بين الطرف الأول المسقط: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. الطرف الثاني المسقط له: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على الإسقاط التوثيقي: الفصل الأول: أسقط الطرف الأول والغي وسحب كافة حقوقه ومناباته والدعاوى الخاصة بـ {property_desc} لفائدة الطرف الثاني الذي قبل ذلك. الفصل الثاني: تم هذا الإسقاط مقابل بدل إسقاط قدره {price_words} ({price_num} دينار). الفصل الثالث: انجرار الملكية {ownership_origin}. وأبرم العقد بين طرفيه وتلي فوافقا وأمضيا واقتطعت فيه بطاقة نقل عدد ................ خالص معلوم نقلها بالقباضة المالية بـ{tax_office} بتاريخ ................ وصل عدد ................م. ورسم بدفتر مسودات أولهما صحيفة ................ عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."""
 
@@ -240,7 +248,6 @@ TEMPLATES_MAP = {
     "عقد بيع أصل تجاري": TEMPLATE_FONDS_COMMERCE,
     "عقد إقرار بدين والتزام": TEMPLATE_IKRAR_DAIN,
 }
-
 
 DAYS_AR = {
     "Monday": "الإثنين", "Tuesday": "الثلاثاء", "Wednesday": "الأربعاء",
@@ -405,10 +412,26 @@ def format_single_party_text(party_dict: dict) -> str:
     if not party_dict:
         return "........................"
     name = str(party_dict.get("full_name") or party_dict.get("name") or "").strip()
+    prenom = str(party_dict.get("prenom") or "").strip()
+    nom = str(party_dict.get("nom") or "").strip()
+    father = str(party_dict.get("father_name") or party_dict.get("father") or "").strip()
+    gfather = str(party_dict.get("grandfather_name") or party_dict.get("grandfather") or "").strip()
+
     if not name or "...." in name:
         name = "........................"
 
-    gender = detect_tunisian_gender(name)
+    gender = detect_tunisian_gender(name or prenom)
+    bin_word = "بنت" if gender == "F" else "بن"
+
+    # Construct full legal parentage name if father/grandfather names exist
+    if prenom and nom and father and gfather:
+        full_display_name = f"{prenom} {bin_word} {father} {bin_word} {gfather} {nom}"
+    elif prenom and nom and father:
+        full_display_name = f"{prenom} {bin_word} {father} {nom}"
+    elif name and father and gfather and father not in name:
+        full_display_name = f"{name} {bin_word} {father} {bin_word} {gfather}"
+    else:
+        full_display_name = name
     
     if gender == "F":
         born_prefix = "المولودة بـ"
@@ -427,10 +450,12 @@ def format_single_party_text(party_dict: dict) -> str:
     bdate = str(party_dict.get("birth_date") or party_dict.get("birthdate") or "").strip()
     job = str(party_dict.get("job") or party_dict.get("profession") or "").strip()
     cin = str(party_dict.get("cin_number") or party_dict.get("cin") or "").strip()
-    cin_date = str(party_dict.get("issue_date") or party_dict.get("cin_date") or "").strip()
+    cin_date = str(party_dict.get("cin_issue_date") or party_dict.get("issue_date") or party_dict.get("cin_date") or "").strip()
+    cin_place = str(party_dict.get("cin_issue_place") or party_dict.get("issue_place") or party_dict.get("cin_place") or "").strip()
+    cin_date_place = str(party_dict.get("cin_date_place") or "").strip()
     addr = str(party_dict.get("address") or party_dict.get("addr") or "").strip()
 
-    parts = [f"{title_prefix} {name}"]
+    parts = [f"{title_prefix} {full_display_name}"]
 
     if bplace and "...." not in bplace and bdate and "...." not in bdate:
         parts.append(f"{born_prefix} {bplace} في {bdate}")
@@ -451,6 +476,10 @@ def format_single_party_text(party_dict: dict) -> str:
         cin_str = f"{cin_prefix} {cin}"
         if cin_date and "...." not in cin_date:
             cin_str += f" مؤرخة في {cin_date}"
+            if cin_place and "...." not in cin_place:
+                cin_str += f" بـ {cin_place}"
+        elif cin_date_place and "...." not in cin_date_place:
+            cin_str += f" مؤرخة في {cin_date_place}"
         parts.append(cin_str)
     else:
         parts.append(f"{cin_prefix} ................")
@@ -638,18 +667,27 @@ def build_multi_party_contract_text(
             p1_str = format_single_party_text(p1_info)
             w1_str = format_single_party_text(witness1_info) if witness1_info else (format_single_party_text(p2_info) if p2_info else "")
             w2_str = format_single_party_text(witness2_info) if witness2_info else ""
-            
+
+            death_act_num = contract_vars.get("death_act_num") or contract_vars.get("act_num") or "........"
+            municipality = contract_vars.get("municipality") or contract_vars.get("city") or "........"
+            death_date = contract_vars.get("death_date") or "........"
+            deceased_name = p2_info.get("full_name") or p2_info.get("name") or contract_vars.get("deceased_name") or "........"
+
+            g1 = detect_tunisian_gender(p1_info.get("full_name") or p1_info.get("name", ""))
+            declarant_role = "بوصفها مصرحة بالوفاة" if g1 == "F" else "بوصفه مصرحاً بالوفاة"
+
             witness_block = ""
             if w1_str:
-                witness_block = f"حضر لدينا الشاهدان المكلفان بالإشهاد: الأول {w1_str}"
+                witness_block = f"كما حضر لدينا الشاهدان: الأول: {w1_str}"
                 if w2_str:
-                    witness_block += f" والثاني {w2_str}"
+                    witness_block += f"، والثاني: {w2_str}"
                 witness_block += "."
 
             body = (
-                f"{preamble_head} بطلب من طالب الإشهاد: {p1_str}. "
+                f"{preamble_head} حضر لدينا: {p1_str} {declarant_role}. "
                 f"{witness_block} "
-                f"والذين أشهدوا بثبوت وفاة الهالك المنحصرة ورثته الشرعيون في: {p_desc_clean}. "
+                f"وذكروا أنهم يعرفون المتوفى: {deceased_name} معرفة تامة وشهدوا بأنه توفي بـ {municipality} بتاريخ {death_date} حسبما هو مضمن برسم وفاته عدد {death_act_num} المحرر من ضابط الحالة المدنية ببلدية {municipality}. "
+                f"وقد ترك ورثته الشرعيين الآتي ذكرهم: {p_desc_clean} ولا غير. "
                 f"هذا ما تم تلقيه وتلي فوافقوا وأمضوا ورسم بدفتر مسودات أولهما صحيفة ................ تحت عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."
             )
             return body
@@ -748,7 +786,7 @@ def build_multi_party_contract_text(
             title_exam_sentence = "حيث أبرم المذكورين عقد بيع بحجة عادلة حررناها بتاريخ سابق مسجلة تخلد بذمة المشترين دين جل أجله وبناء عليه:"
     elif is_real_estate and "بعد الاطلاع على رسم الملكية" not in property_desc:
         p_title = contract_vars.get("property_title") or contract_vars.get("property_name") or ""
-        t_foncier = contract_vars.get("titre_foncier") or contract_vars.get("tf_number") or ""
+        t_foncier = contract_vars.get("titre_foncier") or contract_vars.get("tf_number") or contract_vars.get("title_num") or contract_vars.get("title_number") or ""
         t_gov = contract_vars.get("titre_gov") or contract_vars.get("wilaya") or ""
         p_loc = contract_vars.get("property_location") or contract_vars.get("location") or ""
         p_area = contract_vars.get("property_area") or contract_vars.get("area") or ""
@@ -757,7 +795,7 @@ def build_multi_party_contract_text(
         num_part = f"موضوع الرسم العقاري عدد {t_foncier} " if t_foncier else "موضوع الرسم العقاري عدد ................ "
         gov_part = f"{t_gov} " if t_gov else ""
         loc_part = f"الكائن بـ{p_loc} " if p_loc else "الكائن بـ................ "
-        area_part = f"مساحته {p_area} م.م " if p_area else "مساحته ................ م.م "
+        area_part = f"مساحته {p_area} متر مربع " if p_area else "مساحته ................ متر مربع "
 
         title_exam_sentence = f"بعد الاطلاع على رسم الملكية للعقار {title_part}{num_part}{gov_part}{loc_part}{area_part}وإشعار الطرفين بحالته القانونية اتفقا على:"
 
@@ -826,7 +864,7 @@ def build_multi_party_contract_text(
         p_words_clean += " دينار"
 
     if p_words_clean and p_num_clean:
-        price_str = f"{p_words_clean} {p_num_clean} دينار"
+        price_str = f"{p_words_clean} ({p_num_clean})"
     elif p_words_clean:
         price_str = p_words_clean
     elif p_num_clean:
@@ -908,7 +946,7 @@ def build_multi_party_contract_text(
         p_words_clean += " دينار"
 
     if p_words_clean and p_num_clean:
-        price_str = f"{p_words_clean} {p_num_clean} دينار"
+        price_str = f"{p_words_clean} ({p_num_clean})"
     elif p_words_clean:
         price_str = p_words_clean
     elif p_num_clean:
@@ -1160,25 +1198,13 @@ def _clean_text_entity(text: str) -> str:
     # Apply comprehensive dynamic Gender Grammar Engine for Party 1 & Party 2
     res = _apply_gender_grammar_corrections(res)
 
-    # Strip unnecessary parentheses around numbers, land shares, and dates
-    res = re.sub(r"\((\d+(?:\.\d+)?)\)", r"\1", res)
+    # Strip unnecessary parentheses around dates (preserve parentheses around price numbers)
     res = re.sub(r"\((\d{1,2}/\d{1,2}/\d{2,4})\)", r"\1", res)
 
-    # Strip all verbose spelled-out Arabic number words right before digits & dates
-    # e.g. "في السادس عشر من أوت سنة ألفين واثنين 16/08/2002" -> "في 16/08/2002"
-    # "تسعة وتسعين فاصلة خمسمائة وثمانية وعشرين 99.528" -> "99.528"
-    # "ثلاثمائة وسبعة عشر ألفًا وثلاثمائة وتسعة وسبعين 317379" -> "317379"
-    # "وصل عدد صفر ثلاثة وثلاثين ألفا ومائتين 0330200" -> "وصل عدد 0330200"
-    # "سنة ألفين وثلاثة 2003" -> "سنة 2003"
-    # "عدد ستة آلاف وثمانمائة وتسعة وعشرين 6829" -> "عدد 6829"
+    # Strip verbose spelled-out words before stamp numbers, receipt numbers, and years only
     res = re.sub(r"[\u064b-\u0652]", "", res)  # strip diacritics / tanween for clean matching
-    num_w = r"(?:واحد|إثنان|اثنان|اثنتان|ثلاثة|ثلاث|أربعة|أربع|خمسة|خمس|ستة|ست|سبعة|سبع|ثمانية|ثمان|تسعة|تسع|عشرة|عشر|عشرين|ثلاثين|أربعين|خمسين|ستين|سبعين|ثمانين|تسعين|مائة|مائتين|ثلاثمائة|أربعمائة|خمسمائة|ستمائة|سبعمائة|ثمانمائة|تسعمائة|ألف|ألفا|ألفين|آلاف|ملايين|مليون|فاصلة|فاصل|صفر|وعشرين|وثلاثين|وأربعين|وخمسين|وستين|وسبعين|وثمانين|وتسعين|وواحد|واثنين|وثلاثة|وأربعة|وخمسة|وستة|وسبعة|وثمانية|وتسعة|وثلاثمائة|وأربعمائة|وخمسمائة|وستماءة|وسبعمائة|وثمانمائة|وتسعمائة|وألف|وألفين|ومائتين)"
-    pattern_num = rf"\b(?:{num_w})(?:\s+(?:{num_w}))*\s+(\d+(?:\.\d+)?|\d{{1,2}}/\d{{1,2}}/\d{{2,4}})\b"
-    
     res = re.sub(r"\b(في|بتاريخ)\s+[أ-ي\s]{4,60}?\b(\d{1,2}/\d{1,2}/\d{2,4})\b", r"\1 \2", res)
-    res = re.sub(pattern_num, r"\1", res)
-    res = re.sub(pattern_num, r"\1", res)
-    res = re.sub(r"\b(وصل\s+عدد|عدد|مجلد|سنة|قدرها|قدره|بمبلغ|المقدر|المقدار)\s+[أ-ي\s]{2,30}?\b(\d+)\b", r"\1 \2", res)
+    res = re.sub(r"\b(وصل\s+عدد|عدد|مجلد|سنة)\s+[أ-ي\s]{2,30}?\b(\d+)\b", r"\1 \2", res)
 
     # Clean all variations of "غير مذكور" and "غير واضح" completely
     res = re.sub(r"غير مذكور بالكلمات", "", res)
@@ -1207,10 +1233,8 @@ def _apply_gender_grammar_corrections(text: str) -> str:
     res = re.sub(r"\bللعقارية\b", "للعقار", res)
     res = re.sub(r"\bتحت\s*[أا]تم\s*الضمانات\b", "تحت سائر الضمانات", res)
 
-    # Convert square meters to official Tunisian abbreviation م.م
-    res = re.sub(r"\bمترا\s*مربعا\b", "م.م", res)
-    res = re.sub(r"\bمتر\s*مربع\b", "م.م", res)
-    res = re.sub(r"\bأمتار\s*مربعة\b", "م.م", res)
+    # Ensure square meters are written out in full as متر مربع as requested
+    res = re.sub(r"\bم\.م\b", "متر مربع", res)
 
     # Detect Party 1 gender from Preamble header
     p1_male_header = bool(re.search(r"الطرف\s*الأول\s*(?:البائع|الواهب|المتنازل|المؤجر|المقاسم|السيد)\b", res))
@@ -1251,4 +1275,81 @@ def _apply_gender_grammar_corrections(text: str) -> str:
         res = re.sub(r"\b(ل?لطرف\s*الثاني)\s*المشترية\s*التي\s*اشترت\b", r"\1 المشتري الذي اشترى", res)
 
     return res
+
+
+def format_arabic_price(amount) -> str:
+    """
+    Formats a numeric price into formal Arabic words + parenthesized number.
+    e.g. 5000 -> 'خمسة آلاف دينار (5000)'
+    """
+    if amount is None or amount == "":
+        return ""
+    try:
+        val = float(str(amount).replace(",", ".").replace("دينار", "").strip())
+    except (ValueError, TypeError):
+        return str(amount)
+
+    units = {
+        0: "صفر", 1: "واحد", 2: "اثنان", 3: "ثلاثة", 4: "أربعة",
+        5: "خمسة", 6: "ستة", 7: "سبعة", 8: "ثمانية", 9: "تسعة",
+        10: "عشرة", 11: "أحد عشر", 12: "اثنا عشر", 13: "ثلاثة عشر",
+        14: "أربعة عشر", 15: "خمسة عشر", 16: "ستة عشر", 17: "سبعة عشر",
+        18: "ثمانية عشر", 19: "تسعة عشر"
+    }
+    tens = {2: "عشرون", 3: "ثلاثون", 4: "أربعون", 5: "خمسون", 6: "ستون", 7: "سبعون", 8: "ثمانون", 9: "تسعون"}
+    hundreds = {1: "مائة", 2: "مائتان", 3: "ثلاثمائة", 4: "أربعمائة", 5: "خمسمائة", 6: "ستمائة", 7: "سبعمائة", 8: "ثمانمائة", 9: "تسعمائة"}
+
+    int_val = int(val)
+    frac_val = int(round((val - int_val) * 1000))
+
+    def _num_to_words(n: int) -> str:
+        if n in units:
+            return units[n]
+        if n < 100:
+            u, t = n % 10, n // 10
+            return f"{units[u]} و{tens[t]}" if u else tens[t]
+        if n < 1000:
+            h, rem = n // 100, n % 100
+            h_str = hundreds[h]
+            return f"{h_str} و{_num_to_words(rem)}" if rem else h_str
+        if n < 1000000:
+            k, rem = n // 1000, n % 1000
+            if k == 1:
+                k_str = "ألف"
+            elif k == 2:
+                k_str = "ألفان"
+            elif 3 <= k <= 10:
+                k_str = f"{units[k]} آلاف"
+            else:
+                k_str = f"{_num_to_words(k)} ألف"
+            return f"{k_str} و{_num_to_words(rem)}" if rem else k_str
+        if n < 1000000000:
+            m, rem = n // 1000000, n % 1000000
+            if m == 1:
+                m_str = "مليون"
+            elif m == 2:
+                m_str = "مليونان"
+            elif 3 <= m <= 10:
+                m_str = f"{units[m]} ملايين"
+            else:
+                m_str = f"{_num_to_words(m)} مليون"
+            return f"{m_str} و{_num_to_words(rem)}" if rem else m_str
+        return str(n)
+
+    words = _num_to_words(int_val) + " دينار"
+    if frac_val > 0:
+        words += f" و{_num_to_words(frac_val)} مليم"
+
+    num_fmt = f"{val:g}"
+    return f"{words} ({num_fmt})"
+
+
+def format_surface_area(area_m2) -> str:
+    """
+    Formats a numeric surface area in square meters.
+    e.g. 250 -> '250 متر مربع'
+    """
+    if not area_m2:
+        return ""
+    return f"{area_m2} متر مربع"
 

@@ -12,10 +12,10 @@
 ; machine, sans rien modifier ici.
 ; ============================================================================
 
-#define MonNom        "Cabinet Notarial Zarai"
-#define MaVersion     "1.0.4"
-#define MonExe        "CabinetNotarialZarai.exe"
-#define ReglePareFeu  "Cabinet Notarial Zarai (partage reseau)"
+#define MonNom        "DATLY"
+#define MaVersion     "1.0.5"
+#define MonExe        "DATLY.exe"
+#define ReglePareFeu  "DATLY (partage reseau)"
 #define PortReseau    "8765"
 
 [Setup]
@@ -25,15 +25,19 @@ AppVersion={#MaVersion}
 AppVerName={#MonNom} {#MaVersion}
 AppPublisher={#MonNom}
 VersionInfoVersion={#MaVersion}
-DefaultDirName={autopf}\CabinetNotarialZarai
+DefaultDirName={localappdata}\DATLY
 DefaultGroupName={#MonNom}
-OutputDir={#SourcePath}dist_installer
-OutputBaseFilename=CabinetNotarial_Setup_v{#MaVersion}
-Compression=lzma2/ultra64
-SolidCompression=yes
+OutputDir=dist_installer
+OutputBaseFilename=DATLY_Setup_v{#MaVersion}_FinalBuild
+SetupIconFile=C:\Users\amin\Desktop\zarai1_pyside\assets\datly_app.ico
+Compression=lzma
+SolidCompression=no
 WizardStyle=modern
-; La regle de pare-feu et l'ecriture dans Program Files demandent l'elevation.
-PrivilegesRequired=admin
+CloseApplications=force
+CloseApplicationsFilter=*.exe
+RestartApplications=yes
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog commandline
 MinVersion=10.0
 ArchitecturesInstallIn64BitMode=x64compatible
 
@@ -43,21 +47,17 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; \
     GroupDescription: "{cm:AdditionalIcons}"
-; Cochee par defaut : sans cette regle, le poste de la secretaire ne peut pas
-; joindre le PC qui detient la base. Inutile mais inoffensive sur un poste de
-; travail, donc laissee active pour eviter un oubli qui coute une heure de
-; diagnostic.
 Name: "parefeu"; Description: \
     "Autoriser le partage reseau du cabinet (port {#PortReseau}) — necessaire sur le PC qui detient la base"; \
     GroupDescription: "Reseau du cabinet :"
 
 [Files]
-Source: "{#SourcePath}dist\CabinetNotarialZarai\*"; DestDir: "{app}"; \
-    Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "C:\Users\amin\Desktop\zarai1_pyside\dist\DATLY\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#MonNom}"; Filename: "{app}\{#MonExe}"
-Name: "{autodesktop}\{#MonNom}"; Filename: "{app}\{#MonExe}"; Tasks: desktopicon
+Name: "{autoprograms}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\_internal\assets\datly_app.ico"
+Name: "{userdesktop}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\_internal\assets\datly_app.ico"; Tasks: desktopicon
+Name: "{commondesktop}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\_internal\assets\datly_app.ico"; Tasks: desktopicon
 
 [Run]
 ; 1. La regle de pare-feu, avant le premier lancement, pour que le serveur soit
@@ -65,17 +65,17 @@ Name: "{autodesktop}\{#MonNom}"; Filename: "{app}\{#MonExe}"; Tasks: desktopicon
 Filename: "{sys}\netsh.exe"; \
     Parameters: "advfirewall firewall add rule name=""{#ReglePareFeu}"" dir=in action=allow protocol=TCP localport={#PortReseau}"; \
     StatusMsg: "Configuration du pare-feu pour le reseau du cabinet..."; \
-    Flags: runhidden; Tasks: parefeu
+    Flags: runhidden; Tasks: parefeu; Check: IsAdminInstallMode
 ; 2. Le lancement propose en fin d'installation.
 Filename: "{app}\{#MonExe}"; Description: "{cm:LaunchProgram,{#MonNom}}"; \
     Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
 ; La regle est retiree a la desinstallation : ne pas laisser un port ouvert sur
-; la machine d'un client apres avoir enleve le logiciel.
+; la machine d'un client apres avoir enleve l'application.
 Filename: "{sys}\netsh.exe"; \
     Parameters: "advfirewall firewall delete rule name=""{#ReglePareFeu}"""; \
-    Flags: runhidden; RunOnceId: "SupprimerReglePareFeu"
+    Flags: runhidden; RunOnceId: "SupprimerReglePareFeu"; Check: IsAdminInstallMode
 
 [UninstallDelete]
 ; Les donnees du cabinet vivent dans %LOCALAPPDATA%\CabinetNotarialZarai et ne

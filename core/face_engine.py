@@ -58,11 +58,15 @@ class FaceEngine:
                 from system_guardian import log_system_error
                 log_system_error("FaceEngine Model Load Failed", e)
 
-    def detect_and_extract(self, frame_bgr: np.ndarray) -> List[Dict]:
+    def detect_and_extract(self, frame_bgr: np.ndarray, non_blocking: bool = False) -> List[Dict]:
         if frame_bgr is None:
             return []
         
-        with self._lock:
+        acquired = self._lock.acquire(blocking=not non_blocking)
+        if not acquired:
+            return []  # Skip frame if another camera is currently detecting, eliminating thread stalls
+
+        try:
             if self.detector is None or self.recognizer is None:
                 return []
 
@@ -117,6 +121,8 @@ class FaceEngine:
                 # Re-initialize models to clear corrupted OpenCV C++ DNN BlobManager
                 self._init_models()
                 return []
+        finally:
+            self._lock.release()
 
     def match_face(
         self,

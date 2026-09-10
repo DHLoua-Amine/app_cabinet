@@ -350,7 +350,7 @@ class TunisianFaridaEngine:
         return "\n".join(lines)
 
     def export_farida_docx(self, result: dict, output_path: str):
-        """Generates an official notary Word document for the Farida calculation."""
+        """Generates an official notary Word document for the Farida calculation matching authentic notary standards."""
         doc = docx.Document()
 
         sections = doc.sections
@@ -360,29 +360,78 @@ class TunisianFaridaEngine:
             section.left_margin = Inches(0.8)
             section.right_margin = Inches(0.8)
 
+        # ── 1. OFFICIAL NOTARY OFFICE HEADER ─────────────────────────────────
+        try:
+            import office_profile
+            prof = office_profile.load()
+            notary_name = (prof.get("notary_name") or "مكتب عدل الإشهاد").strip()
+            office_addr = (prof.get("office_address") or "").strip()
+            office_phone = (prof.get("phone") or "").strip()
+        except Exception:
+            notary_name = "مكتب عدل الإشهاد"
+            office_addr = ""
+            office_phone = ""
+
+        # Top Header Table (Bilingual Notary Header)
+        header_table = doc.add_table(rows=1, cols=2)
+        header_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        header_cells = header_table.rows[0].cells
+        
+        # Right Side: Arabic Header
+        p_ar = header_cells[0].paragraphs[0]
+        p_ar.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        r_ar = p_ar.add_run(f"مكتب الأستاذ: {notary_name}\nعدل إشهاد")
+        r_ar.bold = True
+        r_ar.font.size = Pt(13)
+        r_ar.font.name = "Traditional Arabic"
+        if office_addr:
+            p_ar.add_run(f"\n{office_addr}")
+        if office_phone:
+            p_ar.add_run(f"\nالهاتف: {office_phone}")
+
+        # Left Side: French Header
+        p_fr = header_cells[1].paragraphs[0]
+        p_fr.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r_fr = p_fr.add_run(f"Etude Maître {notary_name}\nNotaire")
+        r_fr.bold = True
+        r_fr.font.size = Pt(11)
+        r_fr.font.name = "Calibri"
+        if office_addr:
+            p_fr.add_run(f"\n{office_addr}")
+        if office_phone:
+            p_fr.add_run(f"\nTél: {office_phone}")
+
+        doc.add_paragraph("═" * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        # ── 2. DEED TITLE ────────────────────────────────────────────────────
         title_p = doc.add_paragraph()
         title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = title_p.add_run("الجمهورية التونسية\nمكتب عدل الإشهاد\nحجة وفاة وإشهاد بالفريضة الشرعية")
+        run = title_p.add_run("فريضة شرعية وحجة تركة")
         run.bold = True
-        run.font.size = Pt(16)
+        run.font.size = Pt(18)
         run.font.name = "Traditional Arabic"
         run.font.color.rgb = RGBColor(15, 23, 42)
 
-        doc.add_paragraph("─" * 45).alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-        doc.add_heading("1. بيان التركة والتكاليف والديون:", level=2)
+        # ── 3. PREAMBLE & ESTATE DETAILS ─────────────────────────────────────
+        doc.add_heading("أولاً - بيان التركة والتكاليف والخصومات الشرعية:", level=2)
         p_info = doc.add_paragraph()
-        p_info.add_run(f"• إجمالي التركة الجملي: {result.get('gross_estate', 0):,.3f} TND\n")
-        p_info.add_run(f"• مصاريف الجنازة والديون: {result.get('total_deductions', 0):,.3f} TND\n")
-        p_info.add_run(f"• صافي التركة المستحقة للقسمة: {result.get('net_estate', 0):,.3f} TND\n").bold = True
+        p_info.paragraph_format.line_spacing = 1.3
+        p_info.add_run(f"• إجمالي التركة الجملي: {result.get('gross_estate', 0):,.3f} دينار توني\n")
+        p_info.add_run(f"• مصاريف الجنازة والديون المستحقة: {result.get('total_deductions', 0):,.3f} دينار\n")
+        p_info.add_run(f"• صافي التركة المعدة للقسمة الشرعية: {result.get('net_estate', 0):,.3f} دينار\n").bold = True
+        if result.get("property_area_m2", 0) > 0:
+            p_info.add_run(f"• المساحة الجملية للعقار: {result.get('property_area_m2')} م²\n")
+        if result.get("property_parts", 0) > 0:
+            p_info.add_run(f"• مناب التجزئة بالعقار: {result.get('property_parts')} جزءاً\n")
 
-        doc.add_heading(f"2. جدول توزيع السهام (أصل الفريضة: {result.get('base_origin')} سهماً):", level=2)
+        # ── 4. SHARES & DISTRIBUTION TABLE ──────────────────────────────────
+        doc.add_heading(f"ثانياً - جدول توزيع المنابات والأنصبة الشرعية (أصل الفريضة: {result.get('base_origin')} سهماً):", level=2)
         summary = result.get("heirs_summary", [])
         
         table = doc.add_table(rows=1, cols=6)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
         hdr_cells = table.rows[0].cells
-        headers = ["الوارث الشرعي", "السهام", "المخرج", "النسبة", "المبلغ بالدينار", "المناب بالعقار"]
+        headers = ["الوارث الشرعي", "عدد السهام", "الفك والكسر", "النسبة %", "المبلغ بالدينار", "مناب العقار والأجزاء"]
         for i, h_text in enumerate(headers):
             hdr_cells[i].text = h_text
             hdr_cells[i].paragraphs[0].runs[0].font.bold = True
@@ -394,7 +443,7 @@ class TunisianFaridaEngine:
             row_cells[1].text = str(item["shares"])
             row_cells[2].text = str(item["fraction"])
             row_cells[3].text = f"%{item['percentage']}"
-            row_cells[4].text = f"{item['amount']:,.3f} TND"
+            row_cells[4].text = f"{item['amount']:,.3f} د.ت"
             
             prop_str = ""
             if item.get("area_m2", 0) > 0:
@@ -403,12 +452,96 @@ class TunisianFaridaEngine:
                 prop_str += f" | {item['parts']} جزء"
             row_cells[5].text = prop_str if prop_str else "—"
 
-        doc.add_heading("3. النص التوثيقي الرسمي لحجة الوفاة:", level=2)
+        # ── 5. LEGAL NOTARIAL TEXT ──────────────────────────────────────────
+        doc.add_heading("ثالثاً - نص التوثيق والتوزيع الشرعي (صياغة العدول):", level=2)
         p_deed = doc.add_paragraph(result.get("legal_notarial_text", ""))
-        p_deed.style.font.size = Pt(12)
+        p_deed.style.font.size = Pt(13)
         p_deed.style.font.name = "Traditional Arabic"
+        p_deed.paragraph_format.line_spacing = 1.4
 
-        doc.add_paragraph("\n\nعدلا الإشهاد                                   طالب الإشهاد").alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        # ── 6. SIGNATURE BLOCK ───────────────────────────────────────────────
+        doc.add_paragraph("\nوذلك تمامها شهد بصحتها ومطابقتها للشريعة والقانون.")
+        p_sig = doc.add_paragraph("\nعدلا الإشهاد                                                       طالب الإشهاد")
+        p_sig.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        p_sig.runs[0].font.bold = True
+        p_sig.runs[0].font.size = Pt(13)
 
         doc.save(output_path)
+
+
+def parse_hujjat_wafat_text(text: str) -> dict:
+    """
+    Parses a Hujjat Wafat / Death Certificate text (or OCR result)
+    specifically extracting surviving heirs from clauses like:
+    "وقد ترك(ت) : زوجها/زوجته/والده/والدته/أبناءه/بناته..."
+    
+    Returns a dictionary ready for calculate_farida!
+    """
+    if not text or not isinstance(text, str):
+        return {}
+
+    t = text.strip()
+    heirs = {
+        'husband': False,
+        'wife': False,
+        'wives_count': 1,
+        'sons_count': 0,
+        'daughters_count': 0,
+        'father': False,
+        'mother': False,
+        'paternal_grandfather': False,
+        'maternal_grandmother': False,
+        'paternal_grandmother': False,
+        'full_brothers_count': 0,
+        'full_sisters_count': 0,
+        'predeceased_children_count': 0,
+        'names': []
+    }
+
+    import re
+    clause_match = re.search(r"(وقد تركت?|أحاط بتركه|انحصر ورثته?|الورثة الشرعيين?)\s*[:：]?(.*?)(ولم ترك|ولم يترك|هذا ما تم|وذلك تمامها|$)", t, re.DOTALL)
+    clause_text = clause_match.group(2) if clause_match else t
+
+    # 1. Spouse check
+    if re.search(r"زوجها\s+المتوفى\s+قبلها", clause_text):
+        heirs['husband'] = False
+    elif re.search(r"\bزوجها\b", clause_text) and "المتوفى قبلها" not in clause_text:
+        heirs['husband'] = True
+
+    if re.search(r"زوجته\s+المتوفاة\s+قبله", clause_text):
+        heirs['wife'] = False
+    elif re.search(r"\b(زوجته|زوجاته|أرملة|حرمته)\b", clause_text):
+        heirs['wife'] = True
+
+    # 2. Parents check
+    if re.search(r"\b(والده|أبوه|أبيه)\b", clause_text) and "المتوفى قبل" not in clause_text:
+        heirs['father'] = True
+    if re.search(r"\b(والدته|أمه|أمي)\b", clause_text) and "المتوفاة قبل" not in clause_text:
+        heirs['mother'] = True
+
+    stop_words = {
+        "الذكر", "مثل", "حظ", "الأنثيين", "وهم", "وهن", "منها", "منه", "غير", "التركة",
+        "ابن", "إبن", "ابنه", "إبنه", "وابنه", "وإبنه", "أبناء", "أبناؤه", "أبنائه",
+        "بنت", "بنته", "وبنته", "ابنة", "ابنته", "بنات", "بناته", "زوجة", "زوجته", "وزوجته"
+    }
+
+    # 3. Sons check (أبناء، ابن، ولد)
+    sons_match = re.search(r"(أبناؤه?|أبنائه?|أبناءها|أبنائها|أبنائهن|إبنه|ابنه|أولاده)\s*(?:منه|منها)?\s*[:：]?\s*([^،.\n]+)", clause_text)
+    if sons_match:
+        sons_part = re.split(r"(بناته?|بناتها|ابنته|بنته)", sons_match.group(2))[0]
+        s_names = [n.strip() for n in re.split(r"[،,و\s]+", sons_part) if len(n.strip()) > 2 and n.strip() not in stop_words]
+        if len(s_names) > 0:
+            heirs['sons_count'] = max(1, len(s_names))
+            heirs['names'].extend(s_names)
+
+    # 4. Daughters check (بنات، ابنة، بنت)
+    daug_match = re.search(r"(بناته?|بناتها|بناتهن|ابنته|إبنته|بنته)\s*(?:منه|منها)?\s*[:：]?\s*([^،.\n]+)", clause_text)
+    if daug_match:
+        daug_part = re.split(r"(أبناؤه?|أبنائه?|إبنه|ابنه|أولاده)", daug_match.group(2))[0]
+        d_names = [n.strip() for n in re.split(r"[،,و\s]+", daug_part) if len(n.strip()) > 2 and n.strip() not in stop_words]
+        if len(d_names) > 0:
+            heirs['daughters_count'] = max(1, len(d_names))
+            heirs['names'].extend(d_names)
+
+    return heirs
 

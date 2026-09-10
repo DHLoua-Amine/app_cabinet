@@ -1,0 +1,296 @@
+[
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\db_server.py",
+    "line": 333,
+    "description": "Query references table 'and' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 409,
+    "description": "Query references table 'import_audit' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 428,
+    "description": "Query references table 'import_audit' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 431,
+    "description": "Query references table 'import_audit' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 440,
+    "description": "Query references table 'ai_cache' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 448,
+    "description": "Query references table 'ai_cache' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 457,
+    "description": "Query references table 'scan_files' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 466,
+    "description": "Query references table 'scan_files' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 1024,
+    "description": "Query references table 'runs' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\legacy_migration.py",
+    "line": 1068,
+    "description": "Query references table 'runs' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\reception.py",
+    "line": 684,
+    "description": "Query references table 'the' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\reception.py",
+    "line": 1324,
+    "description": "Query references table 'SET' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\reception.py",
+    "line": 1400,
+    "description": "Query references table 'check_ins_archive' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\reception.py",
+    "line": 1406,
+    "description": "Query references table 'check_ins_archive' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\reception.py",
+    "line": 1421,
+    "description": "Query references table 'SET' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\reception.py",
+    "line": 1824,
+    "description": "Query references table 'in' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\updater.py",
+    "line": 2,
+    "description": "Query references table 'autonome' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\updater.py",
+    "line": 157,
+    "description": "Query references table 'ignor' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "core\\updater.py",
+    "line": 401,
+    "description": "Query references table 'Helper' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\main_window.py",
+    "line": 490,
+    "description": "Query references table 'Sidebar' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\main_window.py",
+    "line": 495,
+    "description": "Query references table 'Sidebar' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\main_window.py",
+    "line": 495,
+    "description": "Query references table 'Office' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\components\\farida_dialog.py",
+    "line": 34,
+    "description": "Query references table 'Active' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\components\\farida_dialog.py",
+    "line": 825,
+    "description": "Query references table 'active' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\accounting_page.py",
+    "line": 898,
+    "description": "Query references table 'UI' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\accounting_page.py",
+    "line": 903,
+    "description": "Query references table 'values' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\accounting_page.py",
+    "line": 1631,
+    "description": "Query references table 'from' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\clients_page.py",
+    "line": 426,
+    "description": "Query references table 'count' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\fiche_client_page.py",
+    "line": 743,
+    "description": "Query references table 'headers' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\fiche_client_page.py",
+    "line": 774,
+    "description": "Query references table 'banner' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\fiche_client_page.py",
+    "line": 958,
+    "description": "Query references table 'database' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\home_page.py",
+    "line": 475,
+    "description": "Query references table 'Viewport' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\home_page.py",
+    "line": 485,
+    "description": "Query references table 'its' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\home_page.py",
+    "line": 490,
+    "description": "Query references table 'crop' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\home_page.py",
+    "line": 490,
+    "description": "Query references table 'unknown' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\register_page.py",
+    "line": 600,
+    "description": "Query references table 'model' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\register_page.py",
+    "line": 963,
+    "description": "Query references table 'from' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 2054,
+    "description": "Query references table 'every' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 2137,
+    "description": "Query references table 'contract' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 2142,
+    "description": "Query references table 'contract' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 2153,
+    "description": "Query references table 'the' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\settings_page.py",
+    "line": 541,
+    "description": "Query references table 'channel' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\settings_page.py",
+    "line": 967,
+    "description": "Query references table 'translation' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\settings_page.py",
+    "line": 1906,
+    "description": "Query references table 'control' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\settings_page.py",
+    "line": 1981,
+    "description": "Query references table 'ui' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\settings_page.py",
+    "line": 2002,
+    "description": "Query references table 'updater' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\settings\\workers.py",
+    "line": 37,
+    "description": "Query references table 'info' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\settings\\workers.py",
+    "line": 40,
+    "description": "Query references table 'updater' which does not exist in SQLite schema"
+  },
+  {
+    "category": "SQL Table Missing",
+    "file": "ui\\pages\\settings\\workers.py",
+    "line": 57,
+    "description": "Query references table 'updater' which does not exist in SQLite schema"
+  }
+]

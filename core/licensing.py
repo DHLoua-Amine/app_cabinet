@@ -39,6 +39,7 @@ the office's existing archive untouched.
 
 from __future__ import annotations
 
+import os
 import base64
 import datetime
 import hashlib
@@ -336,6 +337,18 @@ def require_licence(fn):
     def wrapper(*args, **kwargs):
         st = status()
         if st.get("status") != ACTIVE:
+            try:
+                from PySide6.QtWidgets import QMessageBox, QApplication
+                if QApplication.instance():
+                    QMessageBox.warning(
+                        None,
+                        "Licence requise / ترخيص مطلوب",
+                        "Cette fonctionnalité nécessite une licence active.\nVeuillez تفعيل الترخيص من الإعدادات." if (hasattr(sys, "modules") and "auth" in sys.modules and getattr(sys.modules["auth"].session_state, "lang", "ar") == "fr") else
+                        "يتطلب هذا الإجراء ترخيصاً نَشِطاً.\nيرجى تفعيل الترخيص من الإعدادات."
+                    )
+                    return None
+            except Exception:
+                pass
             raise LicenceRequired(st.get("detail") or "unlicensed")
         return fn(*args, **kwargs)
 

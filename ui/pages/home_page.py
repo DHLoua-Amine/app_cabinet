@@ -344,6 +344,11 @@ class HomePage(QWidget):
 
     # ── Shared camera service ────────────────────────────────────────────────
     def attach_camera_service(self, service):
+        # Le retrait des fiches annulees passe par le service, comme le reste.
+        try:
+            service.unknown_purged.connect(self.on_unknown_purged)
+        except Exception:
+            pass          # service plus ancien, ou signal deja branche
         """Called once by MainWindow. This page renders the feed; it does not own it."""
         self.camera_service = service
         service.frame_ready.connect(self.on_frame_received)
@@ -447,10 +452,29 @@ class HomePage(QWidget):
         if self.selected_face_id and self.selected_face_id in self.session_faces:
             self.dismiss_unknown_visitor(self.selected_face_id)
 
+    @Slot(list)
+    def on_unknown_purged(self, cles):
+        """Retire les fiches « nouveau visiteur » que la camera vient d'annuler.
+
+        Le fil supprime ces fiches des qu'il reconnait la personne, mais
+        session_faces accumulait pour toute la session et n'etait vide que
+        manuellement. Les cartes annulees restaient donc affichees, et chaque
+        echec de reconnaissance en ajoutait une nouvelle."""
+        retirees = False
+        for cle in cles or ():
+            if cle in self.session_faces:
+                del self.session_faces[cle]
+                retirees = True
+                if self.selected_face_id == cle:
+                    self.selected_face_id = None
+        if retirees:
+            self._rebuild_grids()
+
     @Slot(QImage, list)
     def on_frame_received(self, qimg, detected_list):
-        # 1. Update Viewport image
-        self.video_viewport.setPixmap(QPixmap.fromImage(qimg).scaled(640, 420, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+        # 1. Update Viewport image if valid preview qimg was sent
+        if qimg and not qimg.isNull():
+            self.video_viewport.setPixmap(QPixmap.fromImage(qimg).scaled(640, 420, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
 
         # 2. Accumulate all detected faces into persistent session storage
         changed = False
@@ -479,34 +503,45 @@ class HomePage(QWidget):
                 self.on_face_selected(first_id)
 
     def _rebuild_grids(self):
-        # Clear known layout
-        for i in reversed(range(self.known_grid_layout.count())):
-            item = self.known_grid_layout.takeAt(i)
-            if item and item.widget():
-                item.widget().deleteLater()
-
-        # Clear unknown layout
-        for i in reversed(range(self.unknown_grid_layout.count())):
-            item = self.unknown_grid_layout.takeAt(i)
-            if item and item.widget():
-                item.widget().deleteLater()
+        if not hasattr(self, "_known_widgets"):
+            self._known_widgets = {}
+        if not hasattr(self, "_unknown_widgets"):
+            self._unknown_widgets = {}
 
         active_faces = list(self.session_faces.values())
-        known_faces = [f for f in active_faces if f.get("status") == "known"]
-        unknown_faces = [f for f in active_faces if f.get("status") != "known" and f.get("client_id") not in self.dismissed_unknown_ids]
+        known_faces = {f.get("client_id"): f for f in active_faces if f.get("status") == "known" and f.get("client_id")}
+        unknown_faces = {f.get("client_id"): f for f in active_faces if f.get("status") != "known" and f.get("client_id") and f.get("client_id") not in self.dismissed_unknown_ids}
 
-        # Populate Known Grid
-        for face in known_faces:
-            item_widget = FaceGridItem(face, lang=self.lang, parent=self.known_container)
-            item_widget.clicked.connect(self.on_face_selected)
-            self.known_grid_layout.insertWidget(0, item_widget)
+        # Remove known items no longer active
+        for cid in list(self._known_widgets.keys()):
+            if cid not in known_faces:
+                w = self._known_widgets.pop(cid)
+                self.known_grid_layout.removeWidget(w)
+                w.deleteLater()
 
-        # Populate Unknown Grid
-        for face in unknown_faces:
-            item_widget = FaceGridItem(face, lang=self.lang, parent=self.unknown_container)
-            item_widget.clicked.connect(self.on_face_selected)
-            item_widget.dismiss_clicked.connect(self.dismiss_unknown_visitor)
-            self.unknown_grid_layout.insertWidget(0, item_widget)
+        # Remove unknown items no longer active
+        for cid in list(self._unknown_widgets.keys()):
+            if cid not in unknown_faces:
+                w = self._unknown_widgets.pop(cid)
+                self.unknown_grid_layout.removeWidget(w)
+                w.deleteLater()
+
+        # Add new known items
+        for cid, face in known_faces.items():
+            if cid not in self._known_widgets:
+                item_widget = FaceGridItem(face, lang=self.lang, parent=self.known_container)
+                item_widget.clicked.connect(self.on_face_selected)
+                self.known_grid_layout.insertWidget(0, item_widget)
+                self._known_widgets[cid] = item_widget
+
+        # Add new unknown items
+        for cid, face in unknown_faces.items():
+            if cid not in self._unknown_widgets:
+                item_widget = FaceGridItem(face, lang=self.lang, parent=self.unknown_container)
+                item_widget.clicked.connect(self.on_face_selected)
+                item_widget.dismiss_clicked.connect(self.dismiss_unknown_visitor)
+                self.unknown_grid_layout.insertWidget(0, item_widget)
+                self._unknown_widgets[cid] = item_widget
 
     def on_face_selected(self, client_id):
         self.selected_face_id = client_id
@@ -562,6 +597,7 @@ class HomePage(QWidget):
         if is_known:
             self.client_selected.emit(self.selected_face_id)
         else:
+            old_unk_id = self.selected_face_id
             qimg = face.get("crop_qimg")
             if qimg and not qimg.isNull():
                 temp_id = reception.generate_client_id()
@@ -587,24 +623,38 @@ class HomePage(QWidget):
                         from reception import serialize_embedding
                         try:
                             blob = serialize_embedding(emb)
-                            conn = reception.get_connection()
-                            cursor = conn.cursor()
-                            cursor.execute("UPDATE clients SET face_embedding=? WHERE client_id=?", (blob, temp_id))
-                            conn.commit()
-                            conn.close()
+                            with reception.get_db_cursor(commit=True) as cursor:
+                                cursor.execute("UPDATE clients SET face_embedding=? WHERE client_id=?", (blob, temp_id))
                         except Exception as emb_err:
                             reception.log_system_error("quick registration embedding error", emb_err)
                     
+                    # Instantly dismiss and purge the unknown visitor card from UI
+                    if old_unk_id:
+                        self.dismiss_unknown_visitor(old_unk_id)
+                        if old_unk_id in self.session_faces:
+                            del self.session_faces[old_unk_id]
+                        self._rebuild_grids()
+
                     self.client_selected.emit(temp_id)
                 except Exception as e:
                     QMessageBox.warning(self, "Erreur", f"Erreur de création: {e}")
             else:
+                if old_unk_id:
+                    self.dismiss_unknown_visitor(old_unk_id)
+                    if old_unk_id in self.session_faces:
+                        del self.session_faces[old_unk_id]
+                    self._rebuild_grids()
                 self.client_selected.emit("NEW")
 
     # Parent notification triggers
     def showEvent(self, event):
         if self.camera_service is not None:
             self.camera_service.set_preview_enabled(True)
+        # Purge any remaining unknown face entries that were dismissed or registered
+        for cid in list(self.session_faces.keys()):
+            if cid in self.dismissed_unknown_ids:
+                del self.session_faces[cid]
+        self._rebuild_grids()
         super().showEvent(event)
 
     def hideEvent(self, event):

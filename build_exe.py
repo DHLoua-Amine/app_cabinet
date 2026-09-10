@@ -64,9 +64,9 @@ def build_executable():
         print(f"Erreur lors de la compilation : {e}")
         return False
 
-    dist_dir = BASE_DIR / "dist" / "CabinetNotarialZarai"
-    if not (dist_dir / "CabinetNotarialZarai.exe").exists():
-        print("Erreur : l'exécutable n'a pas été produit.")
+    dist_dir = BASE_DIR / "dist" / "DATLY"
+    if not (dist_dir / "DATLY.exe").exists():
+        print("Erreur : l'exécutable DATLY.exe n'a pas été produit.")
         return False
 
     ok = verify_bundle(dist_dir)
@@ -74,7 +74,7 @@ def build_executable():
     print(f"\nTaille totale du build : {total / 1e6:.0f} Mo")
     if ok:
         print("Compilation terminée avec succès ! "
-              "L'exécutable se trouve dans 'dist/CabinetNotarialZarai/'.")
+              "L'exécutable se trouve dans 'dist/DATLY/'.")
     else:
         print("ATTENTION : des fichiers requis manquent dans le build.")
     return ok

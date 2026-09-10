@@ -1,0 +1,322 @@
+[
+  {
+    "file": "core\\auth.py",
+    "line": 444,
+    "code": "print(f\"[AUTH] could not read {CONFIG_FILE}: {read_err}\", file=sys.stderr)"
+  },
+  {
+    "file": "core\\auth.py",
+    "line": 454,
+    "code": "print(f\"[AUTH] could not write {CONFIG_FILE}: {write_err}\", file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 75,
+    "code": "f\"({local_db} -> {appdata_db}): {mig_err}\", file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 94,
+    "code": "file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 356,
+    "code": "file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 376,
+    "code": "print(f\"[CONFIG] could not save network.json: {e}\", file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 573,
+    "code": "file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 589,
+    "code": "file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 647,
+    "code": "print(f\"[CONFIG] could not decrypt the stored API keys: {e}\", file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 683,
+    "code": "file=sys.stderr)"
+  },
+  {
+    "file": "core\\config.py",
+    "line": 704,
+    "code": "print(f\"[CONFIG] could not save the API keys: {write_err}\", file=sys.stderr)"
+  },
+  {
+    "file": "core\\system_guardian.py",
+    "line": 151,
+    "code": "file=sys.stderr)"
+  },
+  {
+    "file": "core\\system_guardian.py",
+    "line": 166,
+    "code": "f\"({ERROR_LOG_PATH}): {write_err}\", file=sys.stderr)"
+  },
+  {
+    "file": "core\\system_guardian.py",
+    "line": 168,
+    "code": "f\"{err_title}: {exception_obj}\", file=sys.stderr)"
+  },
+  {
+    "file": "core\\updater.py",
+    "line": 46,
+    "code": "file=sys.stderr)"
+  },
+  {
+    "file": "core\\voice_verifier.py",
+    "line": 136,
+    "code": "sys.stdout.write(f\"[TIMING] Audio Downsampling: {orig_sz:,} bytes -> {new_sz:,} bytes ({pct:.1f}% payload reduction) in {t_ds_dur:.3f}s\\n\")"
+  },
+  {
+    "file": "core\\voice_verifier.py",
+    "line": 137,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\components\\audio_recorder.py",
+    "line": 277,
+    "code": "f\"{self.output_path}: {rm_err}\", file=sys.stderr)"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 57,
+    "code": "sys.stdout.write(f\"\\n[TIMING 0.00s] === 🚀 STARTING PIPELINE GENERATION ===\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 58,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 92,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 1 Card {idx+1}: Pre-scanned cache HIT! Name={p1['extracted'].get('full_name')} (0.0s delay)\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 93,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 97,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 1 Card {idx+1}: Background pre-scan active - joining active thread...\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 98,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 116,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 1 Card {idx+1}: Joined background pre-scan in {t_wait_dur:.2f}s! Name={p1['extracted'].get('full_name')}\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 117,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 120,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 1 Card {idx+1}: Registered Client database HIT! (0.0s delay)\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 121,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 124,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 1 Card {idx+1}: Cache MISS - Dispatching Vision OCR in parallel thread...\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 125,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 135,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 2 Card {idx+1}: Pre-scanned cache HIT! Name={p2['extracted'].get('full_name')} (0.0s delay)\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 136,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 140,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 2 Card {idx+1}: Background pre-scan active - joining active thread...\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 141,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 159,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 2 Card {idx+1}: Joined background pre-scan in {t_wait_dur:.2f}s! Name={p2['extracted'].get('full_name')}\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 160,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 163,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 2 Card {idx+1}: Registered Client database HIT! (0.0s delay)\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 164,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 167,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 2 Card {idx+1}: Cache MISS - Dispatching Vision OCR in parallel thread...\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 168,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 178,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Audio Audio Bytes Present ({len(self.audio_bytes)} bytes) - Dispatching Transcription in parallel...\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 179,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 197,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Audio Transcription finished in {t_aud_dur:.2f}s!\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 198,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 215,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Extracting variables & clauses from dictation text...\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 216,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 221,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Spoken variable extraction finished in {t_var_dur:.2f}s!\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 222,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 260,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 1 Vision OCR result collected in {t_ocr_dur:.2f}s!\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 261,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 319,
+    "code": "sys.stdout.write(f\"[TIMING {t_curr:.2f}s] Party 2 Vision OCR result collected in {t_ocr_dur:.2f}s!\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 320,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 357,
+    "code": "sys.stdout.write(f\"[TIMING {t_total:.2f}s] === 🏁 TOTAL PIPELINE EXECUTION TIME: {t_total:.2f} SECONDS ===\\n\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 358,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 1168,
+    "code": "sys.stdout.write(f\"\\n[TIMING] ⚡ Instant Background CIN Pre-OCR Started on Upload for {p_type} Card {idx+1}...\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 1169,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 1184,
+    "code": "sys.stdout.write(f\"[TIMING] ✅ Background CIN Pre-OCR ({faces_str}) Finished in {dur:.2f}s! Name={d.get('full_name')} | Job={job_str} | Address={addr_str}\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 1185,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 1187,
+    "code": "sys.stdout.write(f\"[TIMING] ⚠️ Background CIN Pre-OCR Failed in {dur:.2f}s: {res.get('error')}\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 1188,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 1190,
+    "code": "sys.stdout.write(f\"[TIMING] ❌ Background CIN Pre-OCR Exception: {ex}\\n\")"
+  },
+  {
+    "file": "ui\\pages\\scanner_page.py",
+    "line": 1191,
+    "code": "sys.stdout.flush()"
+  },
+  {
+    "file": "main.py",
+    "line": 15,
+    "code": "None, et le moindre sys.stdout.write() leve"
+  },
+  {
+    "file": "main.py",
+    "line": 205,
+    "code": "print(f\"[Thread Error] {args.thread.name}: {args.exc_value}\\n{err_msg}\", file=sys.stderr)"
+  }
+]

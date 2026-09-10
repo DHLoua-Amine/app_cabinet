@@ -38,6 +38,7 @@ import reception
 from ui.components import pixmap_cache
 import auth
 import cin_extractor
+import config
 from config import PROFILES_DIR, DOCUMENTS_DIR
 
 # Global cache for profile photos
@@ -61,14 +62,19 @@ class OCRThread(QThread):
     # Signals to communicate back to the UI
     finished = Signal(dict)
 
-    def __init__(self, file_bytes, api_key):
+    def __init__(self, front_bytes, back_bytes=None, api_key=""):
         super().__init__()
-        self.file_bytes = file_bytes
+        self.front_bytes = front_bytes
+        self.back_bytes = back_bytes
         self.api_key = api_key
 
     def run(self):
         try:
-            result = cin_extractor.extract_cin_data(self.file_bytes, api_key=self.api_key)
+            result = cin_extractor.extract_cin_dual_faces(
+                self.front_bytes,
+                self.back_bytes,
+                api_key=self.api_key
+            )
             self.finished.emit(result)
         except Exception as e:
             self.finished.emit({"success": False, "error": str(e)})
@@ -138,8 +144,10 @@ class FicheClientPage(QWidget):
         self.client_data = {
             "client_id": self.client_id,
             "nom": "", "prenom": "", "full_name": "",
+            "father_name": "", "grandfather_name": "",
             "phone": "", "maiden_name": "", "birth_date": "01/01/1990", "birth_place": "",
-            "cin_number": "", "cin_date_place": "", "marital_status": "Célibataire / أعزب",
+            "cin_number": "", "cin_date_place": "", "cin_issue_date": "", "cin_issue_place": "",
+            "marital_status": "Célibataire / أعزب",
             "matrimonial_regime": "", "profession": "", "address": "", "legal_role": "مشتري",
             "company_name": "", "company_rc": "", "titre_foncier": "", "wilaya": "", "profile_pic_path": ""
         }
@@ -273,8 +281,8 @@ class FicheClientPage(QWidget):
         ocr_info_lay.addWidget(ocr_header)
 
         ocr_subtitle = self._tr_label(
-            "Téléversez l'image d'une CIN pour pré-remplir automatiquement le nom, prénom, CIN et date de naissance.",
-            "قم بتحميل صورة بطاقة التعريف الوطنية لملء الاسم، اللقب، رقم البطاقة وتاريخ الولادة تلقائياً."
+            "Téléversez 1 ou 2 images de la CIN (Face 1 + Face 2) pour pré-remplir automatiquement tous les champs par l'IA.",
+            "قم بتحميل صورة أو صورتين لبطاقة التعريف الوطنية (الوجه 1 + الوجه 2) لملء كافة البيانات بالذكاء الاصطناعي."
         )
         ocr_subtitle.setParent(ocr_frame)
         ocr_subtitle.setStyleSheet("color: #64748b; font-size: 11px; border: none;")
@@ -282,25 +290,26 @@ class FicheClientPage(QWidget):
 
         ocr_layout.addLayout(ocr_info_lay, 1)
 
-        # Right Action Button
+        # Right Action Button (Primary Dual CIN Upload Button)
         self.ocr_btn = QPushButton(ocr_frame)
-        self._tr_btn(self.ocr_btn, "📷 Importer la CIN", "📷 استخراج معطيات البطاقة")
-        self.ocr_btn.setMinimumHeight(40)
+        self._tr_btn(self.ocr_btn, "📤 Charger photo(s) CIN (Face 1 + Face 2)", "📤 تحميل صورة/صورتين لبطاقة التعريف (الوجه 1 + 2)")
+        self.ocr_btn.setMinimumHeight(42)
         self.ocr_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.ocr_btn.setStyleSheet("""
             QPushButton {
-                background-color: #2563eb;
+                background-color: #0284c7;
                 color: #ffffff;
                 font-weight: 700;
                 font-size: 13px;
                 border: none;
                 border-radius: 8px;
-                padding: 8px 20px;
+                padding: 10px 20px;
             }
             QPushButton:hover {
-                background-color: #1d4ed8;
+                background-color: #0369a1;
             }
         """)
+        self.ocr_btn.setToolTip("إختيار صورة أو صورتين لبطاقة التعريف (الوجه الأول والوجه الثاني) وقراءتها بواسطة الذكاء الاصطناعي")
         self.ocr_btn.clicked.connect(self.run_ocr)
 
         self.ocr_progress = QProgressBar(ocr_frame)
@@ -327,7 +336,7 @@ class FicheClientPage(QWidget):
         self.change_pic_btn = QPushButton(self.tab_civil); self._tr_btn(self.change_pic_btn, "Changer la photo", "تغيير الصورة")
         self.change_pic_btn.setProperty("class", "SecondaryButton")
         self.change_pic_btn.clicked.connect(self.change_photo)
-        
+
         photo_col.addWidget(self.photo_preview)
         photo_col.addWidget(self.change_pic_btn)
         fields_container.addLayout(photo_col, stretch=1)
@@ -361,6 +370,11 @@ class FicheClientPage(QWidget):
         self.profession_input = QLineEdit(self.tab_civil)
         self.cin_date_place_input = QLineEdit(self.tab_civil)
         self.tf_input = QLineEdit(self.tab_civil)
+
+        self.father_name_input = QLineEdit(self.tab_civil)
+        self.grandfather_name_input = QLineEdit(self.tab_civil)
+        self.cin_issue_date_input = QLineEdit(self.tab_civil)
+        self.cin_issue_place_input = QLineEdit(self.tab_civil)
         
         self.wilaya_combo = QComboBox(self.tab_civil)
         self.wilayas_list = [
@@ -461,6 +475,18 @@ class FicheClientPage(QWidget):
         form_grid.addWidget(self._tr_label("Identifiant RNE :", "المعرّف الوحيد :"), 9, 2)
         form_grid.addWidget(self.company_rc_input, 9, 3)
 
+        # Row 10 (Parentage)
+        form_grid.addWidget(self._tr_label("Prénom du père :", "اسم الأب :"), 10, 0)
+        form_grid.addWidget(self.father_name_input, 10, 1)
+        form_grid.addWidget(self._tr_label("Prénom du grand-père :", "اسم الجد :"), 10, 2)
+        form_grid.addWidget(self.grandfather_name_input, 10, 3)
+
+        # Row 11 (CIN Issue details)
+        form_grid.addWidget(self._tr_label("Date d'émission CIN :", "تاريخ إصدار البطاقة :"), 11, 0)
+        form_grid.addWidget(self.cin_issue_date_input, 11, 1)
+        form_grid.addWidget(self._tr_label("Lieu d'émission CIN :", "مكان إصدار البطاقة :"), 11, 2)
+        form_grid.addWidget(self.cin_issue_place_input, 11, 3)
+
         fields_container.addLayout(form_grid, stretch=3)
         civil_layout.addLayout(fields_container)
 
@@ -509,8 +535,10 @@ class FicheClientPage(QWidget):
 
         # Upload header
         upload_bar = QHBoxLayout()
-        self.add_doc_btn = QPushButton(self.tab_docs); self._tr_btn(self.add_doc_btn, "Ajouter un document", "إضافة وثيقة")
-        self.add_doc_btn.setProperty("class", "SecondaryButton")
+        self.add_doc_btn = QPushButton(self.tab_docs)
+        self._tr_btn(self.add_doc_btn, "📤 Ajouter / Importer un document", "📤 إضافة / تحميل وثيقة جديدة")
+        self.add_doc_btn.setProperty("class", "PrimaryButton")
+        self.add_doc_btn.setMinimumHeight(38)
         self.add_doc_btn.clicked.connect(self.upload_general_document)
         upload_bar.addWidget(self.add_doc_btn)
         upload_bar.addStretch()
@@ -652,6 +680,8 @@ class FicheClientPage(QWidget):
                 # different id: the notary could edit or delete against the wrong person.
                 self.client_not_found = True
                 self.init_empty_client()
+        else:
+            self.init_empty_client()
 
         # Clean None values to prevent QLineEdit.setText(None) TypeErrors
         for k, v in self.client_data.items():
@@ -661,10 +691,14 @@ class FicheClientPage(QWidget):
         # Populate state civil fields
         self.prenom_input.setText(self.client_data.get("prenom") or "")
         self.nom_input.setText(self.client_data.get("nom") or "")
+        self.father_name_input.setText(self.client_data.get("father_name") or "")
+        self.grandfather_name_input.setText(self.client_data.get("grandfather_name") or "")
         self.maiden_input.setText(self.client_data.get("maiden_name") or "")
         self.profession_input.setText(self.client_data.get("profession") or "")
         self.cin_input.setText(self.client_data.get("cin_number") or "")
         self.cin_date_place_input.setText(self.client_data.get("cin_date_place") or "")
+        self.cin_issue_date_input.setText(self.client_data.get("cin_issue_date") or "")
+        self.cin_issue_place_input.setText(self.client_data.get("cin_issue_place") or "")
         self.phone_input.setText(self.client_data.get("phone") or "")
         self.tf_input.setText(self.client_data.get("titre_foncier") or "")
         
@@ -787,11 +821,13 @@ class FicheClientPage(QWidget):
 
     def load_profile_photo(self):
         # Header avatar
-        pic_path = self.client_data.get("profile_pic_path") or self.client_data.get("profile_pic")
-        if not pic_path or not os.path.exists(pic_path):
+        raw_pic = self.client_data.get("profile_pic_path") or self.client_data.get("profile_pic") or ""
+        if not raw_pic and not self.is_new:
             prof_file = safe_profile_path(PROFILES_DIR, self.client_id)
             if prof_file and prof_file.exists():
-                pic_path = str(prof_file)
+                raw_pic = str(prof_file)
+
+        pic_path = reception.resolve_photo_path(raw_pic) if raw_pic else ""
 
         if pic_path and os.path.exists(pic_path):
             # Check cache
@@ -804,10 +840,15 @@ class FicheClientPage(QWidget):
                 self.photo_preview.setPixmap(preview)
                 return
 
-        # Fallback avatar representation
-        self.banner_avatar.setText("")
+        # Fallback avatar representation: MUST clear any previous QPixmap explicitly in Qt
+        from PySide6.QtGui import QPixmap
+        self.banner_avatar.clear()
+        self.banner_avatar.setPixmap(QPixmap())
+        self.banner_avatar.setText("👤")
         self.banner_avatar.setStyleSheet("font-size: 32px; color: #64748b; background-color: #ffffff; border-radius: 30px;")
         
+        self.photo_preview.clear()
+        self.photo_preview.setPixmap(QPixmap())
         self.photo_preview.setText("\nSans photo" if self.lang == "fr" else "\nبدون صورة")
         self.photo_preview.setStyleSheet("color: #64748b; font-size: 13px; font-weight: bold; text-align: center; border: 2px dashed #475569; border-radius: 10px; background-color: #ffffff;")
 
@@ -1049,16 +1090,25 @@ class FicheClientPage(QWidget):
 
         # Write to DB using core module (Requirement 4 check)
         try:
+            father_name = self.father_name_input.text().strip()
+            grandfather_name = self.grandfather_name_input.text().strip()
+            cin_issue_date = self.cin_issue_date_input.text().strip()
+            cin_issue_place = self.cin_issue_place_input.text().strip()
+
             success = reception.update_client_civil_status(
                 client_id=self.client_id,
                 nom=nom,
                 prenom=prenom,
+                father_name=father_name,
+                grandfather_name=grandfather_name,
                 phone=phone,
                 maiden_name=self.maiden_input.text().strip(),
                 birth_date=bdate,
                 birth_place=self.birth_place_input.text().strip(),
                 cin_number=cin,
                 cin_date_place=self.cin_date_place_input.text().strip(),
+                cin_issue_date=cin_issue_date,
+                cin_issue_place=cin_issue_place,
                 marital_status=marital,
                 matrimonial_regime=regime,
                 profession=self.profession_input.text().strip(),
@@ -1088,7 +1138,11 @@ class FicheClientPage(QWidget):
             self.client_data["full_name"] = f"{prenom} {nom}".strip()
             self.client_data["prenom"] = prenom
             self.client_data["nom"] = nom
+            self.client_data["father_name"] = father_name
+            self.client_data["grandfather_name"] = grandfather_name
             self.client_data["cin_number"] = cin
+            self.client_data["cin_issue_date"] = cin_issue_date
+            self.client_data["cin_issue_place"] = cin_issue_place
             self.client_data["phone"] = phone
             
             # Check facial trigger
@@ -1111,47 +1165,29 @@ class FicheClientPage(QWidget):
     def run_ocr(self):
         file_paths, _ = QFileDialog.getOpenFileNames(
             self,
-            "Sélectionner les photos CIN (Face avant et/ou arrière) / إختر صور بطاقة التعريف (الوجه الأول والوجه الثاني)",
+            "Sélectionner les photos CIN (Face 1 et/ou Face 2) / إختر صور بطاقة التعريف (الوجه الأول والوجه الثاني)",
             "",
-            "Images (*.png *.jpg *.jpeg *.webp)"
+            "Images / Documents (*.png *.jpg *.jpeg *.webp *.bmp *.pdf)"
         )
         if file_paths:
             self.ocr_btn.setEnabled(False)
             self.ocr_progress.setVisible(True)
 
-            self._pending_ocr_files = list(file_paths)
-            self._ocr_results_merged = {}
-            self._process_next_ocr_file()
+            try:
+                front_bytes = None
+                back_bytes = None
+                with open(file_paths[0], "rb") as f:
+                    front_bytes = f.read()
+                if len(file_paths) > 1:
+                    with open(file_paths[1], "rb") as f:
+                        back_bytes = f.read()
 
-    def _process_next_ocr_file(self):
-        if not getattr(self, "_pending_ocr_files", []):
-            self.on_all_ocr_finished()
-            return
-        fpath = self._pending_ocr_files.pop(0)
-        try:
-            with open(fpath, "rb") as f:
-                file_bytes = f.read()
-            api_key = os.environ.get("GEMINI_API_KEY", "")
-            self.ocr_thread = OCRThread(file_bytes, api_key)
-            self.ocr_thread.finished.connect(self.on_single_ocr_finished)
-            self.ocr_thread.start()
-        except Exception:
-            self._process_next_ocr_file()
-
-    def on_single_ocr_finished(self, result):
-        if result.get("success"):
-            data = result.get("data", {})
-            for k, v in data.items():
-                if v and not getattr(self, "_ocr_results_merged", {}).get(k):
-                    self._ocr_results_merged[k] = v
-        self._process_next_ocr_file()
-
-    def on_all_ocr_finished(self):
-        self.ocr_btn.setEnabled(True)
-        self.ocr_progress.setVisible(False)
-        merged = getattr(self, "_ocr_results_merged", {})
-        result = {"success": bool(merged), "data": merged}
-        self.on_ocr_finished(result)
+                api_key = config.load_saved_api_keys("gemini") or os.environ.get("GEMINI_API_KEY", "")
+                self.ocr_thread = OCRThread(front_bytes, back_bytes, api_key)
+                self.ocr_thread.finished.connect(self.on_ocr_finished)
+                self.ocr_thread.start()
+            except Exception as e:
+                self.on_ocr_finished({"success": False, "error": str(e)})
 
     def on_ocr_finished(self, result):
         self.ocr_btn.setEnabled(True)
@@ -1162,27 +1198,40 @@ class FicheClientPage(QWidget):
             
             # Prefill fields
             if data.get("cin_number"):
-                self.cin_input.setText(data["cin_number"])
-            if data.get("full_name"):
-                names = data["full_name"].strip().split(" ")
+                self.cin_input.setText(str(data["cin_number"]).strip())
+            if data.get("first_name"):
+                self.prenom_input.setText(str(data["first_name"]).strip())
+            if data.get("last_name"):
+                self.nom_input.setText(str(data["last_name"]).strip())
+            elif data.get("full_name"):
+                names = str(data["full_name"]).strip().split(" ")
                 self.prenom_input.setText(names[0])
                 self.nom_input.setText(" ".join(names[1:]) if len(names) > 1 else "")
             if data.get("birth_date"):
-                # Set dob if matches
-                dob_val = data["birth_date"] # Expected DD/MM/YYYY
-                parts = dob_val.split("/")
+                dob_val = str(data["birth_date"]).strip() # Expected YYYY/MM/DD or DD/MM/YYYY
+                parts = re.split(r"[/\-\.]", dob_val)
                 if len(parts) == 3:
-                    self.dob_day.setCurrentText(parts[0])
-                    self.dob_month.setCurrentText(parts[1])
-                    self.dob_year.setCurrentText(parts[2])
+                    if len(parts[0]) == 4: # YYYY/MM/DD
+                        self.dob_year.setCurrentText(parts[0])
+                        self.dob_month.setCurrentText(parts[1])
+                        self.dob_day.setCurrentText(parts[2])
+                    else: # DD/MM/YYYY
+                        self.dob_day.setCurrentText(parts[0])
+                        self.dob_month.setCurrentText(parts[1])
+                        self.dob_year.setCurrentText(parts[2])
             if data.get("birth_place"):
-                self.birth_place_input.setText(data["birth_place"])
+                self.birth_place_input.setText(str(data["birth_place"]).strip())
+            if data.get("father_name"):
+                self.father_name_input.setText(str(data["father_name"]).strip())
+            if data.get("grandfather_name"):
+                self.grandfather_name_input.setText(str(data["grandfather_name"]).strip())
             if data.get("issue_date"):
-                self.cin_date_place_input.setText(data["issue_date"])
+                self.cin_date_place_input.setText(str(data["issue_date"]).strip())
+                self.cin_issue_date_input.setText(str(data["issue_date"]).strip())
             if data.get("job"):
-                self.profession_input.setText(data["job"])
+                self.profession_input.setText(str(data["job"]).strip())
             if data.get("address"):
-                self.address_input.setPlainText(data["address"])
+                self.address_input.setPlainText(str(data["address"]).strip())
 
             QMessageBox.information(self, "OCR CIN", "Données de la CIN lues et appliquées aux champs avec succès !" if self.lang == "fr" else "تم استخراج وتطبيق بيانات بطاقة التعريف الوطنية بنجاح!")
         else:
@@ -1303,8 +1352,8 @@ class FicheClientPage(QWidget):
         pay_btn.setProperty("class", "SecondaryButton")
         pay_btn.clicked.connect(lambda checked=False, cid=cid, tot=total_amount, av=avance_amount, notes=payment_notes: self.open_payment_dialog_full(cid, tot, av, notes))
 
-        attach_btn = QPushButton("Joindre un document" if is_fr else "إرفاق وثيقة", card)
-        attach_btn.setProperty("class", "SecondaryButton")
+        attach_btn = QPushButton("📤 Ajouter un document" if is_fr else "📤 إضافة وثيقة للملف", card)
+        attach_btn.setProperty("class", "PrimaryButton")
         attach_btn.clicked.connect(lambda checked=False, cid=cid: self.attach_case_document(cid))
 
         actions_row.addWidget(status_combo)
@@ -1352,13 +1401,13 @@ class FicheClientPage(QWidget):
                     if not pm.isNull():
                         thumb_lbl.setPixmap(pm)
                         thumb_lbl.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-                        thumb_lbl.setToolTip(f"{dname}\n{'Cliquer pour ouvrir' if is_fr else 'اضغط للفتح'}")
+                        thumb_lbl.setToolTip(f"{dname}\n{'Cliquer pour ouvrir' if is_fr else 'اضغط للفتح والمعاينة'}")
                         thumb_lbl.mousePressEvent = (
-                            lambda ev, p=dpath: self._open_or_save_doc(p))
+                            lambda ev, d=doc, c_docs=case_docs: self._open_gallery_dialog(d, c_docs))
                     else:
-                        thumb_lbl.setText("")
+                        thumb_lbl.setText("🖼️")
                 else:
-                    thumb_lbl.setText("" if Path(dname).suffix.lower() != ".pdf" else "")
+                    thumb_lbl.setText("📄" if Path(dname).suffix.lower() != ".pdf" else "📕")
                     thumb_lbl.setStyleSheet(
                         "border:1px solid #334155; border-radius:6px; background:#0f172a; font-size:22px;")
 
@@ -1367,18 +1416,19 @@ class FicheClientPage(QWidget):
                 doc_lbl.setWordWrap(True)
                 doc_lbl.setToolTip(dname)
 
-                dl_btn = QPushButton("", card)
-                dl_btn.setFixedSize(30, 26)
-                dl_btn.setStyleSheet("font-size:12px; padding:0px;")
-                dl_btn.setToolTip("تحميل / Télécharger")
+                dl_btn = QPushButton("👁️", card)
+                dl_btn.setFixedSize(32, 28)
+                dl_btn.setStyleSheet("font-size:13px; padding:0px; background:#1e293b; color:#38bdf8; border:1px solid #334155; border-radius:4px;")
+                dl_btn.setToolTip("معاينة الوثيقة / Ouvrir la galerie")
                 dl_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-                dl_btn.clicked.connect(lambda chk=False, p=dpath: self._open_or_save_doc(p))
+                dl_btn.clicked.connect(lambda chk=False, d=doc, c_docs=case_docs: self._open_gallery_dialog(d, c_docs))
 
-                del_btn = QPushButton("", card)
-                del_btn.setFixedSize(30, 26)
-                del_btn.setStyleSheet("font-size:12px; padding:0px; color:#dc2626;")
-                del_btn.setToolTip("حذف / Supprimer")
+                del_btn = QPushButton("🗑️", card)
+                del_btn.setFixedSize(32, 28)
+                del_btn.setStyleSheet("font-size:13px; padding:0px; background:#1e293b; color:#ef4444; border:1px solid #334155; border-radius:4px;")
+                del_btn.setToolTip("حذف الوثيقة / Supprimer")
                 del_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                del_btn.clicked.connect(lambda chk=False, n=dname: self._delete_case_doc(n))
                 del_btn.clicked.connect(lambda chk=False, n=dname: self._delete_case_doc(n))
 
                 doc_row.addWidget(thumb_lbl)
@@ -1563,11 +1613,43 @@ class FicheClientPage(QWidget):
                 if saved:
                     pixmap_cache.invalidate(saved)
                 
-                # Refresh docs list
-                self.load_client_documents()
-                QMessageBox.information(self, "Document", "Document joint avec succès !" if self.lang == "fr" else "تم إضافة الوثيقة إلى الملف بنجاح!")
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Erreur de sauvegarde: {e}")
+
+    def scan_cin_with_camera(self):
+        from ui.dialogs.document_scan_dialog import DocumentScanDialog
+        w = self.window()
+        svc = getattr(w, "camera_service", None)
+        dlg = DocumentScanDialog(self, client_id=self.client_id, mode="cin", camera_service=svc, lang=self.lang)
+        dlg.scanned_successfully.connect(self._on_cin_camera_scanned)
+        dlg.exec()
+
+    def _on_cin_camera_scanned(self, res: dict):
+        if res and res.get("extracted"):
+            ext = res["extracted"]
+            if ext.get("cin_number"): self.cin_input.setText(ext["cin_number"])
+            if ext.get("full_name"):
+                names = ext["full_name"].strip().split(" ")
+                self.prenom_input.setText(names[0])
+                self.nom_input.setText(" ".join(names[1:]) if len(names) > 1 else "")
+            if ext.get("birth_date"):
+                parts = ext["birth_date"].split("/")
+                if len(parts) == 3:
+                    self.dob_day.setCurrentText(parts[0])
+                    self.dob_month.setCurrentText(parts[1])
+                    self.dob_year.setCurrentText(parts[2])
+            if ext.get("birth_place"): self.birth_place_input.setText(ext["birth_place"])
+            if ext.get("father_name"): self.father_name_input.setText(ext["father_name"])
+            if ext.get("grandfather_name"): self.grandfather_name_input.setText(ext["grandfather_name"])
+            if ext.get("address"): self.address_input.setPlainText(ext["address"])
+
+    def scan_document_with_camera(self):
+        from ui.dialogs.document_scan_dialog import DocumentScanDialog
+        w = self.window()
+        svc = getattr(w, "camera_service", None)
+        dlg = DocumentScanDialog(self, client_id=self.client_id, mode="document", camera_service=svc, lang=self.lang)
+        dlg.scanned_successfully.connect(lambda res: self.load_client_documents())
+        dlg.exec()
 
     def create_new_case_dialog(self):
         is_fr = self.lang == "fr"
@@ -1789,14 +1871,27 @@ class FicheClientPage(QWidget):
             except Exception as e:
                 QMessageBox.critical(self, "Erreur", f"Erreur d'écriture: {e}")
 
+    def _open_gallery_dialog(self, doc_obj, case_docs=None):
+        """Opens interactive document gallery dialog with left/right carousel."""
+        docs_to_show = case_docs if case_docs else reception.get_client_documents_list(self.client_id)
+        start_idx = 0
+        if docs_to_show and doc_obj in docs_to_show:
+            start_idx = docs_to_show.index(doc_obj)
+        elif docs_to_show and isinstance(doc_obj, str):
+            for i, d in enumerate(docs_to_show):
+                if d.get("path") == doc_obj or d.get("name") == doc_obj:
+                    start_idx = i
+                    break
+
+        from ui.dialogs.document_gallery_dialog import DocumentGalleryDialog
+        dlg = DocumentGalleryDialog(documents=docs_to_show, start_index=start_idx, parent=self, lang=self.lang)
+        dlg.doc_deleted.connect(lambda n: self._delete_case_doc(n))
+        dlg.exec()
+
     def open_selected_document(self, item):
         path = item.data(Qt.ItemDataRole.UserRole)
         if path and os.path.exists(path):
-            try:
-                # Open with default OS reader
-                os.startfile(path)
-            except Exception as e:
-                QMessageBox.warning(self, "Erreur", f"Impossible d'ouvrir le fichier : {e}")
+            self._open_gallery_dialog(path)
 
     def show_docs_context_menu(self, point):
         item = self.docs_list.itemAt(point)
@@ -2047,6 +2142,54 @@ class FicheClientPage(QWidget):
                     else f"تعذّر حذف هذه الوثيقة.\n{filename}")
             self.load_client_cases()
             self.load_client_documents()
+
+    def scan_cin_with_camera(self):
+        """Scans CIN front/back directly from scanner/camera into civil status fields."""
+        from ui.dialogs.document_scan_dialog import DocumentScanDialog
+        dlg = DocumentScanDialog(parent=self, client_id=self.client_id, mode="cin", lang=self.lang)
+        dlg.scanned_successfully.connect(self._on_cin_scanned)
+        dlg.exec()
+
+    def _on_cin_scanned(self, cin_data):
+        if not cin_data or not isinstance(cin_data, dict):
+            return
+        if "cin_number" in cin_data and hasattr(self, "cin_input"):
+            self.cin_input.setText(str(cin_data["cin_number"]))
+        if "first_name" in cin_data and hasattr(self, "prenom_input"):
+            self.prenom_input.setText(str(cin_data["first_name"]))
+        if "last_name" in cin_data and hasattr(self, "nom_input"):
+            self.nom_input.setText(str(cin_data["last_name"]))
+        if "issue_date" in cin_data and hasattr(self, "cin_issue_date_input"):
+            self.cin_issue_date_input.setText(str(cin_data["issue_date"]))
+        if "issue_place" in cin_data and hasattr(self, "cin_issue_place_input"):
+            self.cin_issue_place_input.setText(str(cin_data["issue_place"]))
+
+    def scan_document_with_camera(self):
+        """Scans general paper directly from scanner/camera into client documents."""
+        from ui.dialogs.document_scan_dialog import DocumentScanDialog
+        dlg = DocumentScanDialog(parent=self, client_id=self.client_id, mode="document", lang=self.lang)
+        dlg.scanned_successfully.connect(lambda d: (self.load_client_documents(), self.load_client_cases()))
+        dlg.exec()
+
+    def scan_case_document(self, case_id):
+        """Scans paper directly from scanner/camera into a specific case dossier."""
+        from ui.dialogs.document_scan_dialog import DocumentScanDialog
+        dlg = DocumentScanDialog(parent=self, client_id=self.client_id, mode="document", lang=self.lang)
+        def _on_case_doc_scanned(doc_info):
+            file_path = doc_info.get("file_path") if isinstance(doc_info, dict) else None
+            if file_path and os.path.exists(file_path):
+                try:
+                    with open(file_path, "rb") as f:
+                        file_bytes = f.read()
+                    fname = f"Dossier_{case_id}_{Path(file_path).name}"
+                    reception.save_client_document(self.client_id, file_bytes, fname)
+                except Exception as e:
+                    print("Error saving scanned case doc:", e)
+            self.load_client_cases()
+            self.load_client_documents()
+
+        dlg.scanned_successfully.connect(_on_case_doc_scanned)
+        dlg.exec()
 
     def open_farida_dialog(self):
         from ui.components.farida_dialog import TunisianFaridaDialog

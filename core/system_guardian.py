@@ -17,6 +17,28 @@ import threading
 import time
 from functools import wraps
 
+class _SortieAvalee:
+    encoding = "utf-8"
+    errors = "replace"
+    def write(self, _t=""): return len(_t) if _t else 0
+    def flush(self): return None
+    def writelines(self, l): pass
+    def isatty(self): return False
+    def fileno(self):
+        import io as _io
+        raise _io.UnsupportedOperation("fileno")
+    def close(self): return None
+    @property
+    def closed(self): return False
+
+def _assainir_sorties():
+    for nom in ("stdout", "stderr"):
+        flux = getattr(sys, nom, None)
+        if flux is None or not hasattr(flux, "write"):
+            setattr(sys, nom, _SortieAvalee())
+
+_assainir_sorties()
+
 _guardian_cache = {}
 _guardian_cache_lock = threading.Lock()
 

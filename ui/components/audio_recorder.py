@@ -30,6 +30,93 @@ class AudioRecorder(QObject):
     FINALISE_POLL_MS = 120
     FINALISE_TIMEOUT_MS = 8000
 
+    # Noms des peripheriques qui ne captent PAS un microphone mais rebouclent la
+    # sortie du PC. Windows les designe parfois comme entree par defaut, et
+    # l'enregistrement ne contient alors que ce que la machine joue — du silence
+    # dans un cabinet. Le poste du notaire, le 4 septembre 2026, etait exactement
+    # dans ce cas : « Mixage stereo » actif ET un vrai micro branche a cote.
+    MOTS_BOUCLAGE = (
+        "mixage stereo", "stereo mix", "what u hear", "what you hear",
+        "wave out mix", "waveout", "loopback", "sum", "stereomix",
+        "mezcla estereo", "stereomix", "missaggio stereo",
+    )
+
+    @staticmethod
+    def _sans_accents(texte: str) -> str:
+        """« Mixage stéréo » et « Mixage stereo » doivent se comparer pareil.
+
+        .lower() ne retire pas les accents : la liste contenait bien
+        « mixage stereo » et le peripherique du notaire s'appelait
+        « Mixage stéréo ». Le seul cas qui comptait passait donc a travers.
+        """
+        import unicodedata
+        return "".join(c for c in unicodedata.normalize("NFD", texte or "")
+                       if unicodedata.category(c) != "Mn")
+
+    @classmethod
+    def est_bouclage(cls, description: str) -> bool:
+        """Ce peripherique reboucle-t-il la sortie au lieu d'ecouter la piece ?"""
+        texte = cls._sans_accents(description or "").strip().lower()
+        return any(mot in texte for mot in cls.MOTS_BOUCLAGE)
+
+    @staticmethod
+    def peripheriques_entree():
+        """Les entrees audio vues par Qt, dans l'ordre de Windows."""
+        try:
+            return list(QMediaDevices.audioInputs())
+        except Exception:
+            return []
+
+    @classmethod
+    def choisir_peripherique(cls):
+        """Le microphone a utiliser, et pourquoi.
+
+        Rend (peripherique, raison). La raison sert au journal et au message
+        montre au notaire : il doit pouvoir comprendre POURQUOI l'application
+        ecoute tel appareil plutot qu'un autre.
+
+        Ordre : le choix explicite du notaire, puis le defaut de Windows s'il
+        s'agit d'un vrai micro, puis le premier vrai micro disponible. Un
+        peripherique de bouclage n'est retenu qu'en tout dernier recours."""
+        entrees = cls.peripheriques_entree()
+        if not entrees:
+            return None, "aucune entree audio sur ce poste"
+
+        # a) le choix explicite du notaire, s'il en a fait un
+        try:
+            import config
+            voulu = (config.get_setting("microphone_choisi", "") or "").strip()
+        except Exception:
+            voulu = ""
+        if voulu:
+            for d in entrees:
+                if d.description().strip() == voulu:
+                    return d, f"choix du cabinet : {voulu}"
+
+        vrais = [d for d in entrees if not cls.est_bouclage(d.description())]
+
+        # b) le defaut de Windows, s'il ecoute vraiment la piece
+        try:
+            defaut = QMediaDevices.defaultAudioInput()
+        except Exception:
+            defaut = None
+        if defaut is not None and not defaut.isNull():
+            if not cls.est_bouclage(defaut.description()):
+                return defaut, f"peripherique par defaut : {defaut.description()}"
+            if vrais:
+                # Le defaut est un bouclage alors qu'un vrai micro existe : on
+                # prend le micro. Sans cela l'enregistrement serait muet, et le
+                # notaire n'aurait aucun moyen de le deviner.
+                return vrais[0], (
+                    f"le peripherique par defaut ({defaut.description()}) est un "
+                    f"bouclage, remplace par {vrais[0].description()}")
+
+        if vrais:
+            return vrais[0], f"premier micro disponible : {vrais[0].description()}"
+        return entrees[0], (
+            f"aucun vrai micro detecte, repli sur {entrees[0].description()}")
+
+
     def __init__(self):
         super().__init__()
         self.session = None
@@ -38,6 +125,7 @@ class AudioRecorder(QObject):
         self.output_path = ""
         self.output_mime = "audio/mp4"
         self.is_recording = False
+        self.raison_peripherique = ""
 
         self._finalise_timer = None
         self._finalise_elapsed = 0
@@ -57,9 +145,13 @@ class AudioRecorder(QObject):
             self.session = QMediaCaptureSession()
             self.audio_input = QAudioInput()
 
-            # Select default audio input device
-            default_device = QMediaDevices.defaultAudioInput()
-            self.audio_input.setDevice(default_device)
+            # Le peripherique par defaut de Windows n'est pas forcement un micro :
+            # sur le poste du notaire c'etait le « Mixage stereo », qui n'enregistre
+            # que ce que le PC joue. choisir_peripherique() ecarte ces bouclages.
+            appareil, raison = self.choisir_peripherique()
+            self.raison_peripherique = raison
+            if appareil is not None:
+                self.audio_input.setDevice(appareil)
             self.session.setAudioInput(self.audio_input)
 
             self.recorder = QMediaRecorder()
@@ -123,7 +215,10 @@ class AudioRecorder(QObject):
         fiable a la mesure et ferait perdre des dictees valides ; c'est le
         message de fin, base sur la duree capturee, qui nomme la cause."""
         try:
-            dev = QMediaDevices.defaultAudioInput()
+            dev, _raison = self.choisir_peripherique()
+            if dev is None:
+                return False, ("لا يوجد مايكروفون على هذا الحاسوب. "
+                               "(Aucun microphone detecte sur ce PC)")
             if dev.isNull():
                 return False, ("لا يوجد مايكروفون على هذا الحاسوب. "
                                "(Aucun microphone detecte sur ce PC)")
@@ -190,6 +285,38 @@ class AudioRecorder(QObject):
         except Exception as e:
             self.is_recording = False
             self.error_occurred.emit(str(e))
+
+    def _rendre_ou_signaler_le_silence(self):
+        """Rend l'enregistrement, sauf s'il est muet — auquel cas on le dit.
+
+        Un fichier silencieux part sinon a l'IA, qui met 40 s a rendre une
+        transcription vide : le notaire attend, n'obtient rien, et n'a aucun
+        moyen de comprendre. La mesure coute 1 a 2 s, contre 40 s perdues.
+
+        En cas de doute on REND le fichier : mieux vaut transcrire un
+        enregistrement faible que refuser une dictee valable."""
+        self._relacher_peripherique()
+        try:
+            niveau = self.measure_level(timeout_ms=4000)
+        except Exception:
+            niveau = -1.0
+        if niveau < 0:
+            # Mesure impossible : on ne bloque pas la dictee sur un doute.
+            self.recording_stopped.emit(self.output_path)
+            return
+        if niveau >= self.SILENCE_RMS_THRESHOLD:
+            self.recording_stopped.emit(self.output_path)
+            return
+
+        appareil = (self.raison_peripherique or "").strip()
+        self._journaliser(
+            f"enregistrement muet (RMS {niveau:.0f} < {self.SILENCE_RMS_THRESHOLD:.0f})",
+            appareil)
+        self.error_occurred.emit(
+            "لم يُسجَّل أي صوت — الملف صامت. تأكّد من أنّ المايكروفون الصحيح "
+            "مُختار في الإعدادات، ثم أعد المحاولة. "
+            + (f"[{appareil}] " if appareil else "")
+            + "(Enregistrement silencieux — verifiez le microphone selectionne)")
 
     def _relacher_peripherique(self):
         """Rend le micro au systeme des que la dictee est finie."""
@@ -321,8 +448,7 @@ class AudioRecorder(QObject):
         if self._stable_ticks >= 2:
             self._stop_finalise_timer()
             print(f"[AudioRecorder] Enregistrement finalise ({size} octets) : {self.output_path}")
-            self._relacher_peripherique()
-            self.recording_stopped.emit(self.output_path)
+            self._rendre_ou_signaler_le_silence()
             return
 
         if self._finalise_elapsed >= self.FINALISE_TIMEOUT_MS:
@@ -330,8 +456,7 @@ class AudioRecorder(QObject):
             if size >= self.MIN_VALID_BYTES:
                 # Usable audio, just slow to settle — hand it over.
                 print(f"[AudioRecorder] Finalisation lente, fichier accepte ({size} octets).")
-                self._relacher_peripherique()
-                self.recording_stopped.emit(self.output_path)
+                self._rendre_ou_signaler_le_silence()
             else:
                 # Le message doit nommer la cause : « non finalise » ne dit au
                 # notaire ni ce qui s'est passe ni quoi faire. Une duree restee

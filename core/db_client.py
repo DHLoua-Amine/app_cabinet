@@ -17,12 +17,13 @@ why description is implemented rather than stubbed.
 
 from __future__ import annotations
 
+import os
 import socket
 import sqlite3
 import threading
 
 from db_server import (PROTOCOL_VERSION, DEFAULT_PORT, encode_params,
-                       decode_value, is_ddl)
+                       encode_value, decode_value, is_ddl)
 from db_crypto import (CryptoError, derive_key, recv_plain, recv_sealed,
                        send_plain, send_sealed)
 
@@ -324,6 +325,94 @@ class RemoteConnection:
             return True
         except Exception:
             return False
+
+    def sync_photo(self, photo_path: str) -> bool:
+        """Transfers a profile photo binary file to the office server's disk."""
+        if not photo_path or not os.path.exists(photo_path):
+            return False
+        try:
+            filename = os.path.basename(photo_path)
+            with open(photo_path, "rb") as f:
+                raw_bytes = f.read()
+            res = self._call({
+                "op": "sync_photo",
+                "filename": filename,
+                "data": encode_value(raw_bytes)
+            })
+            return bool(res and res.get("ok"))
+        except Exception as e:
+            from system_guardian import log_system_error
+            log_system_error("sync_photo failed", e)
+            return False
+
+    def cache_generation(self) -> int:
+        try:
+            res = self._call({"op": "get_cache_gen"})
+            return res.get("gen", 0) if res else 0
+        except Exception:
+            return 0
+
+    def fetch_photo(self, photo_path: str) -> str:
+        """Fetches a profile photo binary from the server and saves it to local disk."""
+        if not photo_path:
+            return ""
+        if os.path.exists(photo_path):
+            return photo_path
+        
+        filename = os.path.basename(photo_path)
+        from config import PROFILES_DIR
+        PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+        local_target = PROFILES_DIR / filename
+        if local_target.exists() and os.path.getsize(local_target) > 0:
+            return str(local_target)
+        
+        try:
+            res = self._call({"op": "get_photo", "path": photo_path})
+            if res and res.get("ok") and res.get("data"):
+                raw_bytes = decode_value(res["data"])
+                with open(local_target, "wb") as f:
+                    f.write(raw_bytes)
+                return str(local_target)
+        except Exception as e:
+            from system_guardian import log_system_error
+            log_system_error("fetch_photo failed", e)
+        return photo_path
+
+    def get_unknown_visitors(self) -> list:
+        try:
+            res = self._call({"op": "get_unknown_visitors"})
+            return res.get("visitors", []) if res else []
+        except Exception:
+            return []
+
+    def push_unknown_visitor(self, visitor: dict) -> bool:
+        try:
+            res = self._call({"op": "push_unknown_visitor", "visitor": visitor})
+            return bool(res and res.get("ok"))
+        except Exception:
+            return False
+
+    def purge_unknown_visitor(self, client_ids: list) -> bool:
+        try:
+            res = self._call({"op": "purge_unknown_visitor", "client_ids": client_ids})
+            return bool(res and res.get("ok"))
+        except Exception:
+            return False
+
+    def push_live_detection(self, detection: dict) -> bool:
+        try:
+            res = self._call({"op": "push_live_detection", "detection": detection})
+            return bool(res and res.get("ok"))
+        except Exception:
+            return False
+
+    def get_live_detection(self, since: float = 0) -> list:
+        try:
+            res = self._call({"op": "get_live_detection", "since": since})
+            return res.get("detections", []) if res else []
+        except Exception:
+            return []
+
 
 
 def probe(host: str, port: int, token: str, timeout: float = 6.0) -> tuple:

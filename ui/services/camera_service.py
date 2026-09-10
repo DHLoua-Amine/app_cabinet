@@ -31,6 +31,7 @@ class CameraService(QObject):
     frame_ready = Signal(object, list)          # QImage, detected faces (preview only)
     status_changed = Signal(str, str)           # CameraState, human-readable detail
     client_detected = Signal(str, str, float)   # client_id, name, score
+    unknown_purged = Signal(list)               # fiches « inconnu » annulees
 
     # A camera that disappears mid-session (unplugged, or grabbed by another program)
     # should be retried, but not in a tight loop that pins the CPU.
@@ -43,6 +44,10 @@ class CameraService(QObject):
         # reference tant qu'ils vivent : la lacher detruit l'objet C++ sous un fil
         # encore en cours d'execution, ce qui fait planter l'application.
         self._retires = []
+        # La memoire des visiteurs inconnus appartient au service, pas au fil :
+        # elle doit survivre aux reconnexions de la camera, exactement comme le
+        # cooldown des clients reconnus.
+        self.memoire_inconnus = {"fiches": {}, "compteur": 0, "dernier_ajout": 0.0}
         self._source = None
         self._state = CameraState.OFF
         self._detail = ""
@@ -100,13 +105,42 @@ class CameraService(QObject):
             source=source,
             cooldown_mgr=self.cooldown,
             preview_enabled=self._preview_enabled,
+            memoire_inconnus=self.memoire_inconnus,
         )
         self._thread.frame_ready.connect(self._on_frame)
         self._thread.connection_status.connect(self._on_connection_status)
         self._thread.client_detected.connect(self.client_detected)
+        self._thread.unknown_purged.connect(self.unknown_purged)
         # Noticing the thread end on its own is how a mid-session unplug is detected.
         self._thread.finished.connect(self._on_thread_finished)
         self._thread.start()
+
+        # Start secondary camera thread if configured
+        sec = camera_core.get_saved_secondary_camera_source()
+        if sec and str(sec).strip() and str(sec).strip() != str(source).strip():
+            self._thread_2 = CameraThread(
+                source=sec,
+                cooldown_mgr=self.cooldown,
+                preview_enabled=False,
+                memoire_inconnus=self.memoire_inconnus,
+            )
+            self._thread_2.client_detected.connect(self.client_detected)
+            self._thread_2.unknown_purged.connect(self.unknown_purged)
+            self._thread_2.start()
+
+        # Start tertiary camera thread if configured
+        tert = camera_core.get_saved_tertiary_camera_source()
+        if tert and str(tert).strip() and str(tert).strip() not in (str(source).strip(), str(sec).strip()):
+            self._thread_3 = CameraThread(
+                source=tert,
+                cooldown_mgr=self.cooldown,
+                preview_enabled=False,
+                memoire_inconnus=self.memoire_inconnus,
+            )
+            self._thread_3.client_detected.connect(self.client_detected)
+            self._thread_3.unknown_purged.connect(self.unknown_purged)
+            self._thread_3.start()
+
         self._set_state(CameraState.CONNECTING, str(source))
         return True
 
@@ -119,7 +153,8 @@ class CameraService(QObject):
         """
         if fil is None:
             return
-        for sig in ("frame_ready", "connection_status", "client_detected", "finished"):
+        for sig in ("frame_ready", "connection_status", "client_detected",
+                    "unknown_purged", "finished"):
             try:
                 getattr(fil, sig).disconnect()
             except Exception:
@@ -145,13 +180,15 @@ class CameraService(QObject):
         self._stopping = True
         self._retry_timer.stop()
         ok = True
-        if self._thread:
-            ok = self._thread.stop(timeout_ms=timeout_ms)
-            if not ok:
-                # Il tourne encore : le lacher ici detruirait son objet C++ en
-                # pleine execution. On le met de cote jusqu'a sa vraie fin.
-                self._retirer(self._thread)
-            self._thread = None
+        for attr in ("_thread", "_thread_2", "_thread_3"):
+            th = getattr(self, attr, None)
+            if th:
+                res = th.stop(timeout_ms=timeout_ms)
+                if not res:
+                    self._retirer(th)
+                setattr(self, attr, None)
+                if not res:
+                    ok = False
         self._set_state(CameraState.OFF, "")
         return ok
 

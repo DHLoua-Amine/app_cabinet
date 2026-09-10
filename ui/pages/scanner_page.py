@@ -241,8 +241,14 @@ class UnifiedPipelineThread(QThread):
                         if sc:
                             extracted = {
                                 "full_name": sc.get("full_name", ""),
+                                "prenom": sc.get("prenom", ""),
+                                "nom": sc.get("nom", ""),
+                                "father_name": sc.get("father_name", ""),
+                                "grandfather_name": sc.get("grandfather_name", ""),
                                 "cin_number": sc.get("cin_number", ""),
-                                "issue_date": sc.get("cin_date_place", ""),
+                                "issue_date": sc.get("cin_issue_date") or sc.get("cin_date_place", ""),
+                                "cin_issue_date": sc.get("cin_issue_date", ""),
+                                "cin_issue_place": sc.get("cin_issue_place", ""),
                                 "job": sc.get("profession", ""),
                                 "address": sc.get("address", ""),
                                 "birth_date": sc.get("birth_date", ""),
@@ -300,8 +306,14 @@ class UnifiedPipelineThread(QThread):
                         if sc:
                             extracted = {
                                 "full_name": sc.get("full_name", ""),
+                                "prenom": sc.get("prenom", ""),
+                                "nom": sc.get("nom", ""),
+                                "father_name": sc.get("father_name", ""),
+                                "grandfather_name": sc.get("grandfather_name", ""),
                                 "cin_number": sc.get("cin_number", ""),
-                                "issue_date": sc.get("cin_date_place", ""),
+                                "issue_date": sc.get("cin_issue_date") or sc.get("cin_date_place", ""),
+                                "cin_issue_date": sc.get("cin_issue_date", ""),
+                                "cin_issue_place": sc.get("cin_issue_place", ""),
                                 "job": sc.get("profession", ""),
                                 "address": sc.get("address", ""),
                                 "birth_date": sc.get("birth_date", ""),
@@ -987,6 +999,11 @@ class ScannerPage(QWidget):
         b_lbl.setStyleSheet("color: #64748b; font-size: 11px;")
         card_lay.addWidget(b_lbl)
 
+        both_btn = QPushButton(("Charger 2 faces (1 seule photo)" if self.lang == "fr" else "📸 رفع الوجهين في صورة واحدة (صفحة واحدة)"), card)
+        both_btn.setStyleSheet("background-color: #f0fdf4; color: #15803d; border: 1.5px dashed #86efac; font-size: 11px; font-weight: bold; padding: 5px 8px; border-radius: 5px;")
+        both_btn.clicked.connect(lambda _, i=idx: self.upload_cin_image(p_type, i, "both"))
+        card_lay.addWidget(both_btn)
+
         return card, {"title": lbl_title, "combo": combo, "front": f_lbl, "back": b_lbl}
 
     def _refresh_parties_in_place(self, roles):
@@ -1115,9 +1132,14 @@ class ScannerPage(QWidget):
         if face == "front":
             p_list[idx]["front_bytes"] = img_bytes
             p_list[idx]["front_lbl"] = fname
-        else:
+        elif face == "back":
             p_list[idx]["back_bytes"] = img_bytes
             p_list[idx]["back_lbl"] = fname
+        elif face == "both":
+            p_list[idx]["front_bytes"] = img_bytes
+            p_list[idx]["back_bytes"] = None
+            p_list[idx]["front_lbl"] = f"الوجهان معاً: {fname}"
+            p_list[idx]["back_lbl"] = "(صورة واحدة تحتوي على الوجهين)"
         self.rebuild_parties_ui()
 
         # Always reload AI settings first so ocr_api_key is guaranteed fresh on upload
@@ -1920,6 +1942,37 @@ class ScannerPage(QWidget):
     # nothing was generated yet, and must not be exported or filed as a client's act.
     MIN_CONTRACT_CHARS = 200
 
+    # Les informations sans lesquelles un acte notarie n'en est pas un : chaque
+    # partie doit avoir un nom et un numero de carte d'identite.
+    CHAMPS_OBLIGATOIRES = (
+        ("party1_name", "اسم"),
+        ("party1_cin", "رقم بطاقة تعريف"),
+        ("party2_name", "اسم"),
+        ("party2_cin", "رقم بطاقة تعريف"),
+    )
+
+    def _champs_obligatoires_manquants(self):
+        """Les informations obligatoires absentes, nommees en arabe.
+
+        Chaque champ est designe par le role qu'il occupe dans CE type d'acte :
+        « اسم البائع » pour une vente, « اسم الزوج » pour un mariage. Les roles
+        viennent de contract_templates.get_party_role_names(), qui les connait
+        deja pour chaque type."""
+        try:
+            import contract_templates
+            roles = contract_templates.get_party_role_names(self.selected_contract_type)
+            role1, role2 = roles[0], roles[2]
+        except Exception:
+            role1, role2 = "الطرف الأول", "الطرف الثاني"
+
+        manquants = []
+        for cle, libelle in self.CHAMPS_OBLIGATOIRES:
+            if (self.contract_vars.get(cle) or "").strip():
+                continue
+            role = role1 if cle.startswith("party1") else role2
+            manquants.append(f"{libelle} {role}")
+        return manquants
+
     def _contract_ready_for_output(self, action_label: str) -> bool:
         """Blocks export/archiving of an empty or stub contract, which used to succeed silently."""
         text = (self.ocr_edited_text or "").strip()
@@ -1940,12 +1993,18 @@ class ScannerPage(QWidget):
             )
             return False
 
-        # A deed with no identified party is not a deed.
-        if not (self.contract_vars.get("party1_name") or "").strip() and \
-           not (self.contract_vars.get("party2_name") or "").strip():
+        # A deed with no identified party is not a deed. On ne se contente plus
+        # de le signaler quand TOUTES les parties manquent : on enumere chaque
+        # information absente, sous son nom juridique, pour que le notaire
+        # sache exactement quoi completer.
+        manquants = self._champs_obligatoires_manquants()
+        if manquants:
+            liste = "\n".join(f"    • {m}" for m in manquants)
             proceed = QMessageBox.question(
-                self, "المستند",
-                "لم يتم تحديد اسم أي طرف في العقد.\n\nهل تريد المتابعة رغم ذلك؟",
+                self, "معطيات ناقصة",
+                f"تنقص العقد معطيات إجبارية ({len(manquants)}) :\n\n{liste}\n\n"
+                f"يمكنك إتمامها في قسم « الحقول التحريرية » ثم إعادة المحاولة.\n\n"
+                f"هل تريد المتابعة رغم ذلك؟",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )

@@ -1,0 +1,17 @@
+{
+  "ws_cam_off_times": {
+    "home": 0.03,
+    "register": 129.56,
+    "clients": 198.73,
+    "presence": 1870.32,
+    "settings": 608.92
+  },
+  "ws_cam_on_times": {
+    "home": 0.52,
+    "register": 6.54,
+    "clients": 34.72,
+    "presence": 4.77,
+    "settings": 0.35
+  },
+  "sec_crash_captured": null
+}

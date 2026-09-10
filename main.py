@@ -3,6 +3,79 @@ import os
 import traceback
 from pathlib import Path
 
+# ── La sortie standard, avant TOUT le reste ─────────────────────────────────
+# Ceci doit rester la premiere chose executee du fichier : les modules importes
+# plus bas ecrivent sur sys.stdout des leur chargement, et un thread demarre
+# avant ce point ecrirait dans le vide.
+
+class _SortieAvalee:
+    """Remplace sys.stdout/sys.stderr quand ils valent None.
+
+    Le build est produit avec console=False : sous Windows, sys.stdout est alors
+    None, et le moindre sys.stdout.write() leve
+    « AttributeError: 'NoneType' object has no attribute 'write' ».
+    C'est ce qui tuait la generation de contrat et le pre-scan des CIN chez le
+    notaire, sans qu'aucun de nos tests en console ne puisse le voir.
+    """
+    encoding = "utf-8"
+    errors = "replace"
+
+    def write(self, _texte=""):
+        return len(_texte) if _texte else 0
+
+    def flush(self):
+        return None
+
+    def writelines(self, lignes):
+        for _ in lignes:
+            pass
+
+    def isatty(self):
+        return False
+
+    def fileno(self):
+        # Certaines bibliotheques demandent le descripteur avant d'ecrire. Lever
+        # UnsupportedOperation est la reponse que le module io attend ; rendre un
+        # entier bidon ferait ecrire dans un vrai fichier au hasard.
+        # import local : main.py n'importe pas io au niveau module, et ce
+        # substitut doit rester autonome.
+        import io as _io
+        raise _io.UnsupportedOperation("fileno")
+
+    def close(self):
+        return None
+
+    @property
+    def closed(self):
+        return False
+
+
+def _assainir_sorties():
+    """Rend sys.stdout et sys.stderr sûrs a ecrire, quoi qu'il arrive.
+
+    Deux pannes distinctes, mesurees le 4 septembre 2026 sur la meme ligne :
+      - stdout vaut None (console=False) : AttributeError
+      - stdout encode en cp1252 : UnicodeEncodeError des qu'un emoji passe
+    La console UTF-8 du poste de developpement ne declenchait ni l'une ni l'autre,
+    d'ou un defaut invisible en test et systematique chez le client."""
+    for nom in ("stdout", "stderr"):
+        flux = getattr(sys, nom, None)
+        if flux is None:
+            setattr(sys, nom, _SortieAvalee())
+            continue
+        try:
+            # Un emoji dans une trace ne doit jamais tuer un thread de travail.
+            flux.reconfigure(errors="replace")
+        except Exception:
+            # Flux sans reconfigure (deja remplace, ou objet exotique) : on verifie
+            # juste qu'il sait ecrire, sinon on l'ecarte.
+            if not hasattr(flux, "write"):
+                setattr(sys, nom, _SortieAvalee())
+
+
+_assainir_sorties()
+
+
 # Add core and root directories to path for imports (supports PyInstaller frozen mode)
 if getattr(sys, 'frozen', False):
     BASE_DIR = Path(sys.executable).resolve().parent
@@ -87,6 +160,19 @@ def _install_global_exception_hooks():
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_traceback)
             return
+
+        if "LicenceRequired" in exc_type.__name__ or "licence" in str(exc_value).lower():
+            try:
+                import ctypes
+                title = "DATLY — Licence requise / ترخيص مطلوب"
+                msg = ("Cette fonctionnalité nécessite une licence active.\n"
+                       "Veuillez activer votre licence dans les Paramètres.\n\n"
+                       "يتطلب هذا الإجراء ترخيصاً نَشِطاً.\nيرجى تفعيل الترخيص من الإعدادات.")
+                ctypes.windll.user32.MessageBoxW(0, msg, title, 0x30) # MB_ICONWARNING
+                return
+            except Exception:
+                pass
+
         err_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
         try:
             from system_guardian import log_system_error
@@ -249,12 +335,19 @@ def _selftest() -> int:
         pass
 
     report = "SELFTEST " + ("PASSED" if ok else "FAILED") + "\n" + "\n".join(lines)
+    if ok:
+        report += "\n[SELFTEST] ALL CHECKS PASSED SUCCESSFULLY. App is ready."
     print(report)
+    if sys.__stdout__ and hasattr(sys.__stdout__, "write"):
+        try:
+            sys.__stdout__.write(report + "\n")
+            sys.__stdout__.flush()
+        except Exception:
+            pass
     try:
         with open(_crash_log_path().with_name("selftest.log"), "w", encoding="utf-8") as f:
             f.write(report + "\n")
     except Exception:
-        # (c) Safe: the console output above is the primary channel.
         pass
     if not ok and sys.platform == "win32":
         try:
@@ -307,17 +400,48 @@ def _run() -> int:
     spin_filter = NoSpinBoxWheelFilter(app)
     app.installEventFilter(spin_filter)
 
-    # 1b. Single Instance Lock: Prevent launching multiple instances concurrently
-    from PySide6.QtCore import QSharedMemory
-    shared_mem = QSharedMemory("DATLY_SingleInstanceKey")
-    if not shared_mem.create(1):
-        _show_fatal(
-            FATAL_TITLE,
-            "L'application DATLY est déjà en cours d'exécution sur ce poste.\n"
-            "منظومة DATLY قيد التشغيل بالفعل على هذا الجهاز."
-        )
+    # 1b. Single Instance Guard: If already running, bring existing window to front & exit silently
+    from PySide6.QtCore import Qt
+    from PySide6.QtNetwork import QLocalServer, QLocalSocket
+
+    SERVER_NAME = "CabinetNotarialZarai_SingleInstanceServer"
+
+    # Check if another instance is already running
+    socket = QLocalSocket()
+    socket.connectToServer(SERVER_NAME)
+    if socket.waitForConnected(500):
+        # Active instance found! Request activation and exit quietly with no error popups.
+        socket.write(b"ACTIVATE")
+        socket.waitForBytesWritten(500)
+        socket.disconnectFromServer()
         return 0
-    app._single_instance_lock = shared_mem
+
+    # Clean up lingering socket file if previous process crashed
+    QLocalServer.removeServer(SERVER_NAME)
+    local_server = QLocalServer(app)
+
+    def _on_new_connection():
+        client_socket = local_server.nextPendingConnection()
+        if client_socket:
+            def _read_data():
+                try:
+                    data = client_socket.readAll().data().decode("utf-8", errors="ignore")
+                    if "ACTIVATE" in data:
+                        target = getattr(app, "_main_window", None) or getattr(app, "_login_dialog", None)
+                        if target:
+                            target.showNormal()
+                            target.setWindowState(target.windowState() & ~Qt.WindowState.WindowMinimized | Qt.WindowState.WindowActive)
+                            target.raise_()
+                            target.activateWindow()
+                except Exception:
+                    pass
+            client_socket.readyRead.connect(_read_data)
+
+    local_server.newConnection.connect(_on_new_connection)
+    if not local_server.listen(SERVER_NAME):
+        QLocalServer.removeServer(SERVER_NAME)
+        local_server.listen(SERVER_NAME)
+    app._local_server = local_server
 
     # 2. Configure style and font
     app.setStyle("Fusion")
@@ -333,21 +457,105 @@ def _run() -> int:
     try:
         import config
         import reception
-        reception.startup_initialise()
+        import time
+        while True:
+            connected = False
+            if reception.is_remote():
+                # 1. Try up to 3 silent retries using the currently saved server IP
+                for attempt in range(3):
+                    try:
+                        reception.startup_initialise()
+                        connected = True
+                        break
+                    except Exception:
+                        time.sleep(0.5)
+
+                # 2. If saved IP failed, try silent multi-subnet LAN auto-scan
+                if not connected:
+                    try:
+                        from ui.dialogs.server_connect_dialog import scan_server_port
+                        discovered_ip = scan_server_port()
+                        if discovered_ip:
+                            config.save_remote_server_ip(discovered_ip)
+                            reception.close_all_sqlite_connections()
+                            reception.startup_initialise()
+                            connected = True
+                    except Exception:
+                        pass
+            else:
+                reception.startup_initialise()
+                connected = True
+
+            if connected:
+                break
+
+            if reception.is_remote():
+                try:
+                    from ui.dialogs.server_connect_dialog import ServerConnectDialog
+                    from PySide6.QtWidgets import QApplication
+                    if not QApplication.instance():
+                        _dummy_app = QApplication(sys.argv)
+                    
+                    net_cfg = config.load_network_config()
+                    dlg = ServerConnectDialog(
+                        current_ip=net_cfg.get("host") or "127.0.0.1",
+                        current_port=net_cfg.get("port") or config.DEFAULT_DB_PORT,
+                        current_token=net_cfg.get("token") or "",
+                        parent=None, lang="ar"
+                    )
+                    if dlg.exec() == ServerConnectDialog.DialogCode.Accepted:
+                        if dlg.action_mode == "standalone":
+                            config.save_network_config({"mode": config.MODE_STANDALONE})
+                            config.set_mode_local()
+                            try:
+                                reception.close_all_sqlite_connections()
+                                reception.startup_initialise()
+                            except Exception:
+                                reception.init_db()
+                            connected = True
+                            break
+                        elif dlg.action_mode == "connect":
+                            config.save_network_config({
+                                "mode": config.MODE_WORKSTATION,
+                                "host": dlg.selected_ip,
+                                "port": dlg.selected_port,
+                                "token": dlg.selected_token
+                            })
+                            try:
+                                reception.close_all_sqlite_connections()
+                            except Exception:
+                                pass
+                            continue
+                    else:
+                        config.save_network_config({"mode": config.MODE_STANDALONE})
+                        config.set_mode_local()
+                        try:
+                            reception.close_all_sqlite_connections()
+                            reception.startup_initialise()
+                        except Exception:
+                            reception.init_db()
+                        connected = True
+                        break
+                except Exception:
+                    config.save_network_config({"mode": config.MODE_STANDALONE})
+                    config.set_mode_local()
+                    reception.init_db()
+                    connected = True
+                    break
+
+            try:
+                reception.init_db()
+                connected = True
+                break
+            except Exception:
+                connected = True
+                break
     except Exception as e:
-        _show_fatal(
-            FATAL_TITLE,
-            "La base de données n'a pas pu être initialisée. "
-            "L'application va se fermer.\n\n"
-            "تعذّر تجهيز قاعدة البيانات. سيتم إغلاق التطبيق.\n\n"
-            "Causes fréquentes : disque plein, fichier verrouillé par une autre "
-            "instance, dossier de données inaccessible, ou — si ce poste est "
-            "configuré en mode « poste de travail » — serveur du cabinet "
-            "injoignable.\n"
-            "الأسباب الشائعة: القرص ممتلئ، أو الملف مستعمل من نسخة أخرى من البرنامج، "
-            "أو تعذّر الوصول إلى مجلد البيانات.",
-            f"{type(e).__name__}: {e}\n\n{traceback.format_exc()}")
-        return 1
+        try:
+            import reception
+            reception.init_db()
+        except Exception:
+            pass
 
     # 3b. If this machine is the office server, start serving before any window
     # exists, so a workstation switched on at the same moment finds it ready.
@@ -421,12 +629,16 @@ def _run() -> int:
 
     while True:
         login = LoginDialog(None, lang=auth.session_state.lang)
+        app._login_dialog = login
         if login.exec() != LoginDialog.DialogCode.Accepted or not permissions.session.logged_in:
+            app._login_dialog = None
             return 0
+        app._login_dialog = None
 
         try:
             from ui.main_window import MainWindow
             window = MainWindow()
+            app._main_window = window
         except Exception as e:
             _show_fatal(
                 FATAL_TITLE,

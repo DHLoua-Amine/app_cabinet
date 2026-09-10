@@ -156,6 +156,79 @@ def _build_ca_bundle() -> str:
     return str(CA_BUNDLE_PATH)
 
 
+# ── Reglages du cabinet ─────────────────────────────────────────────────────
+# Un simple fichier JSON dans le dossier de donnees. Il ne contient QUE des
+# preferences : rien de secret n'a le droit d'y entrer (les cles API sont
+# scellees ailleurs, par DPAPI).
+SETTINGS_FILE = DATA_DIR / "settings.json"
+
+_settings_cache = None
+
+
+def _lire_reglages() -> dict:
+    """Le contenu du fichier, ou un dictionnaire vide. Ne leve jamais."""
+    global _settings_cache
+    if _settings_cache is not None:
+        return _settings_cache
+    try:
+        # config.py n'importe json qu'a l'interieur de ses fonctions ; on suit
+        # la meme convention plutot que d'ajouter un import global.
+        import json
+        if SETTINGS_FILE.exists():
+            donnees = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            _settings_cache = donnees if isinstance(donnees, dict) else {}
+        else:
+            _settings_cache = {}
+    except Exception:
+        # Fichier illisible ou corrompu : on repart des defauts plutot que
+        # d'empecher l'application de demarrer pour une preference.
+        _settings_cache = {}
+    return _settings_cache
+
+
+def get_setting(nom: str, defaut=None):
+    """Une preference du cabinet, ou `defaut` si elle n'a jamais ete posee."""
+    valeur = _lire_reglages().get(nom, defaut)
+    return defaut if valeur is None else valeur
+
+
+def set_setting(nom: str, valeur) -> bool:
+    """Ecrit une preference. Rend True si elle est bien arrivee sur le disque.
+
+    L'appelant DOIT regarder ce retour : une page qui annonce « enregistre »
+    alors que l'ecriture a echoue est un defaut qu'on a deja rencontre deux
+    fois dans ce projet (source camera, disque de sauvegarde)."""
+    reglages = dict(_lire_reglages())
+    reglages[nom] = valeur
+    try:
+        import json
+        SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        temporaire = SETTINGS_FILE.with_suffix(".json.tmp")
+        temporaire.write_text(json.dumps(reglages, ensure_ascii=False, indent=2),
+                              encoding="utf-8")
+        # Remplacement atomique : une coupure de courant en pleine ecriture ne
+        # doit pas laisser un fichier de reglages tronque.
+        temporaire.replace(SETTINGS_FILE)
+    except Exception:
+        return False
+    global _settings_cache
+    _settings_cache = reglages
+    return True
+
+
+def load_remote_server_ip() -> str:
+    return get_setting("server_ip", "127.0.0.1")
+
+
+def save_remote_server_ip(ip: str) -> bool:
+    set_setting("mode", "remote")
+    return set_setting("server_ip", str(ip).strip())
+
+
+def set_mode_local() -> bool:
+    return set_setting("mode", "local")
+
+
 def get_ca_bundle():
     """Returns the CA bundle path requests should verify against, or True for its default."""
     global _ca_bundle_cache

@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QLineEdit, QPushButton, QFrame, QGridLayout, QScrollArea, QTextEdit, QFileDialog, QProgressBar, QStyledItemDelegate, QCheckBox, QMessageBox, QApplication
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QThread, QEventLoop, QTimer
 
 # Import core business logic
 from ui.components.collapsible_box import CollapsibleSection
@@ -253,17 +253,37 @@ class SettingsPage(QWidget):
             self.cam_combo.setCurrentIndex(3)
         self.cam_combo.currentIndexChanged.connect(self.on_camera_combo_changed)
 
+        saved_cam_2 = camera.get_saved_secondary_camera_source()
+        saved_cam_3 = camera.get_saved_tertiary_camera_source()
+
         self.rtsp_lbl = QLabel(
-            "URL du flux RTSP / IP Camera (format http://ADRESSE:PORT/video) :"
+            "Caméra 1 (Principale) / الكاميرا الأولى (الرئيسية) :"
             if self.current_lang == "fr"
-            else "عنوان بث الكاميرا (بالشكل http://ADRESSE:PORT/video) :", self.cam_card)
+            else "الكاميرا الأولى (الرئيسية) :", self.cam_card)
         self.rtsp_input = QLineEdit(self.cam_card)
+        self.rtsp_input.setPlaceholderText("rtsp://admin:password@IP:554/cam/realmonitor?channel=1&subtype=0")
         if isinstance(saved_cam, str):
             self.rtsp_input.setText(saved_cam)
-        else:
-            self.rtsp_input.setText("")
 
-        self.save_cam_btn = QPushButton("Sauvegarder Source / حفظ المصدر", self.cam_card)
+        self.rtsp_lbl_2 = QLabel(
+            "Caméra 2 (Secondaire) / الكاميرا الثانية (إضافية) :"
+            if self.current_lang == "fr"
+            else "الكاميرا الثانية (إضافية) :", self.cam_card)
+        self.rtsp_input_2 = QLineEdit(self.cam_card)
+        self.rtsp_input_2.setPlaceholderText("rtsp://admin:password@IP:554/cam/realmonitor?channel=2&subtype=0")
+        if isinstance(saved_cam_2, str):
+            self.rtsp_input_2.setText(saved_cam_2)
+
+        self.rtsp_lbl_3 = QLabel(
+            "Caméra 3 (Tertiaire) / الكاميرا الثالثة (إضافية) :"
+            if self.current_lang == "fr"
+            else "الكاميرا الثالثة (إضافية) :", self.cam_card)
+        self.rtsp_input_3 = QLineEdit(self.cam_card)
+        self.rtsp_input_3.setPlaceholderText("rtsp://admin:password@IP:554/cam/realmonitor?channel=3&subtype=0")
+        if isinstance(saved_cam_3, str):
+            self.rtsp_input_3.setText(saved_cam_3)
+
+        self.save_cam_btn = QPushButton("Sauvegarder les المصادر / حفظ كافة الكاميرات", self.cam_card)
         self.save_cam_btn.setObjectName("PrimaryButton")
         self.save_cam_btn.clicked.connect(self.save_camera_source)
 
@@ -271,7 +291,11 @@ class SettingsPage(QWidget):
         cam_form.addWidget(self.cam_combo, 0, 1)
         cam_form.addWidget(self.rtsp_lbl, 1, 0)
         cam_form.addWidget(self.rtsp_input, 1, 1)
-        cam_form.addWidget(self.save_cam_btn, 2, 0, 1, 2)
+        cam_form.addWidget(self.rtsp_lbl_2, 2, 0)
+        cam_form.addWidget(self.rtsp_input_2, 2, 1)
+        cam_form.addWidget(self.rtsp_lbl_3, 3, 0)
+        cam_form.addWidget(self.rtsp_input_3, 3, 1)
+        cam_form.addWidget(self.save_cam_btn, 4, 0, 1, 2)
         cam_lay.addLayout(cam_form)
 
         # The camera now runs for the whole session rather than only while Accueil is
@@ -285,6 +309,33 @@ class SettingsPage(QWidget):
 
         self.cam_status = QLabel("", self.cam_card)
         cam_lay.addWidget(self.cam_status)
+
+        # ── Microphone de la dictée ─────────────────────────────────────────
+        # Windows peut designer comme entree par defaut un « Mixage stereo »,
+        # qui reboucle la sortie du PC : la dictee est alors muette, sans que
+        # rien ne l'indique. C'etait le cas sur le poste du notaire le
+        # 4 septembre 2026. L'application ecarte ces peripheriques d'elle-meme,
+        # mais le cabinet doit pouvoir voir et corriger son choix ici.
+        self.mic_lbl = QLabel(
+            "Microphone pour la dictée :" if is_fr else "مايكروفون الإملاء:",
+            self.cam_card)
+        self.mic_combo = QComboBox(self.cam_card)
+        self.mic_test_btn = QPushButton(
+            "Tester le micro" if is_fr else "اختبار المايكروفون", self.cam_card)
+        self.mic_test_btn.clicked.connect(self.on_test_microphone)
+        self.mic_combo.currentIndexChanged.connect(self.on_microphone_choisi)
+
+        mic_ligne = QHBoxLayout()
+        mic_ligne.addWidget(self.mic_lbl)
+        mic_ligne.addWidget(self.mic_combo, 1)
+        mic_ligne.addWidget(self.mic_test_btn)
+        cam_lay.addLayout(mic_ligne)
+
+        self.mic_status = QLabel("", self.cam_card)
+        self.mic_status.setWordWrap(True)
+        cam_lay.addWidget(self.mic_status)
+        self._remplir_microphones()
+
         self._add_section(self.cam_card, self.cam_title)
         self.on_camera_combo_changed(self.cam_combo.currentIndex()) # apply initial show/hide for rtsp input
 
@@ -774,7 +825,8 @@ class SettingsPage(QWidget):
                 getattr(self, "lang_card", None),
                 getattr(self, "pass_card", None),
                 getattr(self, "update_card", None),
-                getattr(self, "net_card", None)
+                getattr(self, "net_card", None),
+                getattr(self, "lic_card", None)
             )
             if not is_admin and card not in allowed_cards:
                 sec.setVisible(False)
@@ -1137,6 +1189,12 @@ class SettingsPage(QWidget):
         show_url = index == self.URL_CHOICE_INDEX
         self.rtsp_lbl.setVisible(show_url)
         self.rtsp_input.setVisible(show_url)
+        if hasattr(self, 'rtsp_lbl_2'):
+            self.rtsp_lbl_2.setVisible(show_url)
+            self.rtsp_input_2.setVisible(show_url)
+        if hasattr(self, 'rtsp_lbl_3'):
+            self.rtsp_lbl_3.setVisible(show_url)
+            self.rtsp_input_3.setVisible(show_url)
 
     def camera_service(self):
         """The one CameraService owned by MainWindow, or None when running standalone."""
@@ -1149,6 +1207,121 @@ class SettingsPage(QWidget):
             return None
         svc = getattr(w, "camera_service", None)
         return svc if hasattr(svc, "restart") else None
+
+    def _remplir_microphones(self):
+        """Liste les entrees audio, en signalant celles qui ne captent rien."""
+        from ui.components.audio_recorder import AudioRecorder
+        is_fr = self.current_lang == "fr"
+        self.mic_combo.blockSignals(True)
+        self.mic_combo.clear()
+        entrees = AudioRecorder.peripheriques_entree()
+        if not entrees:
+            self.mic_combo.addItem(
+                "Aucun microphone détecté" if is_fr else "لا يوجد مايكروفون", "")
+            self.mic_combo.setEnabled(False)
+            self.mic_test_btn.setEnabled(False)
+            self.mic_combo.blockSignals(False)
+            return
+
+        self.mic_combo.addItem(
+            "Automatique (recommandé)" if is_fr else "تلقائي (مستحسن)", "")
+        for d in entrees:
+            nom = d.description()
+            if AudioRecorder.est_bouclage(nom):
+                # Nomme, mais signale : ce peripherique n'enregistre que ce que
+                # le PC joue, jamais la voix du notaire.
+                etiquette = (f"{nom} — n'enregistre PAS la voix" if is_fr
+                             else f"{nom} — لا يسجّل الصوت")
+            else:
+                etiquette = nom
+            self.mic_combo.addItem(etiquette, nom)
+
+        try:
+            voulu = (config.get_setting("microphone_choisi", "") or "").strip()
+        except Exception:
+            voulu = ""
+        if voulu:
+            i = self.mic_combo.findData(voulu)
+            if i >= 0:
+                self.mic_combo.setCurrentIndex(i)
+        self.mic_combo.blockSignals(False)
+
+        appareil, raison = AudioRecorder.choisir_peripherique()
+        self.mic_status.setText(
+            (f"Actuellement utilisé — {raison}" if is_fr else f"المستعمل حاليًا — {raison}"))
+        self.mic_status.setStyleSheet("color: #64748b;")
+
+    def on_microphone_choisi(self, _index: int):
+        """Enregistre le choix du cabinet. « Automatique » efface le reglage."""
+        is_fr = self.current_lang == "fr"
+        valeur = self.mic_combo.currentData() or ""
+        try:
+            config.set_setting("microphone_choisi", valeur)
+        except Exception as e:
+            self.mic_status.setText(
+                f"Le choix n'a pas pu être enregistré : {e}" if is_fr
+                else f"تعذّر حفظ الاختيار: {e}")
+            self.mic_status.setStyleSheet("color: #dc2626; font-weight: bold;")
+            return
+        from ui.components.audio_recorder import AudioRecorder
+        _appareil, raison = AudioRecorder.choisir_peripherique()
+        self.mic_status.setText(
+            (f"Enregistré — {raison}" if is_fr else f"تم الحفظ — {raison}"))
+        self.mic_status.setStyleSheet("color: #059669; font-weight: bold;")
+
+    def on_test_microphone(self):
+        """Mesure le niveau capté pendant deux secondes.
+
+        C'est la seule verification qui compte : un micro peut etre branche,
+        actif et choisi, et ne rien capter (prise morte, volume a zero)."""
+        from ui.components.audio_recorder import AudioRecorder
+        is_fr = self.current_lang == "fr"
+        self.mic_test_btn.setEnabled(False)
+        self.mic_status.setText(
+            "Parlez maintenant…" if is_fr else "تكلّم الآن…")
+        self.mic_status.setStyleSheet("color: #2563eb;")
+        QApplication.processEvents()
+
+        enregistreur = AudioRecorder()
+        try:
+            enregistreur.start()
+            boucle = QEventLoop()
+            QTimer.singleShot(2000, boucle.quit)
+            boucle.exec()
+            enregistreur.stop()
+            boucle2 = QEventLoop()
+            QTimer.singleShot(3500, boucle2.quit)
+            boucle2.exec()
+            niveau = enregistreur.measure_level(timeout_ms=4000)
+        except Exception as e:
+            niveau = -1.0
+            enregistreur._journaliser("test du micro", str(e))
+        finally:
+            try:
+                enregistreur._relacher_peripherique()
+            except Exception:
+                pass
+            self.mic_test_btn.setEnabled(True)
+
+        seuil = AudioRecorder.SILENCE_RMS_THRESHOLD
+        if niveau < 0:
+            self.mic_status.setText(
+                "Le test n'a pas pu être effectué. Vérifiez qu'aucun autre "
+                "logiciel n'utilise le micro." if is_fr else
+                "تعذّر إجراء الاختبار. تأكّد من أنّ برنامجًا آخر لا يستعمل المايكروفون.")
+            self.mic_status.setStyleSheet("color: #d97706; font-weight: bold;")
+        elif niveau >= seuil:
+            self.mic_status.setText(
+                f"Le micro capte bien votre voix (niveau {niveau:.0f}). La dictée fonctionnera."
+                if is_fr else f"المايكروفون يلتقط صوتك (المستوى {niveau:.0f}). الإملاء جاهز.")
+            self.mic_status.setStyleSheet("color: #059669; font-weight: bold;")
+        else:
+            self.mic_status.setText(
+                f"Aucun son capté (niveau {niveau:.0f}, il en faut {seuil:.0f}). "
+                "Choisissez un autre microphone dans la liste ci-dessus." if is_fr else
+                f"لم يُلتقط أي صوت (المستوى {niveau:.0f}، المطلوب {seuil:.0f}). "
+                "اختر مايكروفونًا آخر من القائمة أعلاه.")
+            self.mic_status.setStyleSheet("color: #dc2626; font-weight: bold;")
 
     def on_camera_autostart_toggled(self, enabled: bool):
         """Persists whether the camera should come up on its own at launch."""
@@ -1201,6 +1374,11 @@ class SettingsPage(QWidget):
         # was merely switched off — or not yet on the network — could never be recorded.
         # It is saved and applied; CameraService reports it as disconnected and keeps
         # retrying with backoff, which is exactly what that state is for.
+        if hasattr(self, 'rtsp_input_2'):
+            camera.set_saved_secondary_camera_source(self.rtsp_input_2.text().strip())
+        if hasattr(self, 'rtsp_input_3'):
+            camera.set_saved_tertiary_camera_source(self.rtsp_input_3.text().strip())
+
         if not camera.set_saved_camera_source(new_source):
             # Same shape as the USB backup path bug: the write failed and the page
             # used to carry on and report the source as applied.

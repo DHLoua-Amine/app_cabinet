@@ -1026,7 +1026,19 @@ class AccountingPage(QWidget):
                      f"pu être copié.\n\n{copy_err}" if self.lang == "fr" else
                      f"سيتم تسجيل المصروف، لكن لم يتم نسخ الوصل!\n\n{copy_err}"))
 
-        success = reception.add_expense(desc, cat, amt, photo_path=p_path)
+        try:
+            import licensing
+            success = reception.add_expense(desc, cat, amt, photo_path=p_path)
+        except (licensing.LicenceRequired, Exception) as exp_err:
+            if "LicenceRequired" in type(exp_err).__name__ or "licence" in str(exp_err).lower():
+                QMessageBox.warning(
+                    self, "Licence requise" if is_fr else "ترخيص مطلوب",
+                    "Cette fonctionnalité nécessite une licence active.\nVeuillez تفعيل الترخيص من الإعدادات." if is_fr else
+                    "يتطلب هذا الإجراء ترخيصاً نَشِطاً. يرجى تفعيل الترخيص من الإعدادات.")
+            else:
+                QMessageBox.critical(self, "Erreur" if is_fr else "خطأ", f"{exp_err}")
+            return
+
         if success:
             QMessageBox.information(self, "Succès" if is_fr else "نجاح", "Dépense enregistrée !" if is_fr else "تم تسجيل المصروف بنجاح!")
             self.exp_desc_input.clear()

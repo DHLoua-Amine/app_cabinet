@@ -2,7 +2,7 @@
 version.py — Fichier officiel de versionnage de l'application Cabinet Notarial Zarai.
 """
 
-__version__ = "1.0.4"
+__version__ = "1.0.6"
 APP_NAME    = "Cabinet Notarial"
 
 # ── GitHub ────────────────────────────────────────────────────────────────────

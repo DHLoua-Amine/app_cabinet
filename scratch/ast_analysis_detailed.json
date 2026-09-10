@@ -1,0 +1,3703 @@
+{
+  "silent_exceptions": {
+    "cleanup_courtesy": [
+      {
+        "file": "core\\config.py",
+        "line": 405,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\config.py",
+        "line": 412,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_client.py",
+        "line": 273,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 229,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 521,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 572,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 777,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 781,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\reception.py",
+        "line": 204,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\reception.py",
+        "line": 1445,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\reception.py",
+        "line": 143,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 21,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 29,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 55,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\services\\camera_service.py",
+        "line": 141,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\services\\camera_service.py",
+        "line": 148,
+        "snippet": "except ValueError:"
+      },
+      {
+        "file": "ui\\services\\camera_service.py",
+        "line": 133,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 445,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 488,
+        "snippet": "except Exception:"
+      }
+    ],
+    "telemetry_optional": [
+      {
+        "file": "core\\db_server.py",
+        "line": 907,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\face_engine.py",
+        "line": 21,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\system_guardian.py",
+        "line": 197,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\services\\camera_service.py",
+        "line": 232,
+        "snippet": "except Exception:"
+      }
+    ],
+    "ui_warmup_prebuild": [
+      {
+        "file": "core\\camera.py",
+        "line": 110,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\ocr_engine.py",
+        "line": 229,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\reception.py",
+        "line": 2072,
+        "snippet": "except sqlite3.OperationalError:"
+      },
+      {
+        "file": "core\\reception.py",
+        "line": 2123,
+        "snippet": "except sqlite3.OperationalError:"
+      },
+      {
+        "file": "ui\\main_window.py",
+        "line": 558,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\main_window.py",
+        "line": 432,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\main_window.py",
+        "line": 343,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 336,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 219,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 229,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1272,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 203,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 220,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 173,
+        "snippet": "except Exception:"
+      }
+    ],
+    "property_fallback": [
+      {
+        "file": "core\\db_client.py",
+        "line": 297,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 862,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 874,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 886,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\legacy_migration.py",
+        "line": 419,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\licensing.py",
+        "line": 99,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\licensing.py",
+        "line": 350,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\office_profile.py",
+        "line": 120,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\updater.py",
+        "line": 111,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 164,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 258,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 707,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1458,
+        "snippet": "except (AttributeError, RuntimeError):"
+      },
+      {
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 631,
+        "snippet": "except RuntimeError:"
+      },
+      {
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 2039,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1806,
+        "snippet": "except (RuntimeError, IndexError, ValueError):"
+      },
+      {
+        "file": "ui\\pages\\settings_page.py",
+        "line": 828,
+        "snippet": "except (AttributeError, RuntimeError):"
+      },
+      {
+        "file": "ui\\pages\\settings_page.py",
+        "line": 837,
+        "snippet": "except (AttributeError, RuntimeError):"
+      },
+      {
+        "file": "ui\\pages\\settings_page.py",
+        "line": 819,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 334,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 342,
+        "snippet": "except Exception:"
+      }
+    ],
+    "truly_silent_business": [
+      {
+        "file": "core\\archive_importer.py",
+        "line": 344,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\auth.py",
+        "line": 245,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\camera.py",
+        "line": 259,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\camera.py",
+        "line": 226,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\cin_extractor.py",
+        "line": 130,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\config.py",
+        "line": 312,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\config.py",
+        "line": 134,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\config.py",
+        "line": 270,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\config.py",
+        "line": 522,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\config.py",
+        "line": 674,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 236,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 553,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_server.py",
+        "line": 625,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\db_service.py",
+        "line": 114,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\docx_generator.py",
+        "line": 58,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\legacy_migration.py",
+        "line": 933,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\legacy_migration.py",
+        "line": 1252,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\licensing.py",
+        "line": 221,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\licensing.py",
+        "line": 241,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\licensing.py",
+        "line": 246,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\ocr_engine.py",
+        "line": 117,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\ocr_engine.py",
+        "line": 142,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\ocr_engine.py",
+        "line": 372,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\ocr_engine.py",
+        "line": 378,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\office_profile.py",
+        "line": 97,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\reception.py",
+        "line": 222,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\reception.py",
+        "line": 645,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\remote_license.py",
+        "line": 47,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\updater.py",
+        "line": 128,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "core\\voice_verifier.py",
+        "line": 17,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 326,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 179,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 369,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 328,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 334,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 358,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 146,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 298,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\components\\camera_thread.py",
+        "line": 234,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\pages\\home_page.py",
+        "line": 350,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 2152,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 110,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 153,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1882,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 133,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 154,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 180,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 349,
+        "snippet": "except Exception:"
+      },
+      {
+        "file": "main.py",
+        "line": 519,
+        "snippet": "except Exception:"
+      }
+    ]
+  },
+  "uncalled_functions": {
+    "qt_event_handlers": [
+      {
+        "name": "resizeEvent",
+        "file": "ui\\main_window.py",
+        "line": 387
+      },
+      {
+        "name": "closeEvent",
+        "file": "ui\\main_window.py",
+        "line": 569
+      },
+      {
+        "name": "mousePressEvent",
+        "file": "ui\\pages\\home_page.py",
+        "line": 99
+      },
+      {
+        "name": "showEvent",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1304
+      },
+      {
+        "name": "hideEvent",
+        "file": "ui\\pages\\home_page.py",
+        "line": 641
+      },
+      {
+        "name": "eventFilter",
+        "file": "main.py",
+        "line": 387
+      }
+    ],
+    "dunder_protocol": [],
+    "api_and_data_models": [
+      {
+        "name": "parse_folder_name",
+        "file": "core\\archive_importer.py",
+        "line": 105
+      },
+      {
+        "name": "looks_like_client_folder",
+        "file": "core\\archive_importer.py",
+        "line": 150
+      },
+      {
+        "name": "scan_archive",
+        "file": "core\\legacy_migration.py",
+        "line": 1007
+      },
+      {
+        "name": "apply_plan",
+        "file": "core\\archive_importer.py",
+        "line": 353
+      },
+      {
+        "name": "bulk_import_legacy_notary_folders",
+        "file": "core\\archive_importer.py",
+        "line": 467
+      },
+      {
+        "name": "full_name",
+        "file": "core\\archive_importer.py",
+        "line": 95
+      },
+      {
+        "name": "summary",
+        "file": "core\\legacy_migration.py",
+        "line": 349
+      },
+      {
+        "name": "score",
+        "file": "core\\legacy_migration.py",
+        "line": 896
+      },
+      {
+        "name": "hash_password",
+        "file": "core\\auth.py",
+        "line": 51
+      },
+      {
+        "name": "verify_hash",
+        "file": "core\\auth.py",
+        "line": 60
+      },
+      {
+        "name": "generate_recovery_code",
+        "file": "core\\auth.py",
+        "line": 85
+      },
+      {
+        "name": "init_user_store",
+        "file": "core\\auth.py",
+        "line": 105
+      },
+      {
+        "name": "get_user",
+        "file": "core\\auth.py",
+        "line": 127
+      },
+      {
+        "name": "list_users",
+        "file": "core\\auth.py",
+        "line": 143
+      },
+      {
+        "name": "user_count",
+        "file": "core\\auth.py",
+        "line": 161
+      },
+      {
+        "name": "create_user",
+        "file": "core\\auth.py",
+        "line": 170
+      },
+      {
+        "name": "set_password",
+        "file": "core\\auth.py",
+        "line": 191
+      },
+      {
+        "name": "change_own_password",
+        "file": "core\\auth.py",
+        "line": 203
+      },
+      {
+        "name": "authenticate",
+        "file": "core\\auth.py",
+        "line": 239
+      },
+      {
+        "name": "login",
+        "file": "core\\db_client.py",
+        "line": 280
+      },
+      {
+        "name": "logout",
+        "file": "core\\db_client.py",
+        "line": 294
+      },
+      {
+        "name": "is_admin",
+        "file": "core\\auth.py",
+        "line": 287
+      },
+      {
+        "name": "is_secretary",
+        "file": "core\\auth.py",
+        "line": 291
+      },
+      {
+        "name": "is_patron",
+        "file": "core\\auth.py",
+        "line": 296
+      },
+      {
+        "name": "is_receptionniste",
+        "file": "core\\auth.py",
+        "line": 300
+      },
+      {
+        "name": "reset_password_with_recovery_code",
+        "file": "core\\auth.py",
+        "line": 305
+      },
+      {
+        "name": "issue_recovery_code",
+        "file": "core\\auth.py",
+        "line": 331
+      },
+      {
+        "name": "admin_reset_password",
+        "file": "core\\auth.py",
+        "line": 344
+      },
+      {
+        "name": "bootstrap",
+        "file": "core\\auth.py",
+        "line": 367
+      },
+      {
+        "name": "migrate_legacy_passwords",
+        "file": "core\\auth.py",
+        "line": 406
+      },
+      {
+        "name": "load_config",
+        "file": "core\\auth.py",
+        "line": 436
+      },
+      {
+        "name": "save_config",
+        "file": "core\\auth.py",
+        "line": 457
+      },
+      {
+        "name": "update_language",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 2088
+      },
+      {
+        "name": "auth_logged_in",
+        "file": "core\\auth.py",
+        "line": 474
+      },
+      {
+        "name": "check_ip_reachable",
+        "file": "core\\camera.py",
+        "line": 8
+      },
+      {
+        "name": "probe_camera_stream",
+        "file": "core\\camera.py",
+        "line": 41
+      },
+      {
+        "name": "stop_active_camera",
+        "file": "core\\camera.py",
+        "line": 118
+      },
+      {
+        "name": "get_saved_camera_source",
+        "file": "core\\camera.py",
+        "line": 289
+      },
+      {
+        "name": "has_saved_camera_source",
+        "file": "core\\camera.py",
+        "line": 302
+      },
+      {
+        "name": "get_camera_autostart",
+        "file": "core\\camera.py",
+        "line": 319
+      },
+      {
+        "name": "set_camera_autostart",
+        "file": "core\\camera.py",
+        "line": 329
+      },
+      {
+        "name": "set_saved_camera_source",
+        "file": "core\\camera.py",
+        "line": 346
+      },
+      {
+        "name": "start",
+        "file": "ui\\services\\camera_service.py",
+        "line": 88
+      },
+      {
+        "name": "read_frame",
+        "file": "core\\camera.py",
+        "line": 271
+      },
+      {
+        "name": "stop",
+        "file": "ui\\services\\camera_service.py",
+        "line": 151
+      },
+      {
+        "name": "extract_cin_data",
+        "file": "core\\cin_extractor.py",
+        "line": 92
+      },
+      {
+        "name": "extract_cin_dual_faces",
+        "file": "core\\cin_extractor.py",
+        "line": 156
+      },
+      {
+        "name": "resource_path",
+        "file": "core\\config.py",
+        "line": 30
+      },
+      {
+        "name": "get_setting",
+        "file": "core\\config.py",
+        "line": 189
+      },
+      {
+        "name": "set_setting",
+        "file": "core\\config.py",
+        "line": 195
+      },
+      {
+        "name": "save_remote_server_ip",
+        "file": "core\\config.py",
+        "line": 223
+      },
+      {
+        "name": "set_mode_local",
+        "file": "core\\config.py",
+        "line": 228
+      },
+      {
+        "name": "get_ca_bundle",
+        "file": "core\\config.py",
+        "line": 232
+      },
+      {
+        "name": "get_ssl_context",
+        "file": "core\\config.py",
+        "line": 249
+      },
+      {
+        "name": "disable_insecure_tls",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 887
+      },
+      {
+        "name": "insecure_tls_allowed",
+        "file": "core\\config.py",
+        "line": 300
+      },
+      {
+        "name": "load_network_config",
+        "file": "core\\config.py",
+        "line": 343
+      },
+      {
+        "name": "save_network_config",
+        "file": "core\\config.py",
+        "line": 366
+      },
+      {
+        "name": "est_adresse_privee",
+        "file": "core\\config.py",
+        "line": 417
+      },
+      {
+        "name": "verifier_adresse_serveur",
+        "file": "core\\config.py",
+        "line": 430
+      },
+      {
+        "name": "generate_db_token",
+        "file": "core\\config.py",
+        "line": 496
+      },
+      {
+        "name": "network_mode",
+        "file": "core\\config.py",
+        "line": 504
+      },
+      {
+        "name": "is_workstation",
+        "file": "core\\config.py",
+        "line": 508
+      },
+      {
+        "name": "local_ip_addresses",
+        "file": "core\\config.py",
+        "line": 512
+      },
+      {
+        "name": "load_ai_engine",
+        "file": "core\\config.py",
+        "line": 551
+      },
+      {
+        "name": "save_ai_engine",
+        "file": "core\\config.py",
+        "line": 577
+      },
+      {
+        "name": "keystore_is_encrypted",
+        "file": "core\\config.py",
+        "line": 608
+      },
+      {
+        "name": "load_saved_api_keys",
+        "file": "core\\config.py",
+        "line": 660
+      },
+      {
+        "name": "save_api_keys",
+        "file": "core\\config.py",
+        "line": 687
+      },
+      {
+        "name": "get_party_role_names",
+        "file": "core\\contract_templates.py",
+        "line": 115
+      },
+      {
+        "name": "detect_tunisian_gender",
+        "file": "core\\contract_templates.py",
+        "line": 179
+      },
+      {
+        "name": "convert_arabic_time_to_words",
+        "file": "core\\contract_templates.py",
+        "line": 287
+      },
+      {
+        "name": "get_current_arabic_date_info",
+        "file": "core\\contract_templates.py",
+        "line": 320
+      },
+      {
+        "name": "get_default_variables",
+        "file": "core\\contract_templates.py",
+        "line": 349
+      },
+      {
+        "name": "format_single_party_text",
+        "file": "core\\contract_templates.py",
+        "line": 404
+      },
+      {
+        "name": "build_multi_party_contract_text",
+        "file": "core\\contract_templates.py",
+        "line": 466
+      },
+      {
+        "name": "clean_and_verify_tunisian_entities",
+        "file": "core\\contract_templates.py",
+        "line": 1128
+      },
+      {
+        "name": "process_detection",
+        "file": "core\\cooldown.py",
+        "line": 9
+      },
+      {
+        "name": "probe",
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 47
+      },
+      {
+        "name": "keys",
+        "file": "core\\db_client.py",
+        "line": 58
+      },
+      {
+        "name": "get",
+        "file": "core\\db_client.py",
+        "line": 70
+      },
+      {
+        "name": "description",
+        "file": "core\\db_client.py",
+        "line": 86
+      },
+      {
+        "name": "execute",
+        "file": "core\\db_client.py",
+        "line": 307
+      },
+      {
+        "name": "executemany",
+        "file": "core\\db_client.py",
+        "line": 310
+      },
+      {
+        "name": "fetchone",
+        "file": "core\\db_client.py",
+        "line": 126
+      },
+      {
+        "name": "fetchall",
+        "file": "core\\db_client.py",
+        "line": 129
+      },
+      {
+        "name": "close",
+        "file": "main.py",
+        "line": 45
+      },
+      {
+        "name": "cursor",
+        "file": "core\\db_client.py",
+        "line": 304
+      },
+      {
+        "name": "commit",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 450
+      },
+      {
+        "name": "rollback",
+        "file": "core\\db_client.py",
+        "line": 316
+      },
+      {
+        "name": "ping",
+        "file": "core\\db_client.py",
+        "line": 322
+      },
+      {
+        "name": "sync_photo",
+        "file": "core\\db_client.py",
+        "line": 329
+      },
+      {
+        "name": "cache_generation",
+        "file": "core\\reception.py",
+        "line": 638
+      },
+      {
+        "name": "fetch_photo",
+        "file": "core\\db_client.py",
+        "line": 355
+      },
+      {
+        "name": "get_unknown_visitors",
+        "file": "core\\db_client.py",
+        "line": 381
+      },
+      {
+        "name": "push_unknown_visitor",
+        "file": "core\\db_client.py",
+        "line": 388
+      },
+      {
+        "name": "purge_unknown_visitor",
+        "file": "core\\db_client.py",
+        "line": 395
+      },
+      {
+        "name": "push_live_detection",
+        "file": "core\\db_client.py",
+        "line": 402
+      },
+      {
+        "name": "get_live_detection",
+        "file": "core\\db_client.py",
+        "line": 409
+      },
+      {
+        "name": "derive_key",
+        "file": "core\\db_crypto.py",
+        "line": 58
+      },
+      {
+        "name": "send_plain",
+        "file": "core\\db_crypto.py",
+        "line": 76
+      },
+      {
+        "name": "recv_plain",
+        "file": "core\\db_crypto.py",
+        "line": 81
+      },
+      {
+        "name": "send_sealed",
+        "file": "core\\db_crypto.py",
+        "line": 105
+      },
+      {
+        "name": "recv_sealed",
+        "file": "core\\db_crypto.py",
+        "line": 119
+      },
+      {
+        "name": "new_session_id",
+        "file": "core\\db_crypto.py",
+        "line": 140
+      },
+      {
+        "name": "encode_value",
+        "file": "core\\db_server.py",
+        "line": 62
+      },
+      {
+        "name": "decode_value",
+        "file": "core\\db_server.py",
+        "line": 68
+      },
+      {
+        "name": "encode_params",
+        "file": "core\\db_server.py",
+        "line": 74
+      },
+      {
+        "name": "decode_params",
+        "file": "core\\db_server.py",
+        "line": 82
+      },
+      {
+        "name": "is_ddl",
+        "file": "core\\db_server.py",
+        "line": 139
+      },
+      {
+        "name": "is_local_peer",
+        "file": "core\\db_server.py",
+        "line": 186
+      },
+      {
+        "name": "detect_lan_address",
+        "file": "core\\db_server.py",
+        "line": 211
+      },
+      {
+        "name": "tables_touched",
+        "file": "core\\db_server.py",
+        "line": 284
+      },
+      {
+        "name": "is_write",
+        "file": "core\\db_server.py",
+        "line": 289
+      },
+      {
+        "name": "authorise",
+        "file": "core\\db_server.py",
+        "line": 294
+      },
+      {
+        "name": "audit_author_index",
+        "file": "core\\db_server.py",
+        "line": 355
+      },
+      {
+        "name": "enforce_audit_identity",
+        "file": "core\\db_server.py",
+        "line": 388
+      },
+      {
+        "name": "running",
+        "file": "core\\db_server.py",
+        "line": 529
+      },
+      {
+        "name": "client_count",
+        "file": "core\\db_service.py",
+        "line": 38
+      },
+      {
+        "name": "refused_count",
+        "file": "core\\db_service.py",
+        "line": 53
+      },
+      {
+        "name": "blocked_addresses",
+        "file": "core\\db_service.py",
+        "line": 58
+      },
+      {
+        "name": "refuse",
+        "file": "core\\db_server.py",
+        "line": 567
+      },
+      {
+        "name": "get_server",
+        "file": "core\\db_service.py",
+        "line": 28
+      },
+      {
+        "name": "is_running",
+        "file": "ui\\services\\camera_service.py",
+        "line": 77
+      },
+      {
+        "name": "bound_address",
+        "file": "core\\db_service.py",
+        "line": 43
+      },
+      {
+        "name": "start_if_server",
+        "file": "core\\db_service.py",
+        "line": 63
+      },
+      {
+        "name": "polices_installees",
+        "file": "core\\docx_generator.py",
+        "line": 44
+      },
+      {
+        "name": "police_arabe",
+        "file": "core\\docx_generator.py",
+        "line": 63
+      },
+      {
+        "name": "set_rtl",
+        "file": "core\\docx_generator.py",
+        "line": 82
+      },
+      {
+        "name": "set_run_font",
+        "file": "core\\docx_generator.py",
+        "line": 90
+      },
+      {
+        "name": "format_legal_paragraph",
+        "file": "core\\docx_generator.py",
+        "line": 108
+      },
+      {
+        "name": "get_global_face_engine",
+        "file": "core\\face_engine.py",
+        "line": 32
+      },
+      {
+        "name": "detect_and_extract",
+        "file": "core\\face_engine.py",
+        "line": 61
+      },
+      {
+        "name": "match_face",
+        "file": "core\\face_engine.py",
+        "line": 121
+      },
+      {
+        "name": "calculate_lcm_list",
+        "file": "core\\farida_engine.py",
+        "line": 25
+      },
+      {
+        "name": "calculate_farida",
+        "file": "core\\farida_engine.py",
+        "line": 35
+      },
+      {
+        "name": "export_farida_docx",
+        "file": "core\\farida_engine.py",
+        "line": 352
+      },
+      {
+        "name": "is_blocked",
+        "file": "core\\legacy_migration.py",
+        "line": 149
+      },
+      {
+        "name": "strip_accents",
+        "file": "core\\legacy_migration.py",
+        "line": 161
+      },
+      {
+        "name": "looks_like_date",
+        "file": "core\\legacy_migration.py",
+        "line": 166
+      },
+      {
+        "name": "normalise_cin",
+        "file": "core\\legacy_migration.py",
+        "line": 186
+      },
+      {
+        "name": "name_tokens",
+        "file": "core\\legacy_migration.py",
+        "line": 202
+      },
+      {
+        "name": "name_key",
+        "file": "core\\legacy_migration.py",
+        "line": 216
+      },
+      {
+        "name": "name_similarity",
+        "file": "core\\legacy_migration.py",
+        "line": 232
+      },
+      {
+        "name": "display_name",
+        "file": "core\\office_profile.py",
+        "line": 171
+      },
+      {
+        "name": "sniff_type",
+        "file": "core\\legacy_migration.py",
+        "line": 246
+      },
+      {
+        "name": "is_real_image",
+        "file": "core\\legacy_migration.py",
+        "line": 263
+      },
+      {
+        "name": "sha256_of",
+        "file": "core\\legacy_migration.py",
+        "line": 267
+      },
+      {
+        "name": "audit",
+        "file": "core\\legacy_migration.py",
+        "line": 404
+      },
+      {
+        "name": "done_files",
+        "file": "core\\legacy_migration.py",
+        "line": 463
+      },
+      {
+        "name": "inventory",
+        "file": "core\\legacy_migration.py",
+        "line": 470
+      },
+      {
+        "name": "looks_like_id_card",
+        "file": "core\\legacy_migration.py",
+        "line": 565
+      },
+      {
+        "name": "extract_document_text",
+        "file": "core\\legacy_migration.py",
+        "line": 577
+      },
+      {
+        "name": "gather_evidence",
+        "file": "core\\legacy_migration.py",
+        "line": 599
+      },
+      {
+        "name": "cluster",
+        "file": "core\\legacy_migration.py",
+        "line": 699
+      },
+      {
+        "name": "build_dossiers",
+        "file": "core\\legacy_migration.py",
+        "line": 849
+      },
+      {
+        "name": "choose_photo",
+        "file": "core\\legacy_migration.py",
+        "line": 882
+      },
+      {
+        "name": "match_existing",
+        "file": "core\\legacy_migration.py",
+        "line": 916
+      },
+      {
+        "name": "assess",
+        "file": "core\\legacy_migration.py",
+        "line": 939
+      },
+      {
+        "name": "classify_excluded",
+        "file": "core\\legacy_migration.py",
+        "line": 986
+      },
+      {
+        "name": "split_group",
+        "file": "core\\legacy_migration.py",
+        "line": 1079
+      },
+      {
+        "name": "merge_groups",
+        "file": "core\\legacy_migration.py",
+        "line": 1099
+      },
+      {
+        "name": "set_identity",
+        "file": "core\\legacy_migration.py",
+        "line": 1125
+      },
+      {
+        "name": "commit_plan",
+        "file": "core\\legacy_migration.py",
+        "line": 1150
+      },
+      {
+        "name": "needs_review",
+        "file": "core\\legacy_migration.py",
+        "line": 365
+      },
+      {
+        "name": "machine_fingerprint",
+        "file": "core\\licensing.py",
+        "line": 104
+      },
+      {
+        "name": "parse_licence",
+        "file": "core\\licensing.py",
+        "line": 143
+      },
+      {
+        "name": "verify_licence",
+        "file": "core\\licensing.py",
+        "line": 156
+      },
+      {
+        "name": "save_licence",
+        "file": "core\\licensing.py",
+        "line": 207
+      },
+      {
+        "name": "load_licence",
+        "file": "core\\licensing.py",
+        "line": 216
+      },
+      {
+        "name": "status",
+        "file": "core\\licensing.py",
+        "line": 268
+      },
+      {
+        "name": "is_licensed",
+        "file": "core\\licensing.py",
+        "line": 298
+      },
+      {
+        "name": "require_licence",
+        "file": "core\\licensing.py",
+        "line": 326
+      },
+      {
+        "name": "activate",
+        "file": "core\\licensing.py",
+        "line": 359
+      },
+      {
+        "name": "wrapper",
+        "file": "core\\system_guardian.py",
+        "line": 48
+      },
+      {
+        "name": "audit_notary_contract",
+        "file": "core\\notary_checker.py",
+        "line": 123
+      },
+      {
+        "name": "inspect_card_image",
+        "file": "core\\ocr_engine.py",
+        "line": 78
+      },
+      {
+        "name": "optimize_image_for_api",
+        "file": "core\\ocr_engine.py",
+        "line": 125
+      },
+      {
+        "name": "load",
+        "file": "core\\office_profile.py",
+        "line": 80
+      },
+      {
+        "name": "save",
+        "file": "core\\office_profile.py",
+        "line": 104
+      },
+      {
+        "name": "is_configured",
+        "file": "core\\office_profile.py",
+        "line": 125
+      },
+      {
+        "name": "missing_fields",
+        "file": "core\\office_profile.py",
+        "line": 131
+      },
+      {
+        "name": "notary_block",
+        "file": "core\\office_profile.py",
+        "line": 150
+      },
+      {
+        "name": "tax_office_name",
+        "file": "core\\office_profile.py",
+        "line": 166
+      },
+      {
+        "name": "office_title",
+        "file": "core\\office_profile.py",
+        "line": 181
+      },
+      {
+        "name": "letterhead",
+        "file": "core\\office_profile.py",
+        "line": 188
+      },
+      {
+        "name": "signature_block",
+        "file": "core\\office_profile.py",
+        "line": 202
+      },
+      {
+        "name": "header_html",
+        "file": "core\\office_profile.py",
+        "line": 213
+      },
+      {
+        "name": "footer_html",
+        "file": "core\\office_profile.py",
+        "line": 274
+      },
+      {
+        "name": "letterhead_fr",
+        "file": "core\\office_profile.py",
+        "line": 299
+      },
+      {
+        "name": "generate_pdf_bilan",
+        "file": "core\\pdf_generator.py",
+        "line": 37
+      },
+      {
+        "name": "apply_run_font",
+        "file": "core\\pdf_generator.py",
+        "line": 344
+      },
+      {
+        "name": "generate_docx_from_transcription",
+        "file": "core\\pdf_generator.py",
+        "line": 430
+      },
+      {
+        "name": "generate_pdf_from_transcription",
+        "file": "core\\pdf_generator.py",
+        "line": 534
+      },
+      {
+        "name": "generate_client_fiche_pdf",
+        "file": "core\\pdf_generator.py",
+        "line": 580
+      },
+      {
+        "name": "has",
+        "file": "core\\permissions.py",
+        "line": 164
+      },
+      {
+        "name": "require",
+        "file": "core\\permissions.py",
+        "line": 169
+      },
+      {
+        "name": "check",
+        "file": "main.py",
+        "line": 281
+      },
+      {
+        "name": "redact",
+        "file": "core\\permissions.py",
+        "line": 197
+      },
+      {
+        "name": "describe",
+        "file": "core\\permissions.py",
+        "line": 221
+      },
+      {
+        "name": "sign_in",
+        "file": "core\\permissions.py",
+        "line": 138
+      },
+      {
+        "name": "sign_out",
+        "file": "core\\permissions.py",
+        "line": 147
+      },
+      {
+        "name": "capabilities",
+        "file": "core\\permissions.py",
+        "line": 154
+      },
+      {
+        "name": "decorator",
+        "file": "core\\system_guardian.py",
+        "line": 46
+      },
+      {
+        "name": "local_cache",
+        "file": "core\\system_guardian.py",
+        "line": 45
+      },
+      {
+        "name": "set_remote_identity",
+        "file": "core\\reception.py",
+        "line": 87
+      },
+      {
+        "name": "clear_remote_identity",
+        "file": "core\\reception.py",
+        "line": 92
+      },
+      {
+        "name": "is_remote",
+        "file": "core\\reception.py",
+        "line": 124
+      },
+      {
+        "name": "get_connection",
+        "file": "core\\reception.py",
+        "line": 133
+      },
+      {
+        "name": "get_db_cursor",
+        "file": "core\\reception.py",
+        "line": 179
+      },
+      {
+        "name": "close_all_sqlite_connections",
+        "file": "core\\reception.py",
+        "line": 212
+      },
+      {
+        "name": "serialize_embedding",
+        "file": "core\\reception.py",
+        "line": 232
+      },
+      {
+        "name": "deserialize_embedding",
+        "file": "core\\reception.py",
+        "line": 248
+      },
+      {
+        "name": "check_name_field",
+        "file": "core\\reception.py",
+        "line": 269
+      },
+      {
+        "name": "unique_file_stamp",
+        "file": "core\\reception.py",
+        "line": 293
+      },
+      {
+        "name": "generate_client_id",
+        "file": "core\\reception.py",
+        "line": 311
+      },
+      {
+        "name": "init_db",
+        "file": "core\\reception.py",
+        "line": 347
+      },
+      {
+        "name": "ensure_indexes",
+        "file": "core\\reception.py",
+        "line": 604
+      },
+      {
+        "name": "clear_db_caches",
+        "file": "core\\reception.py",
+        "line": 628
+      },
+      {
+        "name": "register_client",
+        "file": "core\\reception.py",
+        "line": 651
+      },
+      {
+        "name": "update_client_civil_status",
+        "file": "core\\reception.py",
+        "line": 704
+      },
+      {
+        "name": "find_client_by_cin_or_name",
+        "file": "core\\reception.py",
+        "line": 772
+      },
+      {
+        "name": "resolve_photo_path",
+        "file": "core\\reception.py",
+        "line": 794
+      },
+      {
+        "name": "update_client_profile_pic",
+        "file": "core\\reception.py",
+        "line": 812
+      },
+      {
+        "name": "enrol_face_from_photo",
+        "file": "core\\reception.py",
+        "line": 847
+      },
+      {
+        "name": "update_client_facial_embedding_from_photo",
+        "file": "core\\reception.py",
+        "line": 894
+      },
+      {
+        "name": "update_client_facial_embedding_from_photo_async",
+        "file": "core\\reception.py",
+        "line": 901
+      },
+      {
+        "name": "get_all_clients_summary",
+        "file": "core\\reception.py",
+        "line": 935
+      },
+      {
+        "name": "search_cases",
+        "file": "core\\reception.py",
+        "line": 954
+      },
+      {
+        "name": "count_clients",
+        "file": "core\\reception.py",
+        "line": 1022
+      },
+      {
+        "name": "count_check_ins",
+        "file": "core\\reception.py",
+        "line": 1035
+      },
+      {
+        "name": "count_check_ins_today",
+        "file": "core\\reception.py",
+        "line": 1048
+      },
+      {
+        "name": "search_clients_summary",
+        "file": "core\\reception.py",
+        "line": 1069
+      },
+      {
+        "name": "get_client_name_map",
+        "file": "core\\reception.py",
+        "line": 1097
+      },
+      {
+        "name": "get_all_face_embeddings",
+        "file": "core\\reception.py",
+        "line": 1123
+      },
+      {
+        "name": "get_all_clients",
+        "file": "core\\reception.py",
+        "line": 1152
+      },
+      {
+        "name": "get_client_by_id",
+        "file": "core\\reception.py",
+        "line": 1169
+      },
+      {
+        "name": "delete_client",
+        "file": "core\\reception.py",
+        "line": 1185
+      },
+      {
+        "name": "log_check_in",
+        "file": "core\\reception.py",
+        "line": 1265
+      },
+      {
+        "name": "recompute_monthly_visit_stats",
+        "file": "core\\reception.py",
+        "line": 1311
+      },
+      {
+        "name": "archive_old_check_ins",
+        "file": "core\\reception.py",
+        "line": 1333
+      },
+      {
+        "name": "run_daily_archiving_if_needed",
+        "file": "core\\reception.py",
+        "line": 1410
+      },
+      {
+        "name": "get_recent_check_ins",
+        "file": "core\\reception.py",
+        "line": 1449
+      },
+      {
+        "name": "get_check_in_inflows_between",
+        "file": "core\\reception.py",
+        "line": 1496
+      },
+      {
+        "name": "count_check_ins_matching",
+        "file": "core\\reception.py",
+        "line": 1545
+      },
+      {
+        "name": "search_check_ins",
+        "file": "core\\reception.py",
+        "line": 1566
+      },
+      {
+        "name": "get_check_ins_filtered",
+        "file": "core\\reception.py",
+        "line": 1614
+      },
+      {
+        "name": "get_check_ins_for_client",
+        "file": "core\\reception.py",
+        "line": 1716
+      },
+      {
+        "name": "create_case",
+        "file": "core\\reception.py",
+        "line": 1749
+      },
+      {
+        "name": "update_case_payment",
+        "file": "core\\reception.py",
+        "line": 1797
+      },
+      {
+        "name": "get_client_cases",
+        "file": "core\\reception.py",
+        "line": 1821
+      },
+      {
+        "name": "count_cases_by_status",
+        "file": "core\\reception.py",
+        "line": 1842
+      },
+      {
+        "name": "get_client_case_counts",
+        "file": "core\\reception.py",
+        "line": 1879
+      },
+      {
+        "name": "get_case_inflows_between",
+        "file": "core\\reception.py",
+        "line": 1894
+      },
+      {
+        "name": "get_receivables",
+        "file": "core\\reception.py",
+        "line": 1926
+      },
+      {
+        "name": "update_case_status",
+        "file": "core\\reception.py",
+        "line": 1968
+      },
+      {
+        "name": "delete_case",
+        "file": "core\\reception.py",
+        "line": 1982
+      },
+      {
+        "name": "get_client_documents_list",
+        "file": "core\\reception.py",
+        "line": 1995
+      },
+      {
+        "name": "delete_client_document",
+        "file": "core\\reception.py",
+        "line": 2035
+      },
+      {
+        "name": "save_client_document",
+        "file": "core\\reception.py",
+        "line": 2049
+      },
+      {
+        "name": "add_expense",
+        "file": "core\\reception.py",
+        "line": 2066
+      },
+      {
+        "name": "get_expenses",
+        "file": "core\\reception.py",
+        "line": 2089
+      },
+      {
+        "name": "delete_expense",
+        "file": "core\\reception.py",
+        "line": 2100
+      },
+      {
+        "name": "add_salary",
+        "file": "core\\reception.py",
+        "line": 2117
+      },
+      {
+        "name": "get_salaries",
+        "file": "core\\reception.py",
+        "line": 2139
+      },
+      {
+        "name": "delete_salary",
+        "file": "core\\reception.py",
+        "line": 2150
+      },
+      {
+        "name": "get_record_edits",
+        "file": "core\\reception.py",
+        "line": 2200
+      },
+      {
+        "name": "update_expense",
+        "file": "core\\reception.py",
+        "line": 2225
+      },
+      {
+        "name": "update_salary",
+        "file": "core\\reception.py",
+        "line": 2266
+      },
+      {
+        "name": "update_case_details",
+        "file": "core\\reception.py",
+        "line": 2393
+      },
+      {
+        "name": "startup_initialise",
+        "file": "core\\reception.py",
+        "line": 2437
+      },
+      {
+        "name": "check_remote_license",
+        "file": "core\\remote_license.py",
+        "line": 24
+      },
+      {
+        "name": "set_client_features",
+        "file": "core\\remote_license.py",
+        "line": 103
+      },
+      {
+        "name": "has_feature",
+        "file": "core\\remote_license.py",
+        "line": 110
+      },
+      {
+        "name": "create_executive_excel",
+        "file": "core\\style_utils.py",
+        "line": 8
+      },
+      {
+        "name": "clear_guardian_cache",
+        "file": "core\\system_guardian.py",
+        "line": 69
+      },
+      {
+        "name": "init_sentry",
+        "file": "core\\system_guardian.py",
+        "line": 99
+      },
+      {
+        "name": "redact_secrets",
+        "file": "core\\system_guardian.py",
+        "line": 148
+      },
+      {
+        "name": "log_system_error",
+        "file": "core\\system_guardian.py",
+        "line": 161
+      },
+      {
+        "name": "create_full_system_backup",
+        "file": "core\\system_guardian.py",
+        "line": 209
+      },
+      {
+        "name": "get_external_backup_dir",
+        "file": "core\\system_guardian.py",
+        "line": 342
+      },
+      {
+        "name": "set_external_backup_dir",
+        "file": "core\\system_guardian.py",
+        "line": 365
+      },
+      {
+        "name": "mirror_backup_to_external_drive",
+        "file": "core\\system_guardian.py",
+        "line": 401
+      },
+      {
+        "name": "prune_old_backups",
+        "file": "core\\system_guardian.py",
+        "line": 418
+      },
+      {
+        "name": "verify_database_integrity",
+        "file": "core\\system_guardian.py",
+        "line": 436
+      },
+      {
+        "name": "validate_backup_archive",
+        "file": "core\\system_guardian.py",
+        "line": 469
+      },
+      {
+        "name": "restore_from_latest_backup",
+        "file": "core\\system_guardian.py",
+        "line": 512
+      },
+      {
+        "name": "cleanup_temporary_files",
+        "file": "core\\system_guardian.py",
+        "line": 564
+      },
+      {
+        "name": "run_startup_health_check",
+        "file": "core\\system_guardian.py",
+        "line": 591
+      },
+      {
+        "name": "write",
+        "file": "main.py",
+        "line": 23
+      },
+      {
+        "name": "flush",
+        "file": "main.py",
+        "line": 26
+      },
+      {
+        "name": "writelines",
+        "file": "main.py",
+        "line": 29
+      },
+      {
+        "name": "isatty",
+        "file": "main.py",
+        "line": 33
+      },
+      {
+        "name": "fileno",
+        "file": "main.py",
+        "line": 36
+      },
+      {
+        "name": "closed",
+        "file": "main.py",
+        "line": 49
+      },
+      {
+        "name": "log_startup_event",
+        "file": "core\\updater.py",
+        "line": 33
+      },
+      {
+        "name": "is_update_channel_configured",
+        "file": "core\\updater.py",
+        "line": 61
+      },
+      {
+        "name": "get_github_token",
+        "file": "core\\updater.py",
+        "line": 94
+      },
+      {
+        "name": "make_github_request",
+        "file": "core\\updater.py",
+        "line": 134
+      },
+      {
+        "name": "check_for_update",
+        "file": "core\\updater.py",
+        "line": 148
+      },
+      {
+        "name": "download_and_verify_update",
+        "file": "core\\updater.py",
+        "line": 261
+      },
+      {
+        "name": "get_current_pid_and_install_dir",
+        "file": "core\\updater.py",
+        "line": 330
+      },
+      {
+        "name": "prepare_clean_app_shutdown",
+        "file": "core\\updater.py",
+        "line": 343
+      },
+      {
+        "name": "apply_update_and_restart",
+        "file": "core\\updater.py",
+        "line": 364
+      },
+      {
+        "name": "redirect_request",
+        "file": "core\\updater.py",
+        "line": 86
+      },
+      {
+        "name": "parse_version",
+        "file": "core\\updater.py",
+        "line": 52
+      },
+      {
+        "name": "safe_log",
+        "file": "core\\voice_verifier.py",
+        "line": 12
+      },
+      {
+        "name": "downsample_wav_to_16k_mono",
+        "file": "core\\voice_verifier.py",
+        "line": 58
+      },
+      {
+        "name": "call_gemini_api",
+        "file": "core\\voice_verifier.py",
+        "line": 118
+      },
+      {
+        "name": "transcribe_audio_bytes",
+        "file": "core\\voice_verifier.py",
+        "line": 241
+      },
+      {
+        "name": "extract_variables_from_spoken_text",
+        "file": "core\\voice_verifier.py",
+        "line": 371
+      },
+      {
+        "name": "normalise_foussoul",
+        "file": "core\\voice_verifier.py",
+        "line": 471
+      },
+      {
+        "name": "get_all",
+        "file": "core\\repositories\\client_repository.py",
+        "line": 46
+      },
+      {
+        "name": "run",
+        "file": "ui\\pages\\settings\\workers.py",
+        "line": 87
+      },
+      {
+        "name": "update_sidebar_brand",
+        "file": "ui\\main_window.py",
+        "line": 60
+      },
+      {
+        "name": "init_ui",
+        "file": "ui\\pages\\settings\\office_profile_section.py",
+        "line": 23
+      },
+      {
+        "name": "may_open",
+        "file": "ui\\main_window.py",
+        "line": 248
+      },
+      {
+        "name": "switch_page",
+        "file": "ui\\main_window.py",
+        "line": 405
+      },
+      {
+        "name": "open_fiche_client",
+        "file": "ui\\main_window.py",
+        "line": 466
+      },
+      {
+        "name": "update_ui_language",
+        "file": "ui\\main_window.py",
+        "line": 486
+      },
+      {
+        "name": "restart_app_for_language",
+        "file": "ui\\main_window.py",
+        "line": 514
+      },
+      {
+        "name": "logout_user",
+        "file": "ui\\main_window.py",
+        "line": 531
+      },
+      {
+        "name": "est_bouclage",
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 57
+      },
+      {
+        "name": "peripheriques_entree",
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 63
+      },
+      {
+        "name": "choisir_peripherique",
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 71
+      },
+      {
+        "name": "init_recorder",
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 137
+      },
+      {
+        "name": "measure_level",
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 374
+      },
+      {
+        "name": "on_ready",
+        "file": "ui\\components\\audio_recorder.py",
+        "line": 403
+      },
+      {
+        "name": "configure_calendar",
+        "file": "ui\\components\\calendar_utils.py",
+        "line": 97
+      },
+      {
+        "name": "set_status",
+        "file": "ui\\components\\camera_status_bar.py",
+        "line": 68
+      },
+      {
+        "name": "set_language",
+        "file": "ui\\components\\camera_status_bar.py",
+        "line": 158
+      },
+      {
+        "name": "show_detection",
+        "file": "ui\\components\\camera_status_bar.py",
+        "line": 128
+      },
+      {
+        "name": "set_preview_enabled",
+        "file": "ui\\services\\camera_service.py",
+        "line": 172
+      },
+      {
+        "name": "toggle_expansion",
+        "file": "ui\\components\\collapsible_box.py",
+        "line": 98
+      },
+      {
+        "name": "set_expanded",
+        "file": "ui\\components\\collapsible_box.py",
+        "line": 101
+      },
+      {
+        "name": "set_title",
+        "file": "ui\\components\\collapsible_box.py",
+        "line": 109
+      },
+      {
+        "name": "add_widget",
+        "file": "ui\\components\\collapsible_box.py",
+        "line": 112
+      },
+      {
+        "name": "add_layout",
+        "file": "ui\\components\\collapsible_box.py",
+        "line": 115
+      },
+      {
+        "name": "run_export_with_progress",
+        "file": "ui\\components\\export_thread.py",
+        "line": 52
+      },
+      {
+        "name": "on_progress",
+        "file": "ui\\components\\export_thread.py",
+        "line": 69
+      },
+      {
+        "name": "cleanup",
+        "file": "ui\\components\\export_thread.py",
+        "line": 75
+      },
+      {
+        "name": "report",
+        "file": "ui\\components\\export_thread.py",
+        "line": 34
+      },
+      {
+        "name": "wheelEvent",
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 23
+      },
+      {
+        "name": "focusInEvent",
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 26
+      },
+      {
+        "name": "load_client_profile",
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 698
+      },
+      {
+        "name": "on_calculate_clicked",
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 710
+      },
+      {
+        "name": "on_insert_direct_clicked",
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 824
+      },
+      {
+        "name": "on_generate_partition_clicked",
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 832
+      },
+      {
+        "name": "on_print_clicked",
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 839
+      },
+      {
+        "name": "on_export_word_clicked",
+        "file": "ui\\components\\farida_dialog.py",
+        "line": 904
+      },
+      {
+        "name": "clear",
+        "file": "ui\\components\\pixmap_cache.py",
+        "line": 35
+      },
+      {
+        "name": "invalidate",
+        "file": "ui\\components\\pixmap_cache.py",
+        "line": 39
+      },
+      {
+        "name": "circular_avatar",
+        "file": "ui\\components\\pixmap_cache.py",
+        "line": 51
+      },
+      {
+        "name": "scaled_preview",
+        "file": "ui\\components\\pixmap_cache.py",
+        "line": 82
+      },
+      {
+        "name": "placeholder_avatar",
+        "file": "ui\\components\\pixmap_cache.py",
+        "line": 98
+      },
+      {
+        "name": "values",
+        "file": "ui\\dialogs\\edit_entry_dialog.py",
+        "line": 178
+      },
+      {
+        "name": "is_fr",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 43
+      },
+      {
+        "name": "tr",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 46
+      },
+      {
+        "name": "open_network_dialog",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 144
+      },
+      {
+        "name": "attempt_login",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 372
+      },
+      {
+        "name": "password_problem",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 453
+      },
+      {
+        "name": "forgot_password",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 468
+      },
+      {
+        "name": "do_save",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 205
+      },
+      {
+        "name": "confirm",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 440
+      },
+      {
+        "name": "do_reset",
+        "file": "ui\\dialogs\\login_dialog.py",
+        "line": 526
+      },
+      {
+        "name": "lm",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 64
+      },
+      {
+        "name": "browse",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 187
+      },
+      {
+        "name": "start_scan",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 193
+      },
+      {
+        "name": "populate",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 228
+      },
+      {
+        "name": "set_reviewed",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 368
+      },
+      {
+        "name": "exclude_selected",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 373
+      },
+      {
+        "name": "confirm_all_high",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 382
+      },
+      {
+        "name": "split_selected",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 396
+      },
+      {
+        "name": "merge_selected",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 415
+      },
+      {
+        "name": "edit_identity",
+        "file": "ui\\dialogs\\migration_review_dialog.py",
+        "line": 429
+      },
+      {
+        "name": "get_local_ip_prefixes",
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 10
+      },
+      {
+        "name": "scan_server_port",
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 37
+      },
+      {
+        "name": "start_auto_scan",
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 216
+      },
+      {
+        "name": "on_scan_finished",
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 227
+      },
+      {
+        "name": "on_test_clicked",
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 245
+      },
+      {
+        "name": "on_connect_clicked",
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 270
+      },
+      {
+        "name": "on_standalone_clicked",
+        "file": "ui\\dialogs\\server_connect_dialog.py",
+        "line": 285
+      },
+      {
+        "name": "rowCount",
+        "file": "ui\\pages\\register_page.py",
+        "line": 36
+      },
+      {
+        "name": "columnCount",
+        "file": "ui\\pages\\register_page.py",
+        "line": 39
+      },
+      {
+        "name": "data",
+        "file": "ui\\pages\\register_page.py",
+        "line": 42
+      },
+      {
+        "name": "headerData",
+        "file": "ui\\pages\\register_page.py",
+        "line": 79
+      },
+      {
+        "name": "configure_table",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 639
+      },
+      {
+        "name": "update_translations",
+        "file": "ui\\pages\\settings\\office_profile_section.py",
+        "line": 81
+      },
+      {
+        "name": "on_custom_date_changed",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 715
+      },
+      {
+        "name": "on_period_changed",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 720
+      },
+      {
+        "name": "get_period_dates",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 727
+      },
+      {
+        "name": "load_data",
+        "file": "ui\\pages\\register_page.py",
+        "line": 467
+      },
+      {
+        "name": "update_kpi_cards",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 902
+      },
+      {
+        "name": "update_tables",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 910
+      },
+      {
+        "name": "save_expense",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 997
+      },
+      {
+        "name": "build_row_action_bar",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1080
+      },
+      {
+        "name": "on_row_activated",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1142
+      },
+      {
+        "name": "open_selected_receipt",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1163
+      },
+      {
+        "name": "edit_selected_expense",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1183
+      },
+      {
+        "name": "edit_expense_row",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1188
+      },
+      {
+        "name": "edit_selected_salary",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1219
+      },
+      {
+        "name": "edit_salary_row",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1224
+      },
+      {
+        "name": "delete_selected_expense",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1269
+      },
+      {
+        "name": "delete_selected_salary",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1276
+      },
+      {
+        "name": "open_receipt",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1292
+      },
+      {
+        "name": "show_expenses_context_menu",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1318
+      },
+      {
+        "name": "delete_expense_action",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1348
+      },
+      {
+        "name": "save_salary",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1359
+      },
+      {
+        "name": "show_salaries_context_menu",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1400
+      },
+      {
+        "name": "delete_salary_action",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1430
+      },
+      {
+        "name": "export_excel",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1475
+      },
+      {
+        "name": "export_pdf",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 2019
+      },
+      {
+        "name": "filter_inflows",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1541
+      },
+      {
+        "name": "browse_expense_photo",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1556
+      },
+      {
+        "name": "browse_salary_photo",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1565
+      },
+      {
+        "name": "on_receivable_clicked",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1574
+      },
+      {
+        "name": "clean_cat_lang",
+        "file": "ui\\pages\\accounting_page.py",
+        "line": 1620
+      },
+      {
+        "name": "mouseReleaseEvent",
+        "file": "ui\\pages\\clients_page.py",
+        "line": 139
+      },
+      {
+        "name": "load_profile_pic",
+        "file": "ui\\pages\\clients_page.py",
+        "line": 148
+      },
+      {
+        "name": "apply_search",
+        "file": "ui\\pages\\clients_page.py",
+        "line": 343
+      },
+      {
+        "name": "display_clients",
+        "file": "ui\\pages\\clients_page.py",
+        "line": 399
+      },
+      {
+        "name": "add_new_client",
+        "file": "ui\\pages\\clients_page.py",
+        "line": 433
+      },
+      {
+        "name": "on_client_clicked",
+        "file": "ui\\pages\\clients_page.py",
+        "line": 436
+      },
+      {
+        "name": "safe_profile_path",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 45
+      },
+      {
+        "name": "validate",
+        "file": "ui\\pages\\fiche_client\\civil_status_form.py",
+        "line": 98
+      },
+      {
+        "name": "init_empty_client",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 135
+      },
+      {
+        "name": "load_client_data",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 641
+      },
+      {
+        "name": "update_header_visuals",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 726
+      },
+      {
+        "name": "load_profile_photo",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 788
+      },
+      {
+        "name": "change_photo",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 907
+      },
+      {
+        "name": "save_client",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 959
+      },
+      {
+        "name": "run_ocr",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1113
+      },
+      {
+        "name": "on_single_ocr_finished",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1143
+      },
+      {
+        "name": "on_all_ocr_finished",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1151
+      },
+      {
+        "name": "on_ocr_finished",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1158
+      },
+      {
+        "name": "load_client_cases",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1193
+      },
+      {
+        "name": "build_case_card_widget",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1214
+      },
+      {
+        "name": "change_case_status",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1394
+      },
+      {
+        "name": "open_payment_dialog_full",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1411
+      },
+      {
+        "name": "attach_case_document",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1554
+      },
+      {
+        "name": "create_new_case_dialog",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1574
+      },
+      {
+        "name": "load_client_documents",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1738
+      },
+      {
+        "name": "upload_general_document",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1776
+      },
+      {
+        "name": "open_selected_document",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1794
+      },
+      {
+        "name": "show_docs_context_menu",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1803
+      },
+      {
+        "name": "delete_document_action",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1829
+      },
+      {
+        "name": "print_fiche",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1855
+      },
+      {
+        "name": "load_visits_tab",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1894
+      },
+      {
+        "name": "filter_visits",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1915
+      },
+      {
+        "name": "export_visits_csv",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1935
+      },
+      {
+        "name": "delete_client_action",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1959
+      },
+      {
+        "name": "open_farida_dialog",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 2053
+      },
+      {
+        "name": "browse_proof",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1474
+      },
+      {
+        "name": "browse_attach",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 1660
+      },
+      {
+        "name": "attach_camera_service",
+        "file": "ui\\pages\\home_page.py",
+        "line": 346
+      },
+      {
+        "name": "on_service_status",
+        "file": "ui\\pages\\home_page.py",
+        "line": 358
+      },
+      {
+        "name": "init_camera_config",
+        "file": "ui\\pages\\home_page.py",
+        "line": 369
+      },
+      {
+        "name": "refresh_camera_hint",
+        "file": "ui\\pages\\home_page.py",
+        "line": 372
+      },
+      {
+        "name": "show_camera_disconnected_message",
+        "file": "ui\\pages\\home_page.py",
+        "line": 388
+      },
+      {
+        "name": "toggle_camera",
+        "file": "ui\\pages\\home_page.py",
+        "line": 392
+      },
+      {
+        "name": "start_camera",
+        "file": "ui\\pages\\home_page.py",
+        "line": 399
+      },
+      {
+        "name": "stop_camera",
+        "file": "ui\\pages\\home_page.py",
+        "line": 413
+      },
+      {
+        "name": "dismiss_unknown_visitor",
+        "file": "ui\\pages\\home_page.py",
+        "line": 419
+      },
+      {
+        "name": "clear_known_history",
+        "file": "ui\\pages\\home_page.py",
+        "line": 430
+      },
+      {
+        "name": "clear_unknown_history",
+        "file": "ui\\pages\\home_page.py",
+        "line": 440
+      },
+      {
+        "name": "on_sidebar_delete_clicked",
+        "file": "ui\\pages\\home_page.py",
+        "line": 451
+      },
+      {
+        "name": "on_unknown_purged",
+        "file": "ui\\pages\\home_page.py",
+        "line": 456
+      },
+      {
+        "name": "on_frame_received",
+        "file": "ui\\pages\\home_page.py",
+        "line": 474
+      },
+      {
+        "name": "on_face_selected",
+        "file": "ui\\pages\\home_page.py",
+        "line": 545
+      },
+      {
+        "name": "on_quick_action_clicked",
+        "file": "ui\\pages\\home_page.py",
+        "line": 586
+      },
+      {
+        "name": "update_headers",
+        "file": "ui\\pages\\register_page.py",
+        "line": 23
+      },
+      {
+        "name": "show_context_menu",
+        "file": "ui\\pages\\register_page.py",
+        "line": 636
+      },
+      {
+        "name": "on_row_double_clicked",
+        "file": "ui\\pages\\presence_page.py",
+        "line": 414
+      },
+      {
+        "name": "reset_filters",
+        "file": "ui\\pages\\register_page.py",
+        "line": 476
+      },
+      {
+        "name": "apply_filter",
+        "file": "ui\\pages\\presence_page.py",
+        "line": 484
+      },
+      {
+        "name": "retitle_ui",
+        "file": "ui\\pages\\presence_page.py",
+        "line": 599
+      },
+      {
+        "name": "update_stats",
+        "file": "ui\\pages\\register_page.py",
+        "line": 538
+      },
+      {
+        "name": "rows_for_export",
+        "file": "ui\\pages\\presence_page.py",
+        "line": 645
+      },
+      {
+        "name": "export_to_excel",
+        "file": "ui\\pages\\register_page.py",
+        "line": 368
+      },
+      {
+        "name": "build",
+        "file": "ui\\pages\\register_page.py",
+        "line": 380
+      },
+      {
+        "name": "clean_service_type_lang",
+        "file": "ui\\pages\\register_page.py",
+        "line": 85
+      },
+      {
+        "name": "clean_val_lang",
+        "file": "ui\\pages\\register_page.py",
+        "line": 928
+      },
+      {
+        "name": "on_filter_date_changed",
+        "file": "ui\\pages\\register_page.py",
+        "line": 472
+      },
+      {
+        "name": "apply_filters",
+        "file": "ui\\pages\\register_page.py",
+        "line": 483
+      },
+      {
+        "name": "update_filtered_count_label",
+        "file": "ui\\pages\\register_page.py",
+        "line": 574
+      },
+      {
+        "name": "update_table_view",
+        "file": "ui\\pages\\register_page.py",
+        "line": 594
+      },
+      {
+        "name": "prev_page",
+        "file": "ui\\pages\\register_page.py",
+        "line": 623
+      },
+      {
+        "name": "next_page",
+        "file": "ui\\pages\\register_page.py",
+        "line": 628
+      },
+      {
+        "name": "edit_selected_case",
+        "file": "ui\\pages\\register_page.py",
+        "line": 700
+      },
+      {
+        "name": "edit_selected_case_by_row",
+        "file": "ui\\pages\\register_page.py",
+        "line": 713
+      },
+      {
+        "name": "delete_selected_case",
+        "file": "ui\\pages\\register_page.py",
+        "line": 722
+      },
+      {
+        "name": "delete_case_action",
+        "file": "ui\\pages\\register_page.py",
+        "line": 882
+      },
+      {
+        "name": "on_table_double_clicked",
+        "file": "ui\\pages\\register_page.py",
+        "line": 830
+      },
+      {
+        "name": "change_status",
+        "file": "ui\\pages\\register_page.py",
+        "line": 842
+      },
+      {
+        "name": "filter_clients",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 897
+      },
+      {
+        "name": "rebuild_parties_ui",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1012
+      },
+      {
+        "name": "clear_layout",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1055
+      },
+      {
+        "name": "add_party",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1065
+      },
+      {
+        "name": "remove_party",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1072
+      },
+      {
+        "name": "on_p1_client_selected",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1079
+      },
+      {
+        "name": "on_p2_client_selected",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1084
+      },
+      {
+        "name": "upload_cin_image",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1089
+      },
+      {
+        "name": "trigger_background_cin_ocr",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1158
+      },
+      {
+        "name": "load_clients_list",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1201
+      },
+      {
+        "name": "populate_contract_types",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1247
+      },
+      {
+        "name": "select_contract_type",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1285
+      },
+      {
+        "name": "update_office_header",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1299
+      },
+      {
+        "name": "on_contract_type_changed",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1309
+      },
+      {
+        "name": "update_ui_fields_from_state",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1312
+      },
+      {
+        "name": "pull_state_from_ui_fields",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1332
+      },
+      {
+        "name": "refresh_contract_preview_text",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1400
+      },
+      {
+        "name": "on_editor_text_changed",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1429
+      },
+      {
+        "name": "quick_fill_witnesses",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1432
+      },
+      {
+        "name": "copy_contract_text",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1439
+      },
+      {
+        "name": "start_recording",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1446
+      },
+      {
+        "name": "on_recording_started",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1465
+      },
+      {
+        "name": "on_recording_stopped",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1468
+      },
+      {
+        "name": "on_recording_error",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1521
+      },
+      {
+        "name": "stop_recording",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1530
+      },
+      {
+        "name": "save_audio_to_laptop",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1538
+      },
+      {
+        "name": "clear_audio_recording",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1569
+      },
+      {
+        "name": "upload_audio_file",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1585
+      },
+      {
+        "name": "reload_ai_engine",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1602
+      },
+      {
+        "name": "run_unified_generation",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1613
+      },
+      {
+        "name": "on_pipeline_finished",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1681
+      },
+      {
+        "name": "render_pipeline_log",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1752
+      },
+      {
+        "name": "reset_pipeline",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1829
+      },
+      {
+        "name": "run_legal_audit",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1857
+      },
+      {
+        "name": "export_word",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 1994
+      },
+      {
+        "name": "archive_to_clients",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 2041
+      },
+      {
+        "name": "open_farida_calculator",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 2113
+      },
+      {
+        "name": "vlabel",
+        "file": "ui\\pages\\scanner_page.py",
+        "line": 623
+      },
+      {
+        "name": "apply_role_restrictions",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 794
+      },
+      {
+        "name": "refresh_tls_warning",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 840
+      },
+      {
+        "name": "on_ai_model_changed",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 934
+      },
+      {
+        "name": "on_ai_keys_changed",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 946
+      },
+      {
+        "name": "save_language",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 962
+      },
+      {
+        "name": "update_translation",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 970
+      },
+      {
+        "name": "on_camera_combo_changed",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1164
+      },
+      {
+        "name": "camera_service",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1169
+      },
+      {
+        "name": "on_microphone_choisi",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1224
+      },
+      {
+        "name": "on_test_microphone",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1242
+      },
+      {
+        "name": "on_camera_autostart_toggled",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1296
+      },
+      {
+        "name": "save_camera_source",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1309
+      },
+      {
+        "name": "on_camera_connection_tested",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1337
+      },
+      {
+        "name": "save_password",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1401
+      },
+      {
+        "name": "run_manual_backup",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1522
+      },
+      {
+        "name": "on_backup_completed",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1534
+      },
+      {
+        "name": "download_backup_zip",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1556
+      },
+      {
+        "name": "save_usb_path",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1574
+      },
+      {
+        "name": "check_usb_status",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1626
+      },
+      {
+        "name": "load_diagnostic_logs",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1648
+      },
+      {
+        "name": "clear_diagnostic_log",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1659
+      },
+      {
+        "name": "export_diagnostic_log",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1755
+      },
+      {
+        "name": "load_office_profile",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1809
+      },
+      {
+        "name": "refresh_office_labels",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1817
+      },
+      {
+        "name": "refresh_office_preview",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1836
+      },
+      {
+        "name": "save_office_profile",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1846
+      },
+      {
+        "name": "check_app_updates",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1918
+      },
+      {
+        "name": "on_update_checked",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1934
+      },
+      {
+        "name": "start_update_download",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1967
+      },
+      {
+        "name": "on_update_downloaded",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1987
+      },
+      {
+        "name": "refresh_licence_status",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2021
+      },
+      {
+        "name": "copy_machine_id",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2074
+      },
+      {
+        "name": "activate_licence",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2083
+      },
+      {
+        "name": "load_network_settings",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2130
+      },
+      {
+        "name": "on_network_mode_changed",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2148
+      },
+      {
+        "name": "refresh_network_status",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2161
+      },
+      {
+        "name": "generate_network_token",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2219
+      },
+      {
+        "name": "test_network_connection",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2229
+      },
+      {
+        "name": "save_network_settings",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2255
+      },
+      {
+        "name": "open_migration_review",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2375
+      },
+      {
+        "name": "browse_import_directory",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2399
+      },
+      {
+        "name": "run_bulk_import",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2404
+      },
+      {
+        "name": "on_bulk_import_finished",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 2426
+      },
+      {
+        "name": "fail",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1420
+      },
+      {
+        "name": "ok",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1424
+      },
+      {
+        "name": "safe",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1697
+      },
+      {
+        "name": "state",
+        "file": "ui\\services\\camera_service.py",
+        "line": 70
+      },
+      {
+        "name": "detail",
+        "file": "ui\\services\\camera_service.py",
+        "line": 74
+      },
+      {
+        "name": "restart",
+        "file": "ui\\services\\camera_service.py",
+        "line": 166
+      },
+      {
+        "name": "preview_enabled",
+        "file": "ui\\services\\camera_service.py",
+        "line": 184
+      },
+      {
+        "name": "load_documents",
+        "file": "ui\\pages\\fiche_client\\documents_list_widget.py",
+        "line": 67
+      },
+      {
+        "name": "add_document",
+        "file": "ui\\pages\\fiche_client\\documents_list_widget.py",
+        "line": 91
+      },
+      {
+        "name": "load_logs",
+        "file": "ui\\pages\\settings\\diagnostics_section.py",
+        "line": 78
+      },
+      {
+        "name": "clear_log",
+        "file": "ui\\pages\\settings\\diagnostics_section.py",
+        "line": 93
+      },
+      {
+        "name": "load_profile",
+        "file": "ui\\pages\\settings\\office_profile_section.py",
+        "line": 57
+      },
+      {
+        "name": "save_profile",
+        "file": "ui\\pages\\settings\\office_profile_section.py",
+        "line": 62
+      },
+      {
+        "name": "load_stylesheet",
+        "file": "main.py",
+        "line": 231
+      },
+      {
+        "name": "main",
+        "file": "main.py",
+        "line": 618
+      },
+      {
+        "name": "handle_exception",
+        "file": "main.py",
+        "line": 159
+      },
+      {
+        "name": "handle_thread_exception",
+        "file": "main.py",
+        "line": 198
+      }
+    ],
+    "truly_uncalled": [
+      {
+        "name": "is_logged_in",
+        "file": "core\\auth.py",
+        "line": 279
+      },
+      {
+        "name": "get_role",
+        "file": "core\\auth.py",
+        "line": 283
+      },
+      {
+        "name": "auth_role",
+        "file": "core\\auth.py",
+        "line": 478
+      },
+      {
+        "name": "auth_display",
+        "file": "core\\auth.py",
+        "line": 482
+      },
+      {
+        "name": "auth_username",
+        "file": "core\\auth.py",
+        "line": 486
+      },
+      {
+        "name": "load_remote_server_ip",
+        "file": "core\\config.py",
+        "line": 219
+      },
+      {
+        "name": "fetchmany",
+        "file": "core\\db_client.py",
+        "line": 133
+      },
+      {
+        "name": "send_frame",
+        "file": "core\\db_server.py",
+        "line": 90
+      },
+      {
+        "name": "recv_frame",
+        "file": "core\\db_server.py",
+        "line": 102
+      },
+      {
+        "name": "recent_events",
+        "file": "core\\db_service.py",
+        "line": 24
+      },
+      {
+        "name": "create_notary_deed_docx",
+        "file": "core\\docx_generator.py",
+        "line": 132
+      },
+      {
+        "name": "read_audit",
+        "file": "core\\legacy_migration.py",
+        "line": 425
+      },
+      {
+        "name": "may_create_records",
+        "file": "core\\licensing.py",
+        "line": 302
+      },
+      {
+        "name": "get_client_features",
+        "file": "core\\remote_license.py",
+        "line": 107
+      },
+      {
+        "name": "prompt_user_update",
+        "file": "core\\updater.py",
+        "line": 230
+      },
+      {
+        "name": "extract_dynamic_foussoul_from_audio_or_text",
+        "file": "core\\voice_verifier.py",
+        "line": 402
+      },
+      {
+        "name": "get_all_expenses",
+        "file": "core\\repositories\\accounting_repository.py",
+        "line": 14
+      },
+      {
+        "name": "get_total_expenses_sum",
+        "file": "core\\repositories\\accounting_repository.py",
+        "line": 25
+      },
+      {
+        "name": "get_all_salaries",
+        "file": "core\\repositories\\accounting_repository.py",
+        "line": 33
+      },
+      {
+        "name": "get_total_salaries_sum",
+        "file": "core\\repositories\\accounting_repository.py",
+        "line": 44
+      },
+      {
+        "name": "get_todays_check_ins",
+        "file": "core\\repositories\\checkin_repository.py",
+        "line": 16
+      },
+      {
+        "name": "count_todays_visits",
+        "file": "core\\repositories\\checkin_repository.py",
+        "line": 31
+      },
+      {
+        "name": "get_filtered",
+        "file": "core\\repositories\\checkin_repository.py",
+        "line": 43
+      },
+      {
+        "name": "get_by_id",
+        "file": "core\\repositories\\client_repository.py",
+        "line": 15
+      },
+      {
+        "name": "find_by_cin_or_name",
+        "file": "core\\repositories\\client_repository.py",
+        "line": 23
+      },
+      {
+        "name": "count_all",
+        "file": "core\\repositories\\client_repository.py",
+        "line": 38
+      },
+      {
+        "name": "valueFromText",
+        "file": "ui\\pages\\fiche_client_page.py",
+        "line": 29
+      },
+      {
+        "name": "regenerate_recovery_code",
+        "file": "ui\\pages\\settings_page.py",
+        "line": 1496
+      },
+      {
+        "name": "get_data",
+        "file": "ui\\pages\\fiche_client\\civil_status_form.py",
+        "line": 140
+      },
+      {
+        "name": "set_data",
+        "file": "ui\\pages\\fiche_client\\civil_status_form.py",
+        "line": 159
+      },
+      {
+        "name": "set_client_id",
+        "file": "ui\\pages\\fiche_client\\documents_list_widget.py",
+        "line": 63
+      }
+    ]
+  }
+}

@@ -148,17 +148,17 @@ class ClientCard(QFrame):
     def load_profile_pic(self):
         # Resolve pic path
         pic_path = self.client_data.get("profile_pic_path", "") or self.client_data.get("profile_pic", "")
-        img_src = None
+        if not pic_path:
+            pic_path = str(PROFILES_DIR / f"{self.client_id}.jpg")
         
-        if pic_path and os.path.exists(pic_path):
-            img_src = pic_path
-        else:
-            prof_file = PROFILES_DIR / f"{self.client_id}.jpg"
-            if prof_file.exists():
-                img_src = str(prof_file)
+        img_src = reception.resolve_photo_path(pic_path)
+        if not img_src or not os.path.exists(img_src):
+            fallback = str(PROFILES_DIR / f"{self.client_id}.jpg")
+            if fallback != pic_path:
+                img_src = reception.resolve_photo_path(fallback)
 
         # Render image
-        if img_src:
+        if img_src and os.path.exists(img_src):
             # Check Pixmap cache first (Requirement 2)
             # Cached at 70px, LRU-bounded (see ui/components/pixmap_cache.py).
             rounded = pixmap_cache.circular_avatar(img_src, 70)

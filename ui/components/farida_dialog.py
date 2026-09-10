@@ -8,8 +8,12 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont, QColor, QTextDocument
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 
-from farida_engine import TunisianFaridaEngine
-import reception
+try:
+    from farida_engine import TunisianFaridaEngine
+    import reception
+except ImportError:
+    from core.farida_engine import TunisianFaridaEngine
+    import core.reception as reception
 
 class NoWheelSpinBox(QSpinBox):
     def wheelEvent(self, event):
@@ -186,6 +190,25 @@ class TunisianFaridaDialog(QDialog):
         self.client_info_lbl.setStyleSheet("color: #0369a1; font-weight: bold; font-size: 11px;")
         self.client_info_lbl.setVisible(False)
         left_layout.addWidget(self.client_info_lbl)
+
+        # Import Hujjat Wafat button
+        self.btn_import_wafat = QPushButton("📁 استيراد وتفريغ حجة وفاة تلقائياً (صورة / PDF / نص)", left_card)
+        self.btn_import_wafat.setStyleSheet("""
+            QPushButton {
+                background-color: #0284c7;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 12px;
+                font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #0369a1;
+            }
+        """)
+        self.btn_import_wafat.clicked.connect(self.import_hujjat_wafat_file)
+        left_layout.addWidget(self.btn_import_wafat)
 
         scroll = QScrollArea(left_card)
         scroll.setWidgetResizable(True)
@@ -911,4 +934,57 @@ class TunisianFaridaDialog(QDialog):
                 QMessageBox.information(self, "نجاح التصدير", f"تم تصدير وثيقة الفريضة الشرعية بنجاح في:\n{file_path}")
             except Exception as e:
                 QMessageBox.critical(self, "خطأ", f"تعذّر تصدير ملف Word:\n{e}")
+
+    def import_hujjat_wafat_file(self):
+        """Allows selecting a Hujjat Wafat image or PDF, extracts heirs, and updates form spinboxes automatically."""
+        from pathlib import Path
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "اختر ملف أو صورة حجة الوفاة", "", "الملفات وثائق وصور (*.png *.jpg *.jpeg *.pdf *.txt)"
+        )
+        if not file_path:
+            return
+
+        p = Path(file_path)
+        extracted_text = ""
+        try:
+            if p.suffix.lower() == ".txt":
+                extracted_text = p.read_text(encoding="utf-8", errors="ignore")
+            elif p.suffix.lower() in [".png", ".jpg", ".jpeg"]:
+                from ocr_engine import extract_handwritten_notary_script
+                res = extract_handwritten_notary_script(p.read_bytes())
+                extracted_text = res.get("full_text") or res.get("property_desc") or str(res)
+            elif p.suffix.lower() == ".pdf":
+                try:
+                    import pypdf
+                    reader = pypdf.PdfReader(file_path)
+                    extracted_text = "\n".join([page.extract_text() or "" for page in reader.pages])
+                except Exception:
+                    extracted_text = ""
+        except Exception as e:
+            QMessageBox.warning(self, "خطأ في قراءة الملف", f"تعذر قراءة ملف حجة الوفاة: {e}")
+            return
+
+        if not extracted_text:
+            QMessageBox.warning(self, "تنبيه", "لم يتم استخراج نص واضح من الملف المرفق.")
+            return
+
+        from farida_engine import parse_hujjat_wafat_text
+        parsed = parse_hujjat_wafat_text(extracted_text)
+
+        if parsed:
+            if 'husband' in parsed: self.cb_husband.setChecked(bool(parsed['husband']))
+            if 'wife' in parsed: self.cb_wife.setChecked(bool(parsed['wife']))
+            if 'father' in parsed: self.cb_father.setChecked(bool(parsed['father']))
+            if 'mother' in parsed: self.cb_mother.setChecked(bool(parsed['mother']))
+            if parsed.get('sons_count', 0) > 0: self.spin_sons.setValue(parsed['sons_count'])
+            if parsed.get('daughters_count', 0) > 0: self.spin_daug.setValue(parsed['daughters_count'])
+
+            self.on_calculate_clicked()
+            QMessageBox.information(
+                self, "نجاح الاستيراد التلقائي",
+                f"تم تفريغ حجة الوفاة بنجاح والتكون الآلي للورثة:\n"
+                f"• أبناء: {parsed.get('sons_count', 0)}\n"
+                f"• بنات: {parsed.get('daughters_count', 0)}\n"
+                f"• زوج/زوجة: {'نعم' if (parsed.get('husband') or parsed.get('wife')) else 'لا'}"
+            )
 

@@ -2,6 +2,7 @@
 # force pandas to load just to define the functions.
 from __future__ import annotations
 
+import os
 import sqlite3
 import datetime
 import shutil
@@ -410,6 +411,10 @@ def init_db():
                     ("company_rc", "TEXT DEFAULT ''"),
                     ("titre_foncier", "TEXT DEFAULT ''"),
                     ("wilaya", "TEXT DEFAULT ''"),
+                    ("father_name", "TEXT DEFAULT ''"),
+                    ("grandfather_name", "TEXT DEFAULT ''"),
+                    ("cin_issue_date", "TEXT DEFAULT ''"),
+                    ("cin_issue_place", "TEXT DEFAULT ''"),
                 ]
                 for col_name, col_def in new_cols:
                     if col_name not in existing_cols:
@@ -521,6 +526,19 @@ def init_db():
                         status TEXT DEFAULT 'En cours',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (client_id) REFERENCES clients (client_id)
+                    )
+                """)
+
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS fees (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        case_id TEXT,
+                        client_id TEXT,
+                        service_name TEXT DEFAULT '',
+                        fee_amount REAL DEFAULT 0.0,
+                        paid_amount REAL DEFAULT 0.0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        notes TEXT DEFAULT ''
                     )
                 """)
 
@@ -636,6 +654,13 @@ def clear_db_caches():
 
 def cache_generation() -> int:
     """Monotonic counter; changes whenever cached data was invalidated."""
+    if is_remote():
+        try:
+            conn = get_connection()
+            if hasattr(conn, "cache_generation"):
+                return conn.cache_generation()
+        except Exception:
+            pass
     return _cache_generation
 
 @licensing.require_licence
@@ -699,7 +724,9 @@ def update_client_civil_status(
     cin_number: str, cin_date_place: str, marital_status: str,
     matrimonial_regime: str, profession: str, address: str,
     legal_role: str, company_name: str, company_rc: str,
-    titre_foncier: str = "", wilaya: str = "", is_new: bool = False
+    titre_foncier: str = "", wilaya: str = "", is_new: bool = False,
+    father_name: str = "", grandfather_name: str = "",
+    cin_issue_date: str = "", cin_issue_place: str = ""
 ) -> bool:
     init_db()
     check_name_field(nom, "اللقب")
@@ -726,12 +753,14 @@ def update_client_civil_status(
                     INSERT INTO clients 
                     (client_id, nom, prenom, full_name, phone, maiden_name, birth_date, birth_place,
                      cin_number, cin_date_place, marital_status, matrimonial_regime, profession, address,
-                     legal_role, company_name, company_rc, titre_foncier, wilaya, created_at, documents_dir, face_embedding)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     legal_role, company_name, company_rc, titre_foncier, wilaya, created_at, documents_dir, face_embedding,
+                     father_name, grandfather_name, cin_issue_date, cin_issue_place)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     client_id, nom, prenom, full_name, phone, maiden_name, birth_date, birth_place,
                     cin_number, cin_date_place, marital_status, matrimonial_regime, profession, address,
-                    legal_role, company_name, company_rc, titre_foncier, wilaya, now_str, doc_dir, b""
+                    legal_role, company_name, company_rc, titre_foncier, wilaya, now_str, doc_dir, b"",
+                    father_name, grandfather_name, cin_issue_date, cin_issue_place
                 ))
             else:
                 cursor.execute("""
@@ -741,7 +770,8 @@ def update_client_civil_status(
                         cin_number=?, cin_date_place=?, marital_status=?,
                         matrimonial_regime=?, profession=?, address=?,
                         legal_role=?, company_name=?, company_rc=?,
-                        titre_foncier=?, wilaya=?
+                        titre_foncier=?, wilaya=?,
+                        father_name=?, grandfather_name=?, cin_issue_date=?, cin_issue_place=?
                     WHERE client_id=?
                 """, (
                     nom, prenom, full_name, phone,
@@ -750,6 +780,7 @@ def update_client_civil_status(
                     matrimonial_regime, profession, address,
                     legal_role, company_name, company_rc,
                     titre_foncier, wilaya,
+                    father_name, grandfather_name, cin_issue_date, cin_issue_place,
                     client_id
                 ))
         clear_db_caches()
@@ -783,10 +814,35 @@ def find_client_by_cin_or_name(cin_number: str = "", full_name: str = "") -> Opt
         log_system_error("find_client_by_cin_or_name failed", e)
     return None
 
+def resolve_photo_path(photo_path: str) -> str:
+    """Resolves local photo path. If running remotely and photo is missing locally, fetches it from server."""
+    if not photo_path:
+        return ""
+    if os.path.exists(photo_path):
+        return photo_path
+    if is_remote():
+        try:
+            conn = get_connection()
+            if hasattr(conn, "fetch_photo"):
+                local_p = conn.fetch_photo(photo_path)
+                if local_p and os.path.exists(local_p):
+                    return local_p
+        except Exception as e:
+            log_system_error("fetch_photo failed in resolve_photo_path", e)
+    return photo_path
+
 @permissions.require(Cap.EDIT_CLIENTS)
 def update_client_profile_pic(client_id: str, profile_pic_path: str) -> bool:
     init_db()
     try:
+        if is_remote() and profile_pic_path and Path(profile_pic_path).exists():
+            try:
+                conn = get_connection()
+                if hasattr(conn, "sync_photo"):
+                    conn.sync_photo(profile_pic_path)
+            except Exception as sync_err:
+                log_system_error("sync_photo failed in update_client_profile_pic", sync_err)
+
         with get_db_cursor(commit=True) as cursor:
             cursor.execute("UPDATE clients SET profile_pic_path=? WHERE client_id=?", (profile_pic_path, client_id))
 
@@ -823,6 +879,14 @@ def enrol_face_from_photo(client_id: str, photo_path: str) -> Tuple[bool, str]:
     if not photo_path or not Path(photo_path).exists():
         return False, ENROL_NO_FILE
     try:
+        if is_remote():
+            try:
+                conn = get_connection()
+                if hasattr(conn, "sync_photo"):
+                    conn.sync_photo(photo_path)
+            except Exception as sync_err:
+                log_system_error("sync_photo failed in enrol_face_from_photo", sync_err)
+
         import cv2
         img_bgr = cv2.imread(str(photo_path))
         if img_bgr is None:
@@ -1227,6 +1291,18 @@ def log_check_in(client_id: str, location: str, confidence: float, status: str) 
     annee_mois = now_str[:7]
     try:
         with get_db_cursor(commit=True) as cursor:
+            # Check if client_id exists in clients table to satisfy FOREIGN KEY(client_id)
+            cursor.execute("SELECT 1 FROM clients WHERE client_id=?", (client_id,))
+            if cursor.fetchone() is None:
+                # Client does not exist in clients table; return False gracefully rather than triggering Foreign Key IntegrityError
+                return False
+
+            # Deduplicate visits within 15 seconds to prevent duplicate logs between Admin & Secretary
+            fifteen_sec_ago = (datetime.datetime.now() - datetime.timedelta(seconds=15)).strftime("%Y-%m-%d %H:%M:%S")
+            cursor.execute("SELECT 1 FROM check_ins WHERE client_id=? AND timestamp >= ?", (client_id, fifteen_sec_ago))
+            if cursor.fetchone() is not None:
+                return True
+
             cursor.execute("PRAGMA table_info(check_ins)")
             c_cols = [r["name"] for r in cursor.fetchall()]
 
@@ -1248,11 +1324,8 @@ def log_check_in(client_id: str, location: str, confidence: float, status: str) 
                 ON CONFLICT(annee_mois) DO UPDATE SET
                     nombre_visites = nombre_visites + 1
             """, (annee_mois,))
-        # count_check_ins() and count_check_ins_today() are cached for 60 s. Without
-        # this, a client who has just walked in front of the camera does not appear
-        # in the Journal's totals for up to a minute, which reads as a missed
-        # check-in rather than a stale number.
-        clear_db_caches()
+        # FIX 3: Do not call clear_db_caches() here! A check-in does NOT change client face embeddings,
+        # so wiping the cache forced the camera thread & presence page to reload all embeddings over DB/network.
         return True
     except Exception as e:
         log_system_error("log_check_in failed", e)

@@ -110,7 +110,11 @@ class PresenceTableModel(QAbstractTableModel):
             img_src = None
             if photo_path and os.path.exists(photo_path):
                 img_src = photo_path
-            else:
+            elif photo_path:
+                rel_p = PROFILES_DIR / os.path.basename(photo_path)
+                if rel_p.exists():
+                    img_src = str(rel_p)
+            if not img_src:
                 cf = PROFILES_DIR / f"{client_id}.jpg"
                 if cf.exists():
                     img_src = str(cf)

@@ -712,12 +712,29 @@ class RegisterPage(QWidget):
 
     def edit_selected_case_by_row(self, row: int):
         """Opens the client fiche for the dossier at specified row."""
-        if 0 <= row < len(getattr(self, "displayed_cases", [])):
-            case = self.displayed_cases[row]
+        model_data = getattr(self.model, "_data", []) if hasattr(self, "model") and self.model else []
+        if 0 <= row < len(model_data):
+            case = model_data[row]
             client_id = case.get("client_id")
-            win = self.window()
-            if client_id and win and hasattr(win, "open_fiche_client"):
-                win.open_fiche_client(client_id)
+            if client_id:
+                win = self.window()
+                if win and hasattr(win, "open_fiche_client"):
+                    win.open_fiche_client(client_id)
+            else:
+                is_fr = self.lang == "fr"
+                QMessageBox.warning(
+                    self, "Client introuvable" if is_fr else "تعذّر إيجاد الحريف",
+                    "Ce dossier n'est associé à aucun client enregistré." if is_fr
+                    else "هذا الملف غير مرتبط بحريف مسجل في المنظومة."
+                )
+
+    def open_in_fiche_client(self):
+        """Alias for edit_selected_case."""
+        self.edit_selected_case()
+
+    def _on_open_in_fiche_client(self):
+        """Alias slot for edit_selected_case."""
+        self.edit_selected_case()
 
     def delete_selected_case(self):
         """Deletes the selected dossier (Admin Only)."""
@@ -730,8 +747,9 @@ class RegisterPage(QWidget):
                 if is_fr else "اختر أولا ملفا من الجدول.")
             return
         row = idx.row()
-        if 0 <= row < len(getattr(self, "displayed_cases", [])):
-            case = self.displayed_cases[row]
+        model_data = getattr(self.model, "_data", []) if hasattr(self, "model") and self.model else []
+        if 0 <= row < len(model_data):
+            case = model_data[row]
             case_id = case.get("case_id")
             if case_id:
                 self.delete_case_action(case_id)
@@ -832,12 +850,14 @@ class RegisterPage(QWidget):
         if not index.isValid():
             return
         row = index.row()
-        if 0 <= row < len(getattr(self, "displayed_cases", [])):
-            case = self.displayed_cases[row]
+        model_data = getattr(self.model, "_data", []) if hasattr(self, "model") and self.model else []
+        if 0 <= row < len(model_data):
+            case = model_data[row]
             client_id = case.get("client_id")
-            win = self.window()
-            if client_id and win and hasattr(win, "open_fiche_client"):
-                win.open_fiche_client(client_id)
+            if client_id:
+                win = self.window()
+                if win and hasattr(win, "open_fiche_client"):
+                    win.open_fiche_client(client_id)
 
     def change_status(self, case_id, new_status):
         """

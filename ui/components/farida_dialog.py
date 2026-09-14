@@ -1536,10 +1536,17 @@ class TunisianFaridaDialog(QDialog):
 
             self.refresh_heir_details_widgets()
 
+            # Fill wife_name separately so children names don't end up on the wife row
+            wife_name_parsed = parsed.get('wife_name', '').strip()
+            if wife_name_parsed and 'wife_1' in self.heir_inputs:
+                self.heir_inputs['wife_1']['name'].setText(wife_name_parsed)
+
             extracted_names = parsed.get('names', [])
             if extracted_names:
                 n_idx = 0
                 for k, data in self.heir_inputs.items():
+                    if k.startswith('wife_'):
+                        continue  # wife name already handled above
                     if n_idx < len(extracted_names):
                         data["name"].setText(extracted_names[n_idx])
                         n_idx += 1

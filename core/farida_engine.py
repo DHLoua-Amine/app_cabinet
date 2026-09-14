@@ -841,7 +841,17 @@ def parse_hujjat_wafat_text(text: str) -> dict:
         elif re.search(r"\b(زوجته|زوجاته|أرملة|حرمته)\b", clause_text):
             heirs['wife'] = True
             m_wife = re.search(r"زوجته\s*[:：]?\s*([^\n،.]+?)(?=\s+و?ابناؤه|\s+و?ابنائه|\s+و?اولاده|\s+و?المحيطين|\s+وهم|\n|$)", clause_text)
-            if m_wife: heirs['wife_name'] = _clean_extracted_text(m_wife.group(1))
+            if m_wife:
+                wife_raw = _clean_extracted_text(m_wife.group(1))
+                # Strip 'ولقبها X' from end of matched text but record lakab to append cleanly
+                m_wife_lakab = re.search(r"ولقبها\s*[:：]?\s*([^\s،.\n]+)", m_wife.group(1))
+                if m_wife_lakab:
+                    wife_lakab = _clean_extracted_text(m_wife_lakab.group(1))
+                    # Remove the 'ولقبها X' fragment from the middle of wife_raw
+                    wife_raw = re.sub(r"\s+ولقبها\s*[:：]?\s*[^\s،.\n]+", "", wife_raw).strip()
+                    if wife_lakab and not wife_raw.endswith(wife_lakab):
+                        wife_raw = f"{wife_raw} {wife_lakab}"
+                heirs['wife_name'] = wife_raw
         else:
             heirs['wife'] = False
     else:
@@ -882,6 +892,10 @@ def parse_hujjat_wafat_text(text: str) -> dict:
         if len(dec_parts) > 1 and "بن" not in dec_parts[-1] and "بنت" not in dec_parts[-1]:
             deceased_lakab = dec_parts[-1]
     heirs['deceased_lakab'] = deceased_lakab
+
+    # Append lakab to deceased_name if not already present (e.g. "بوجمعه بن الطيب" + "الرياحي")
+    if deceased_lakab and heirs['deceased_name'] and not heirs['deceased_name'].endswith(deceased_lakab):
+        heirs['deceased_name'] = f"{heirs['deceased_name']} {deceased_lakab}"
 
     # 3. Children list parsing (e.g. وأبناؤه منها الرشداء وهم : رفيقه / جمال / أحمد / أميرة / منصور / عزة لا غير)
     t_norm = re.sub(r'[أإآ]', 'ا', t)
@@ -962,8 +976,13 @@ def parse_hujjat_wafat_text(text: str) -> dict:
 
     # Top left: Case File Number (عدد الملف / عدد المادة / عدد...)
     if not heirs['hujja_num']:
-        m_num = re.search(r"(?:عدد\s+الملف|عدد\s+المادة|ملف\s+عدد|عدد)\s*[:：]?\s*([\d\/]+)", t)
+        # Try specific patterns first (most reliable)
+        m_num = re.search(r"(?:عدد\s+الملف|عدد\s+المادة|ملف\s+عدد)\s*[:：]?\s*([\d\/]+)", t)
         if not m_num:
+            # Bare 'عدد' but ONLY if followed by a NN/YYYY or NN/NN pattern
+            m_num = re.search(r"(?<![رسم الوفاة])\bعدد\b\s*[:：]?\s*(\d+\/\d{4})\b", t)
+        if not m_num:
+            # Fallback: find any NN/YYYY standalone
             m_num = re.search(r"\b(\d+\/\d{4})\b", t)
         if m_num: heirs['hujja_num'] = _clean_extracted_text(m_num.group(1))
 

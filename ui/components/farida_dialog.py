@@ -469,7 +469,7 @@ class TunisianFaridaDialog(QDialog):
         self.txt_hujja_date.setPlaceholderText("تاريخ حجة الوفاة")
         self.txt_hujja_court = QLineEdit(grp_hujja)
         self.txt_hujja_court.setPlaceholderText("المحكمة الصادرة عنها")
-        hujja_lay.addWidget(QLabel("بيانات الحجة:", grp_hujja))
+        hujja_lay.addWidget(QLabel("عدد الحجة:", grp_hujja))
         hujja_lay.addWidget(self.txt_hujja_num)
         hujja_lay.addWidget(self.txt_hujja_date)
         hujja_lay.addWidget(self.txt_hujja_court)

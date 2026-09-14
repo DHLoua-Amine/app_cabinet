@@ -134,9 +134,9 @@ class FaceEngine:
         if threshold is None:
             try:
                 from core import config
-                threshold = float(config.get_setting("face_match_threshold", 0.363))
+                threshold = float(config.get_setting("face_match_threshold", 0.46))
             except Exception:
-                threshold = 0.363
+                threshold = 0.46
 
         if query_emb is None or len(query_emb) == 0:
             return None, 0.0

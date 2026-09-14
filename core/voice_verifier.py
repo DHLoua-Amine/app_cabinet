@@ -217,7 +217,7 @@ def call_gemini_api(prompt: str, audio_bytes: bytes = None, mime_type: str = "au
                     raise
                 http_client = httpx.Client(verify=False)
             client = genai.Client(api_key=current_key, http_options={"httpx_client": http_client})
-            target_models = [model_name or "gemini-3.6-flash", "gemini-3.6-flash", "gemini-2.5-flash"]
+            target_models = [model_name or "gemini-3.6-flash", "gemini-3.6-flash"]
             for model_id in target_models:
                 try:
                     if part:
@@ -242,7 +242,7 @@ def transcribe_audio_bytes(
     audio_bytes: bytes,
     api_key: str,
     mime_type: str = "audio/wav",
-    model_name: str = "gemini-2.5-flash",
+    model_name: str = "gemini-3.6-flash",
     provider: str = "gemini"
 ) -> dict:
     """

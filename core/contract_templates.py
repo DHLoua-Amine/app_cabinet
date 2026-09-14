@@ -29,6 +29,8 @@ CONTRACT_CATEGORIES = {
         "توكيل",
         "تكليف وتوكيل",
         "حجة وفاة",
+        "فريضة شرعية",
+        "فريضة جزئية",
         "عقد وصية",
         "عقد تخارج من التركة"
     ],
@@ -41,6 +43,42 @@ CONTRACT_CATEGORIES = {
         "عقد بيع أصل تجاري"
     ]
 }
+
+def populate_categorized_contract_types(combo, first_item=None, default_selected=None):
+    """
+    Populates any QComboBox with ALL contract types categorized into sections
+    matching CONTRACT_CATEGORIES. Section headers are unselectable.
+    """
+    from PySide6.QtCore import Qt
+    combo.blockSignals(True)
+    combo.clear()
+
+    if first_item:
+        combo.addItem(first_item, "")
+
+    for cat_name, contracts in CONTRACT_CATEGORIES.items():
+        combo.addItem(f"── {cat_name} ──", "HEADER")
+        row = combo.count() - 1
+        model = combo.model()
+        if hasattr(model, "item"):
+            it = model.item(row)
+            if it:
+                it.setFlags(Qt.ItemFlag.NoItemFlags)
+
+        for c in contracts:
+            combo.addItem(f"   {c}", c)
+
+    combo.blockSignals(False)
+
+    if default_selected:
+        idx = combo.findData(default_selected)
+        if idx >= 0:
+            combo.setCurrentIndex(idx)
+        else:
+            for i in range(combo.count()):
+                if default_selected.strip() in combo.itemText(i):
+                    combo.setCurrentIndex(i)
+                    break
 
 CONTRACT_TYPES = {
     "عقد بيع": "عقد بيع",
@@ -58,6 +96,8 @@ CONTRACT_TYPES = {
     "توكيل": "توكيل",
     "تكليف وتوكيل": "تكليف وتوكيل",
     "حجة وفاة": "حجة وفاة",
+    "فريضة شرعية": "فريضة شرعية",
+    "فريضة جزئية": "فريضة جزئية",
     "عقد وصية": "عقد وصية",
     "عقد تخارج من التركة": "عقد تخارج من التركة",
     "اتفاق": "اتفاق",
@@ -151,7 +191,7 @@ def get_party_role_names(contract_type: str) -> tuple:
         return ("الزوج", "الزوج", "الزوجة", "الزوجة", False)
     elif "توكيل" in c:
         return ("الموكل", "الموكلون", "الوكيل", "الوكلاء", True)
-    elif "وفاة" in c:
+    elif "وفاة" in c or "فريضة" in c:
         return ("طالب الإشهاد", "طالبو الإشهاد", "الموروث الهالك", "الهالك", False)
     elif "وصية" in c:
         return ("الموصي", "الموصون", "الموصى له", "الموصى لهم", True)
@@ -229,6 +269,14 @@ TEMPLATE_WAAD_BAY3 = """الحمد لله في يوم {day_words} من {hijri_da
 
 TEMPLATE_ISKAT = """الحمد لله في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} انعقد بين الطرف الأول المسقط: {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr}. الطرف الثاني المسقط له: {party2_name} {party2_born_prefix} {party2_birthplace} في {party2_birthdate} {party2_nat} {party2_job} {party2_cin_prefix} {party2_cin} مؤرخة في {party2_cin_date} {party2_resident_prefix} {party2_addr}. اتفقا على الإسقاط التوثيقي: الفصل الأول: أسقط الطرف الأول والغي وسحب كافة حقوقه ومناباته والدعاوى الخاصة بـ {property_desc} لفائدة الطرف الثاني الذي قبل ذلك. الفصل الثاني: تم هذا الإسقاط مقابل بدل إسقاط قدره {price_words} ({price_num} دينار). الفصل الثالث: انجرار الملكية {ownership_origin}. وأبرم العقد بين طرفيه وتلي فوافقا وأمضيا واقتطعت فيه بطاقة نقل عدد ................ خالص معلوم نقلها بالقباضة المالية بـ{tax_office} بتاريخ ................ وصل عدد ................م. ورسم بدفتر مسودات أولهما صحيفة ................ عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."""
 
+TEMPLATE_FARIDA_CHAR3EYA = """فريضة شرعية
+
+الحمد لله وحده في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} وبطلب من {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr} قصد القيام بفريضة شرعية للمتوفى {party2_name} موضوع {property_desc}. وحيث توفي الهالك المذكور واطردت وتحددت منابات ورثته الشرعيين حسب حجة وفاته الصادرة في الغرض. هذا ما تم تلقيه وتلي فوافقوا وأمضوا ورسم بدفتر مسودات أولهما صحيفة ................ تحت عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."""
+
+TEMPLATE_FARIDA_JOZ2EYA = """فريضة جزئية
+
+الحمد لله وحده في يوم {day_words} من {hijri_date} هـ الموافق لـ {gregorian_date} {notary_block} وبطلب من {party1_name} {party1_born_prefix} {party1_birthplace} في {party1_birthdate} {party1_nat} {party1_job} {party1_cin_prefix} {party1_cin} مؤرخة في {party1_cin_date} {party1_resident_prefix} {party1_addr} قصد القيام بفريضة جزئية للمتوفى {party2_name} موضوع {property_desc}. وحيث توفي الهالك المذكور واطردت وتحددت منابات ورثته الشرعيين حسب حجة وفاته الصادرة في الغرض. هذا ما تم تلقيه وتلي فوافقوا وأمضوا ورسم بدفتر مسودات أولهما صحيفة ................ تحت عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."""
+
 TEMPLATES_MAP = {
     "عقد بيع": TEMPLATE_SALE,
     "عقد هبة": TEMPLATE_HIBA,
@@ -242,6 +290,8 @@ TEMPLATES_MAP = {
     "عقد صداق وزواج": TEMPLATE_ZAWADJ,
     "عقد توكيل": TEMPLATE_TAWKEEL,
     "حجة وفاة": TEMPLATE_HOJJAT_WAFAT,
+    "فريضة شرعية": TEMPLATE_FARIDA_CHAR3EYA,
+    "فريضة جزئية": TEMPLATE_FARIDA_JOZ2EYA,
     "عقد وصية": TEMPLATE_WASSIYA,
     "عقد تخارج من التركة": TEMPLATE_TAKHAROUJ,
     "عقد تأسيس شركة": TEMPLATE_COMPANY,
@@ -275,15 +325,54 @@ YEARS_WORDS_AR = {
     2029: "ألفين وتسع وعشرين", 2030: "ألفين وثلاثين"
 }
 
+HIJRI_MONTHS_AR = {
+    1: "محرم", 2: "صفر", 3: "ربيع الأول", 4: "ربيع الثاني",
+    5: "جمادى الأولى", 6: "جمادى الثانية", 7: "رجب", 8: "شعبان",
+    9: "رمضان", 10: "شوال", 11: "ذو القعدة", 12: "ذو الحجة"
+}
+
 HIJRI_YEARS_AR = {
+    1440: "أربعين وأربعمائة وألف",
+    1441: "إحدى وأربعين وأربعمائة وألف",
     1442: "اثنتين وأربعين وأربعمائة وألف",
+    1443: "ثلاث وأربعين وأربعمائة وألف",
+    1444: "أربع وأربعين وأربعمائة وألف",
     1445: "خمس وأربعين وأربعمائة وألف",
     1446: "ست وأربعين وأربعمائة وألف",
     1447: "سبع وأربعين وأربعمائة وألف",
     1448: "ثمان وأربعين وأربعمائة وألف",
     1449: "تسع وأربعين وأربعمائة وألف",
-    1450: "خمسين وأربعمائة وألف"
+    1450: "خمسين وأربعمائة وألف",
+    1451: "إحدى وخمسين وأربعمائة وألف",
+    1452: "اثنتين وخمسين وأربعمائة وألف",
+    1453: "ثلاث وخمسين وأربعمائة وألف",
+    1454: "أربع وخمسين وأربعمائة وألف",
+    1455: "خمس وخمسين وأربعمائة وألف"
 }
+
+def gregorian_to_hijri(dt):
+    """Converts a Gregorian date/datetime object to Hijri (year, month, day)."""
+    import datetime
+    if isinstance(dt, datetime.datetime):
+        dt = dt.date()
+    y, m, d = dt.year, dt.month, dt.day
+    if (y > 1582) or (y == 1582 and m > 10) or (y == 1582 and m == 10 and d > 14):
+        jd = int((1461 * (y + 4800 + int((m - 14) / 12))) / 4) + \
+             int((367 * (m - 2 - 12 * (int((m - 14) / 12)))) / 12) - \
+             int((3 * (int((y + 4900 + int((m - 14) / 12)) / 100))) / 4) + d - 32075
+    else:
+        jd = 367 * y - int((7 * (y + 5001 + int((m - 9) / 7))) / 4) + \
+             int((275 * m) / 9) + d + 1729777
+
+    l = jd - 1948440 + 10632
+    n = int((l - 1) / 10631)
+    l = l - 10631 * n + 354
+    j = (int((10985 - l) / 5316)) * (int((50 * l) / 17719)) + (int(l / 5670)) * (int((43 * l) / 15238))
+    l = l - (int((30 - j) / 15)) * (int((17719 * j) / 50)) - (int(j / 16)) * (int((15238 * j) / 43)) + 29
+    h_m = int((24 * l) / 709)
+    h_d = l - int((709 * h_m) / 24)
+    h_y = 30 * n + j - 30
+    return h_y, h_m, h_d
 
 HOURS_AR = {
     1: "الأولى", 2: "الثانية", 3: "الثالثة", 4: "الرابعة", 5: "الخامسة",
@@ -324,23 +413,34 @@ def convert_arabic_time_to_words(hour: int, minute: int) -> str:
     period_str = "صباحاً" if hour < 12 else "مساءً"
     return f"على الساعة {hr_word} {min_word} {period_str}"
 
-def get_current_arabic_date_info(dt: datetime.datetime = None, hijri_day_ordinal: str = "السابع عشر", hijri_month: str = "ربيع الأول", hijri_year: int = 1448) -> dict:
-    """Returns today's current day name, Hijri date, Gregorian date, and time spelled out 100% in formal Arabic words."""
+def get_current_arabic_date_info(dt = None, hijri_day_ordinal: str = None, hijri_month: str = None, hijri_year: int = None) -> dict:
+    """Returns day name, Hijri date, Gregorian date, and time spelled out 100% in formal Arabic words."""
     import datetime
     if dt is None:
         dt = datetime.datetime.now()
+    elif isinstance(dt, datetime.date) and not isinstance(dt, datetime.datetime):
+        dt = datetime.datetime.combine(dt, datetime.time(9, 0))
 
-    day_name = DAYS_AR.get(dt.strftime("%A"), "السبت")
+    day_name = DAYS_AR.get(dt.strftime("%A"), "الإثنين")
     greg_day_word = DAY_ORDINALS_AR.get(dt.day, f"لـ {dt.day}")
     greg_month = MONTHS_AR.get(dt.month, "أوت")
     greg_year_word = YEARS_WORDS_AR.get(dt.year, f"سنة {dt.year}")
     
+    # Auto-calculate Hijri if parameters omitted or default
+    h_y, h_m, h_d = gregorian_to_hijri(dt)
+    
+    # If today 2026-09-14 default, preset ordinal if specified, else use exact calculated ordinal
+    if hijri_day_ordinal is None:
+        hijri_day_ordinal = DAY_ORDINALS_AR.get(h_d, f"{h_d}")
+    if hijri_month is None:
+        hijri_month = HIJRI_MONTHS_AR.get(h_m, "ربيع الأول")
+    if hijri_year is None:
+        hijri_year = h_y
+
     hijri_year_word = HIJRI_YEARS_AR.get(hijri_year, f"{hijri_year}")
     time_words = convert_arabic_time_to_words(dt.hour, dt.minute)
 
     full_date_text = f"في يوم {day_name} {hijri_day_ordinal} من {hijri_month} سنة {hijri_year_word} هـ الموافق لـ{greg_day_word} من {greg_month} سنة {greg_year_word} و{time_words}"
-    # The same sentence without the hour. Deeds use this one; the timed version
-    # is kept because other callers still ask for it.
     full_date_text_no_time = f"في يوم {day_name} {hijri_day_ordinal} من {hijri_month} سنة {hijri_year_word} هـ الموافق لـ{greg_day_word} من {greg_month} سنة {greg_year_word}"
 
     return {
@@ -353,12 +453,15 @@ def get_current_arabic_date_info(dt: datetime.datetime = None, hijri_day_ordinal
     }
 
 
-def get_default_variables(contract_type: str = "عقد بيع") -> dict:
+def get_default_variables(contract_type: str = "عقد بيع", dt=None) -> dict:
     """Returns a clean default dictionary of variables with auto-computed date for filling notary templates."""
-    date_info = get_current_arabic_date_info()
+    date_info = get_current_arabic_date_info(dt=dt)
     return {
         "contract_type": contract_type,
+        "date_info": date_info,
         "day_words": date_info["day_words"],
+        "hijri_date": date_info["hijri_date"],
+        "gregorian_date": date_info["gregorian_date"],
         "hijri_date": date_info["hijri_date"],
         "gregorian_date": date_info["gregorian_date"],
         "time_str": date_info["time_str"],
@@ -492,6 +595,119 @@ def format_single_party_text(party_dict: dict) -> str:
     return " ".join(parts)
 
 
+def number_to_arabic_words(number: int | float | str) -> str:
+    """Converts a numeric amount to formal Arabic words (Tafqeed)."""
+    try:
+        if isinstance(number, str):
+            clean = re.sub(r"[^\d.]", "", number)
+            if not clean:
+                return ""
+            num = float(clean)
+        else:
+            num = float(number)
+            
+        dinars = int(num)
+        millimes = int(round((num - dinars) * 1000))
+        
+        if dinars == 0 and millimes == 0:
+            return "صفر دينار"
+            
+        units = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة"]
+        teens = ["عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر", "سبعة عشر", "ثمانية عشر", "تسعة عشر"]
+        tens = ["", "عشرة", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"]
+        hundreds = ["", "مائة", "مائتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"]
+        
+        def _convert_below_1000(n):
+            if n == 0:
+                return ""
+            h = n // 100
+            rem = n % 100
+            res = []
+            if h > 0:
+                res.append(hundreds[h])
+            if rem > 0:
+                if rem < 10:
+                    res.append(units[rem])
+                elif rem < 20:
+                    res.append(teens[rem - 10])
+                else:
+                    u = rem % 10
+                    t = rem // 10
+                    if u > 0:
+                        res.append(f"{units[u]} و{tens[t]}")
+                    else:
+                        res.append(tens[t])
+            return " و".join(res)
+
+        parts = []
+        th = dinars // 1000
+        rem_d = dinars % 1000
+        
+        if th > 0:
+            if th == 1:
+                parts.append("ألف")
+            elif th == 2:
+                parts.append("ألفان")
+            elif 3 <= th <= 10:
+                parts.append(f"{units[th]} آلاف")
+            else:
+                parts.append(f"{_convert_below_1000(th)} ألف")
+                
+        if rem_d > 0:
+            parts.append(_convert_below_1000(rem_d))
+            
+        d_str = " و".join(parts) if parts else ""
+        if d_str:
+            d_str += " دينار"
+            
+        m_str = ""
+        if millimes > 0:
+            m_words = _convert_below_1000(millimes)
+            m_str = f"{m_words} مليم"
+            
+        if d_str and m_str:
+            return f"{d_str} و{m_str}"
+        elif d_str:
+            return d_str
+        elif m_str:
+            return m_str
+        return ""
+    except Exception:
+        return ""
+
+
+def format_money_words_and_numbers(price_words: str, price_num: str) -> str:
+    """
+    Guarantees money is ALWAYS formatted with BOTH letters and numbers:
+    e.g. 'خمسة آلاف دينار (5000 د.ت)'
+    """
+    p_num_clean = str(price_num or "").replace("دينار", "").replace("د.ت", "").replace("د", "").strip()
+    p_words_clean = str(price_words or "").strip()
+
+    # If price_words is missing or contains pure numbers e.g. "5000", convert to Arabic words
+    if p_num_clean and (not p_words_clean or re.match(r"^[\d.,\s]+$", p_words_clean)):
+        p_words_clean = number_to_arabic_words(p_num_clean)
+    elif not p_num_clean and p_words_clean and re.match(r"^[\d.,\s]+$", p_words_clean):
+        p_num_clean = p_words_clean
+        p_words_clean = number_to_arabic_words(p_num_clean)
+
+    if p_words_clean and "دينار" not in p_words_clean and "مليم" not in p_words_clean:
+        p_words_clean += " دينار"
+
+    if p_words_clean and p_num_clean:
+        return f"{p_words_clean} ({p_num_clean} د.ت)"
+    elif p_words_clean:
+        return p_words_clean
+    elif p_num_clean:
+        words = number_to_arabic_words(p_num_clean)
+        if words:
+            if "دينار" not in words and "مليم" not in words:
+                words += " دينار"
+            return f"{words} ({p_num_clean} د.ت)"
+        return f"{p_num_clean} د.ت"
+    return ""
+
+
 def build_multi_party_contract_text(
     contract_type: str,
     party1_list: list,
@@ -507,7 +723,12 @@ def build_multi_party_contract_text(
     contract_vars: dict = None
 ) -> str:
     contract_vars = contract_vars or {}
-    date_info = get_current_arabic_date_info()
+    if "date_info" in contract_vars and isinstance(contract_vars["date_info"], dict):
+        date_info = contract_vars["date_info"]
+    elif "custom_date" in contract_vars and contract_vars["custom_date"]:
+        date_info = get_current_arabic_date_info(dt=contract_vars["custom_date"])
+    else:
+        date_info = get_current_arabic_date_info()
     
     is_waad = "وعد" in contract_type and "التزام" not in contract_type
     is_iltizam_bay3 = "التزام بالبيع" in contract_type
@@ -526,7 +747,8 @@ def build_multi_party_contract_text(
     is_rahn = "رهن" in contract_type
     is_zawadj = "صداق" in contract_type or "زواج" in contract_type
     is_tawkeel = "توكيل" in contract_type and "تكليف" not in contract_type
-    is_hojjat_wafat = "وفاة" in contract_type
+    is_farida = "فريضة" in contract_type
+    is_hojjat_wafat = "وفاة" in contract_type and not is_farida
     is_wassiya = "وصية" in contract_type
     is_takharouj = "تخارج" in contract_type
     is_company = "شركة" in contract_type
@@ -550,16 +772,13 @@ def build_multi_party_contract_text(
     p2_count = len(party2_list) if party2_list else 1
     p2_info = party2_list[0] if party2_list else {}
 
-    # ── NON-FOUSSOUL DEED TYPES (إشهاد بالحوز، تكليف، إسقاط، توكيل، حجة وفاة، وصل خلاص) ──
-    if is_ichhad_hawz or is_takleef or is_iskat_daawa or is_tawkeel or is_iskat or is_hojjat_wafat or is_wassl_khalass:
+    # ── NON-FOUSSOUL DEED TYPES (إشهاد بالحوز، تكليف، إسقاط، توكيل، حجة وفاة، فريضة، وصل خلاص) ──
+    if is_ichhad_hawz or is_takleef or is_iskat_daawa or is_tawkeel or is_iskat or is_hojjat_wafat or is_farida or is_wassl_khalass:
         p_desc_clean = re.sub(r"^\s*\*{0,2}الفصل\s*(الأول|الاول)\*{0,2}\s*:\s*", "", property_desc).strip()
         p_desc_clean = p_desc_clean.replace("\n- ", "، ").replace("\n", " ").replace("- ", " ").replace("  ", " ")
         p_desc_clean = re.sub(r"\s+", " ", p_desc_clean).strip()
 
-        p_num_clean = str(price_num).replace("دينار", "").replace("د", "").strip() if price_num else ""
-        p_words_clean = str(price_words).strip() if price_words else ""
-        if p_words_clean and "دينار" not in p_words_clean: p_words_clean += " دينار"
-        price_str = f"{p_words_clean} {p_num_clean} دينار".strip() if (p_words_clean or p_num_clean) else ""
+        price_str = format_money_words_and_numbers(price_words, price_num)
 
         if is_ichhad_hawz:
             p1_name = p1_info.get("full_name") or p1_info.get("name", "")
@@ -691,6 +910,20 @@ def build_multi_party_contract_text(
                 f"هذا ما تم تلقيه وتلي فوافقوا وأمضوا ورسم بدفتر مسودات أولهما صحيفة ................ تحت عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."
             )
             return body
+
+        elif is_farida:
+            return build_farida_contract_text(
+                contract_type=contract_type,
+                applicant_info=p1_info,
+                deceased_info=p2_info,
+                hojjat_wafat_details=contract_vars.get("hojjat_wafat_ref") or contract_vars.get("hujja_num") or "",
+                property_title_details=p_desc_clean,
+                total_shares=contract_vars.get("total_shares") or price_num or "",
+                shares_breakdown=contract_vars.get("shares_breakdown") or price_words or "",
+                wasiya_wajiba_text=contract_vars.get("wasiya_wajiba_text") or "",
+                successive_deaths_text=contract_vars.get("successive_deaths_text") or "",
+                ownership_origin=ownership_origin
+            )
 
         elif is_tawkeel:
             p1_str = format_single_party_text(p1_info)
@@ -857,21 +1090,8 @@ def build_multi_party_contract_text(
         else:
             p2_section = f"الطرف الثاني {p2_role}: " + " ".join(p2_items) + " الذين اتفقوا."
 
-    # Clean price format e.g. ثلاثة آلاف دينار 3000 دينار
-    p_num_clean = str(price_num).replace("دينار", "").replace("د", "").strip() if price_num else ""
-    p_words_clean = str(price_words).strip() if price_words else ""
-    if p_words_clean and "دينار" not in p_words_clean:
-        p_words_clean += " دينار"
-
-    if p_words_clean and p_num_clean:
-        price_str = f"{p_words_clean} ({p_num_clean})"
-    elif p_words_clean:
-        price_str = p_words_clean
-    elif p_num_clean:
-        price_str = f"{p_num_clean} دينار"
-    else:
-        price_str = ""
-
+    # Clean price format e.g. خمسة آلاف دينار (5000 د.ت)
+    price_str = format_money_words_and_numbers(price_words, price_num)
     price_str = re.sub(r"^\s*\*{0,2}الفصل\s*الثاني\*{0,2}\s*:\s*", "", price_str).strip()
 
     # Chapter 1
@@ -939,22 +1159,7 @@ def build_multi_party_contract_text(
         sale_verb = "باعوا واحالوا الطرف الأول بالتساوي بينهم تحت سائر الضمانات الفعلية والقانونية" if p1_count > 1 else "باع واحال الطرف الأول تحت سائر الضمانات الفعلية والقانونية"
         ch1 = f"الفصل الأول: {sale_verb} للطرف الثاني {p2_accept} جميع {p_desc_clean}."
 
-    # Chapter 2 (Clean price format e.g. ثلاثة آلاف دينار 3000 دينار)
-    p_num_clean = str(price_num).replace("دينار", "").replace("د", "").strip() if price_num else ""
-    p_words_clean = str(price_words).strip() if price_words else ""
-    if p_words_clean and "دينار" not in p_words_clean:
-        p_words_clean += " دينار"
-
-    if p_words_clean and p_num_clean:
-        price_str = f"{p_words_clean} ({p_num_clean})"
-    elif p_words_clean:
-        price_str = p_words_clean
-    elif p_num_clean:
-        price_str = f"{p_num_clean} دينار"
-    else:
-        price_str = ""
-
-    price_str = re.sub(r"^\s*\*{0,2}الفصل\s*الثاني\*{0,2}\s*:\s*", "", price_str).strip()
+    # Chapter 2 uses price_str computed above as خمسة آلاف دينار (5000 د.ت)
 
     if is_zawadj:
         ch2 = f"الفصل الثاني: الصداق المسمى بينهما قدره {price_str} قبضته الزوجة بذراعها."
@@ -1352,4 +1557,67 @@ def format_surface_area(area_m2) -> str:
     if not area_m2:
         return ""
     return f"{area_m2} متر مربع"
+
+
+def build_farida_contract_text(
+    contract_type: str,
+    applicant_info: dict,
+    deceased_info: dict,
+    hojjat_wafat_details: str = "",
+    property_title_details: str = "",
+    total_shares: str = "",
+    shares_breakdown: str = "",
+    wasiya_wajiba_text: str = "",
+    successive_deaths_text: str = "",
+    ownership_origin: str = ""
+) -> str:
+    """
+    Assembles an authentic Tunisian Notary Farida Act (فريضة شرعية / فريضة جزئية)
+    without chapters (الفصول) as a continuous legal narrative text, matching official notary deeds.
+    """
+    date_info = get_current_arabic_date_info()
+    import office_profile
+    full_date_str = (date_info.get("full_date_text_no_time")
+                     or f"في يوم {date_info['day_words']} من {date_info['hijri_date']} "
+                        f"هـ الموافق لـ {date_info['gregorian_date']}")
+    
+    farida_type_title = "فريضة جزئية" if "جزئية" in contract_type else "فريضة شرعية"
+    preamble = f"{farida_type_title}\n\nالحمد لله وحده {full_date_str} {office_profile.notary_block()}"
+    
+    p1_formatted = format_single_party_text(applicant_info or {})
+    
+    d_name = deceased_info.get("full_name") or deceased_info.get("name") or "........................"
+    
+    prop_str = property_title_details.strip() if property_title_details else "........................"
+    hojjat_str = hojjat_wafat_details.strip() if hojjat_wafat_details else ""
+    
+    header_block = f"{preamble} وبطلب من {p1_formatted} قصد القيام بـ{farida_type_title} للمتوفى {d_name} موضوع {prop_str}."
+    
+    paragraphs = [header_block]
+    
+    if hojjat_str:
+        paragraphs.append(f"وحيث توفي الموروث المذكور واحيط بإرثه وتحددت ورثته حسب حجة وفاته {hojjat_str}.")
+    elif ownership_origin and ownership_origin.strip():
+        paragraphs.append(f"وحيث توفي الموروث المذكور واحيط بإرثه {ownership_origin.strip()}.")
+    else:
+        paragraphs.append("وحيث توفي الموروث المذكور واحيط بإرثه وتحددت منابات ورثته الشرعيين.")
+        
+    if successive_deaths_text and successive_deaths_text.strip():
+        paragraphs.append(f"{successive_deaths_text.strip()}")
+        
+    if total_shares and total_shares.strip():
+        paragraphs.append(f"عن عدد أسهم إجمالي قدره {total_shares.strip()} سهماً.")
+        
+    if wasiya_wajiba_text and wasiya_wajiba_text.strip():
+        paragraphs.append(f"وتم إخراج الوصية الواجبة لفائدة الأحفاد المستحقين: {wasiya_wajiba_text.strip()}")
+        
+    if shares_breakdown and shares_breakdown.strip():
+        clean_breakdown = re.sub(r"^\s*\*{0,2}الفصل\s*(الأول|الاول|الثاني|الثالث)\*{0,2}\s*:\s*", "", shares_breakdown.strip())
+        paragraphs.append(f"وتحددت وانحصرت منابات الورثة الشرعيين وتأصيل الفريضة كما يلي: {clean_breakdown}")
+        
+    closing = "هذا ما تم تلقيه وتلي فوافقوا وأمضوا ورسم بدفتر مسودات أولهما صحيفة ................ تحت عدد ................ أجره والمصاريف القانونية دنانير والله الموفق."
+    paragraphs.append(closing)
+    
+    full_text = "\n\n".join(paragraphs)
+    return _clean_text_entity(full_text)
 

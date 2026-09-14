@@ -277,6 +277,20 @@ class VideoCaptureThread:
         # Never hand back a stale frame once the device has gone away.
         if not self.running:
             return False, None
+        if self.ret and self.frame is not None:
+            frame = self.frame
+            try:
+                # Digital vertical ROI crop: crops ceiling out and shifts camera view down to face level
+                v_crop = 0.20
+                if v_crop > 0.0:
+                    h, w = frame.shape[:2]
+                    top_cut = int(h * v_crop)
+                    if h - top_cut > 100:
+                        cropped = frame[top_cut:h, 0:w]
+                        frame = cv2.resize(cropped, (w, h), interpolation=cv2.INTER_LINEAR)
+            except Exception:
+                frame = self.frame
+            return self.ret, frame
         return self.ret, self.frame
 
     def stop(self):

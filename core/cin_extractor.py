@@ -92,19 +92,28 @@ def _assemble_tunisian_full_name(extracted: dict) -> str:
 def extract_cin_data(
     image_bytes: bytes,
     api_key: str = "",
-    model_name: str = "gemini-2.5-flash",
-    provider: str = "gemini"
+    model_name: str = "",
+    provider: str = ""
 ) -> dict:
     """
     Calls AI Vision API to extract structured fields from a Tunisian CIN Card image.
+    Automatically loads configured API keys if not provided.
     """
     if not image_bytes:
         return {"success": False, "error": "لم يتم تقديم صورة لبطاقة التعريف."}
+
+    if not provider or not api_key:
+        try:
+            import config
+            provider, model_name = config.load_ai_engine()
+            api_key = config.load_saved_api_keys(provider)
+        except Exception:
+            provider = provider or "google"
         
     if provider == "openai":
-        res = _call_openai_vision(image_bytes, api_key, model_name, prompt=TUNISIAN_CIN_PROMPT)
+        res = _call_openai_vision(image_bytes, api_key, model_name or "gpt-4o", prompt=TUNISIAN_CIN_PROMPT)
     else:
-        res = _call_gemini_vision(image_bytes, api_key, model_name, prompt=TUNISIAN_CIN_PROMPT)
+        res = _call_gemini_vision(image_bytes, api_key, model_name or "gemini-3.6-flash", prompt=TUNISIAN_CIN_PROMPT)
         
     if not res.get("success"):
         return res
@@ -157,15 +166,23 @@ def extract_cin_dual_faces(
     front_bytes: bytes,
     back_bytes: bytes,
     api_key: str = "",
-    model_name: str = "gemini-3.6-flash",
-    provider: str = "gemini"
+    model_name: str = "",
+    provider: str = ""
 ) -> dict:
     """
     Extracts and merges structured fields from both Front and Back sides of a Tunisian CIN Card in 1 SINGLE API call.
     """
+    if not provider or not api_key:
+        try:
+            import config
+            provider, model_name = config.load_ai_engine()
+            api_key = config.load_saved_api_keys(provider)
+        except Exception:
+            provider = provider or "google"
+
     if provider == "gemini" and (front_bytes or back_bytes):
         from ocr_engine import _call_gemini_vision_dual
-        res = _call_gemini_vision_dual(front_bytes, back_bytes, api_key, model_name, TUNISIAN_CIN_PROMPT)
+        res = _call_gemini_vision_dual(front_bytes, back_bytes, api_key, model_name or "gemini-3.6-flash", TUNISIAN_CIN_PROMPT)
         if res.get("success"):
             raw_text = res.get("transcription", "")
             extracted = {}

@@ -188,8 +188,10 @@ def office_title(prof: dict = None) -> str:
 def letterhead(prof: dict = None) -> str:
     """The block printed at the top-right of a generated PDF or Word file."""
     prof = prof if prof is not None else load()
-    lines = ["مكــتب الأســتاذ", (prof.get("notary_name") or "").strip() or BLANK,
-             "عدل إشهــــاد"]
+    name = (prof.get("notary_name") or "").strip()
+    title = (prof.get("notary_title") or "الأستاذ").strip()
+    line1 = f"مكــتب {title} {name}".strip() if name else "مكــتب الأســتاذ"
+    lines = [line1, "عدل إشهــــاد"]
     addr = (prof.get("letterhead_address") or prof.get("office_address") or "").strip()
     if addr:
         lines.append(addr)
@@ -303,6 +305,8 @@ def letterhead_fr(prof: dict = None) -> str:
     name = (prof.get("notary_name_fr") or "").strip()
     if name:
         lines.append(f"MAITRE {name}")
+    else:
+        lines.append("MAITRE Notaire")
     lines.append("NOTAIRE")
     court = (prof.get("court_fr") or "").strip()
     if court:
@@ -314,3 +318,22 @@ def letterhead_fr(prof: dict = None) -> str:
     if phone:
         lines.append(f"Tel: {phone}")
     return "\n".join(lines)
+
+
+def jaliss_signature_block(prof: dict = None) -> str:
+    """The signature line of the co-notary / seated assistant (الجليس)."""
+    prof = prof if prof is not None else load()
+    name = (prof.get("jaliss_name") or "").strip()
+    title = (prof.get("jaliss_title") or "الأستاذ").strip()
+    cin = (prof.get("jaliss_cin") or "").strip()
+    
+    if name:
+        out = f"{title} {name}".strip()
+    else:
+        out = "الجليس (عدل الإشهاد الثاني)"
+    
+    if cin:
+        out += f"\nب ت و ع {cin}دد"
+    else:
+        out += "\nب ت و ع ................"
+    return out

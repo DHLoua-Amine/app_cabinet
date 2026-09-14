@@ -28,7 +28,7 @@ VersionInfoVersion={#MaVersion}
 DefaultDirName={localappdata}\DATLY
 DefaultGroupName={#MonNom}
 OutputDir=dist_installer
-OutputBaseFilename=DATLY_Setup_v{#MaVersion}_FinalBuild
+OutputBaseFilename=DATLY_Setup_v{#MaVersion}_NewBuild
 SetupIconFile=C:\Users\amin\Desktop\zarai1_pyside\assets\datly_app.ico
 Compression=lzma
 SolidCompression=no
@@ -55,9 +55,9 @@ Name: "parefeu"; Description: \
 Source: "C:\Users\amin\Desktop\zarai1_pyside\dist\DATLY\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\_internal\assets\datly_app.ico"
-Name: "{userdesktop}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\_internal\assets\datly_app.ico"; Tasks: desktopicon
-Name: "{commondesktop}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\_internal\assets\datly_app.ico"; Tasks: desktopicon
+Name: "{autoprograms}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\{#MonExe}"
+Name: "{userdesktop}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\{#MonExe}"; Tasks: desktopicon
+Name: "{commondesktop}\{#MonNom}"; Filename: "{app}\{#MonExe}"; IconFilename: "{app}\{#MonExe}"; Tasks: desktopicon
 
 [Run]
 ; 1. La regle de pare-feu, avant le premier lancement, pour que le serveur soit

@@ -2,6 +2,7 @@ import office_profile
 import io
 import copy
 import datetime
+import re
 
 # reportlab costs ~0.6 s to import and is only needed while a PDF is actually being
 # produced, so it loads on demand instead of at application start.
@@ -341,22 +342,114 @@ def _ensure_docx() -> bool:
     _DOCX_READY = True
     return docx is not None
 
-def apply_run_font(run, font_name="Traditional Arabic", size_pt=13, is_bold=False):
+def set_table_borders(table, has_inside_v=False):
+    tblPr = table._tbl.tblPr
+    tblBorders = tblPr.find(qn('w:tblBorders'))
+    if tblBorders is not None:
+        tblPr.remove(tblBorders)
+    tblBorders = OxmlElement('w:tblBorders')
+    
+    for side in ['top', 'left', 'bottom', 'right']:
+        b = OxmlElement(f'w:{side}')
+        b.set(qn('w:val'), 'single')
+        b.set(qn('w:sz'), '12') # 1.5 pt solid line
+        b.set(qn('w:space'), '0')
+        b.set(qn('w:color'), '000000')
+        tblBorders.append(b)
+        
+    if has_inside_v:
+        insideV = OxmlElement('w:insideV')
+        insideV.set(qn('w:val'), 'single')
+        insideV.set(qn('w:sz'), '12')
+        insideV.set(qn('w:space'), '0')
+        insideV.set(qn('w:color'), '000000')
+        tblBorders.append(insideV)
+        
+    tblPr.append(tblBorders)
+
+
+def apply_run_font(run, font_name="Simplified Arabic", size_pt=13, is_bold=False, is_rtl=True):
     run.font.name = font_name
     run.font.size = Pt(size_pt)
+    run.bold = is_bold
     run.font.bold = is_bold
     run.font.color.rgb = RGBColor(0, 0, 0)
+    
     rPr = run._r.get_or_add_rPr()
-    rFonts = OxmlElement('w:rFonts')
+    rFonts = rPr.find(qn('w:rFonts'))
+    if rFonts is None:
+        rFonts = OxmlElement('w:rFonts')
+        rPr.append(rFonts)
     rFonts.set(qn('w:ascii'), font_name)
     rFonts.set(qn('w:hAnsi'), font_name)
     rFonts.set(qn('w:cs'), font_name)
-    rPr.append(rFonts)
-    rtl = OxmlElement('w:rtl')
-    rPr.append(rtl)
+    rFonts.set(qn('w:eastAsia'), font_name)
+    
+def set_paragraph_rtl(paragraph):
+    """Enforces Right-to-Left writing and typing direction on Word paragraph XML."""
+    pPr = paragraph._element.get_or_add_pPr()
+    bidi = OxmlElement('w:bidi')
+    bidi.set(qn('w:val'), '1')
+    pPr.append(bidi)
+    paragraph.paragraph_format.bidi = True
+
+def set_section_rtl(section):
+    """Enforces 100% Native Arabic Right-To-Left view mode on document section."""
+    sectPr = section._sectPr
+    bidi = OxmlElement('w:bidi')
+    bidi.set(qn('w:val'), '1')
+    sectPr.append(bidi)
+
+def set_table_rtl(table):
+    """Sets Word table column order from Right to Left (Arabic view)."""
+    tblPr = table._element.xpath('w:tblPr')
+    if tblPr:
+        bidiVisual = OxmlElement('w:bidiVisual')
+        bidiVisual.set(qn('w:val'), '1')
+        tblPr[0].append(bidiVisual)
+
+def apply_run_font(run, font_name="Simplified Arabic", size_pt=13, is_bold=False, is_rtl=True, color_rgb=(0,0,0)):
+    run.font.name = font_name
+    run.font.size = Pt(size_pt)
+    run.bold = is_bold
+    if color_rgb:
+        run.font.color.rgb = RGBColor(*color_rgb)
+    
+    rPr = run._r.get_or_add_rPr()
+    rFonts = rPr.find(qn('w:rFonts'))
+    if rFonts is None:
+        rFonts = OxmlElement('w:rFonts')
+        rPr.append(rFonts)
+    rFonts.set(qn('w:ascii'), font_name)
+    rFonts.set(qn('w:hAnsi'), font_name)
+    rFonts.set(qn('w:cs'), font_name)
+    rFonts.set(qn('w:eastAsia'), font_name)
+    
+    if is_rtl:
+        rtl = OxmlElement('w:rtl')
+        rtl.set(qn('w:val'), '1')
+        rPr.append(rtl)
+        
     if is_bold:
+        b = OxmlElement('w:b')
+        rPr.append(b)
         bCs = OxmlElement('w:bCs')
+        bCs.set(qn('w:val'), '1')
         rPr.append(bCs)
+
+
+def set_cell_margins(cell, top=60, bottom=60, left=60, right=60):
+    tcPr = cell._tc.get_or_add_tcPr()
+    tcMar = tcPr.find(qn('w:tcMar'))
+    if tcMar is not None:
+        tcPr.remove(tcMar)
+    tcMar = OxmlElement('w:tcMar')
+    for m, val in [('top', top), ('bottom', bottom), ('left', left), ('right', right)]:
+        node = OxmlElement(f'w:{m}')
+        node.set(qn('w:w'), str(val))
+        node.set(qn('w:type'), 'dxa')
+        tcMar.append(node)
+    tcPr.append(tcMar)
 
 
 _CACHED_NOTARY_TEMPLATE_BYTES = None
@@ -364,55 +457,79 @@ _CACHED_NOTARY_DOC_OBJ = None
 
 def _get_base_notary_template_bytes() -> bytes:
     _ensure_docx()
-    global _CACHED_NOTARY_TEMPLATE_BYTES
-    if _CACHED_NOTARY_TEMPLATE_BYTES is not None:
-        return _CACHED_NOTARY_TEMPLATE_BYTES
-
     if docx is None:
         return b""
 
     doc = docx.Document()
+
+    try:
+        style_normal = doc.styles['Normal']
+        style_normal.font.name = 'Simplified Arabic'
+        rPr_norm = style_normal._element.get_or_add_rPr()
+        rFonts_norm = rPr_norm.find(qn('w:rFonts'))
+        if rFonts_norm is None:
+            rFonts_norm = OxmlElement('w:rFonts')
+            rPr_norm.append(rFonts_norm)
+        rFonts_norm.set(qn('w:ascii'), 'Simplified Arabic')
+        rFonts_norm.set(qn('w:hAnsi'), 'Simplified Arabic')
+        rFonts_norm.set(qn('w:cs'), 'Simplified Arabic')
+        rFonts_norm.set(qn('w:eastAsia'), 'Simplified Arabic')
+    except Exception:
+        pass
+
     for section in doc.sections:
         section.top_margin = Inches(0.6)
         section.bottom_margin = Inches(0.6)
         section.left_margin = Inches(0.6)
         section.right_margin = Inches(0.6)
+        set_section_rtl(section)
 
     tbl_hdr = doc.add_table(rows=1, cols=3)
     tbl_hdr.alignment = WD_TABLE_ALIGNMENT.CENTER
+    tbl_hdr.autofit = False
+    set_table_borders(tbl_hdr, has_inside_v=False)
+    set_table_rtl(tbl_hdr)
+    
     hdr_cells = tbl_hdr.rows[0].cells
+    hdr_cells[0].width = Inches(2.9)
+    hdr_cells[1].width = Inches(1.2)
+    hdr_cells[2].width = Inches(2.9)
 
-    # Left Cell (French)
-    p_fr = hdr_cells[0].paragraphs[0]
-    p_fr.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    p_fr.paragraph_format.line_spacing = 1.0
-    p_fr.paragraph_format.space_before = Pt(0)
-    p_fr.paragraph_format.space_after = Pt(0)
-    r_fr = p_fr.add_run(office_profile.letterhead_fr())
-    apply_run_font(r_fr, font_name="Arial", size_pt=9.5, is_bold=True)
+    for cell in hdr_cells:
+        set_cell_margins(cell, top=60, bottom=60, left=60, right=60)
 
-    # Center Cell
+    # Right Cell (Arabic - appears on Visual Right under RTL bidiVisual)
+    p_ar = hdr_cells[0].paragraphs[0]
+    p_ar.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    p_ar.paragraph_format.line_spacing = 0.85
+    p_ar.paragraph_format.space_before = Pt(0)
+    p_ar.paragraph_format.space_after = Pt(0)
+    p_ar.paragraph_format.right_indent = Pt(0)
+    r_ar = p_ar.add_run(office_profile.letterhead().strip())
+    apply_run_font(r_ar, font_name="Simplified Arabic", size_pt=9.5, is_bold=True, is_rtl=True)
+
+    # Center Cell (Empty Spacer)
     p_ctr = hdr_cells[1].paragraphs[0]
     p_ctr.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p_ctr.paragraph_format.line_spacing = 1.0
     p_ctr.paragraph_format.space_before = Pt(0)
     p_ctr.paragraph_format.space_after = Pt(0)
-    r_ctr = p_ctr.add_run("|\nالحمد لله وحده")
-    apply_run_font(r_ctr, font_name="Arial", size_pt=11, is_bold=True)
+    r_ctr = p_ctr.add_run("")
+    apply_run_font(r_ctr, font_name="Simplified Arabic", size_pt=11, is_bold=True, is_rtl=True)
 
-    # Right Cell (Arabic)
-    p_ar = hdr_cells[2].paragraphs[0]
-    p_ar.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    p_ar.paragraph_format.line_spacing = 1.0
-    p_ar.paragraph_format.space_before = Pt(0)
-    p_ar.paragraph_format.space_after = Pt(0)
-    r_ar = p_ar.add_run(office_profile.letterhead())
-    apply_run_font(r_ar, font_name="Arial", size_pt=9.5, is_bold=True)
+    # Left Cell (French - appears on Visual Left under RTL bidiVisual)
+    p_fr = hdr_cells[2].paragraphs[0]
+    p_fr.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    p_fr.paragraph_format.line_spacing = 1.0
+    p_fr.paragraph_format.space_before = Pt(0)
+    p_fr.paragraph_format.space_after = Pt(0)
+    p_fr.paragraph_format.left_indent = Pt(0)
+    r_fr = p_fr.add_run(office_profile.letterhead_fr().strip())
+    apply_run_font(r_fr, font_name="Arial", size_pt=9.5, is_bold=True, is_rtl=False)
 
     buf = io.BytesIO()
     doc.save(buf)
-    _CACHED_NOTARY_TEMPLATE_BYTES = buf.getvalue()
-    return _CACHED_NOTARY_TEMPLATE_BYTES
+    return buf.getvalue()
 
 _CACHED_NOTARY_DOC_OBJ = None
 
@@ -433,31 +550,49 @@ def generate_docx_from_transcription(title: str, text: str, metadata: dict = Non
     if docx is None:
         return b""
 
+    # Clear template caches to force fresh profile values & borders
+    global _CACHED_NOTARY_TEMPLATE_BYTES, _CACHED_NOTARY_DOC_OBJ
+    _CACHED_NOTARY_TEMPLATE_BYTES = None
+    _CACHED_NOTARY_DOC_OBJ = None
+
     base_obj = _get_base_notary_doc_obj()
     doc = copy.deepcopy(base_obj) if base_obj is not None else docx.Document()
 
-    doc.add_paragraph() # Spacer
+    # Enforce Section-level RTL on all sections
+    for section in doc.sections:
+        set_section_rtl(section)
 
-    # 2. MAIN TITLE (Centered & BOLD 20pt)
+    try:
+        style_normal = doc.styles['Normal']
+        style_normal.font.name = 'Simplified Arabic'
+        rPr_norm = style_normal._element.get_or_add_rPr()
+        rFonts_norm = rPr_norm.find(qn('w:rFonts'))
+        if rFonts_norm is None:
+            rFonts_norm = OxmlElement('w:rFonts')
+            rPr_norm.append(rFonts_norm)
+        rFonts_norm.set(qn('w:ascii'), 'Simplified Arabic')
+        rFonts_norm.set(qn('w:hAnsi'), 'Simplified Arabic')
+        rFonts_norm.set(qn('w:cs'), 'Simplified Arabic')
+        rFonts_norm.set(qn('w:eastAsia'), 'Simplified Arabic')
+    except Exception:
+        pass
+
+    sp_p = doc.add_paragraph() # Spacer
+    set_paragraph_rtl(sp_p)
+
+    # 2. MAIN TITLE (Centered & BOLD 20pt ONLY)
     clean_title = title.replace("— " + office_profile.office_title(), "").strip()
     p_title = doc.add_paragraph()
+    set_paragraph_rtl(p_title)
     p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    p_title.paragraph_format.line_spacing = 1.0
+    p_title.paragraph_format.space_before = Pt(4)
+    p_title.paragraph_format.space_after = Pt(8)
     run_t = p_title.add_run(clean_title)
-    run_t.font.name = "Traditional Arabic"
-    run_t.font.size = Pt(20)
-    run_t.font.bold = True
-    run_t.font.color.rgb = RGBColor(0, 0, 0)
+    apply_run_font(run_t, font_name="Simplified Arabic", size_pt=20, is_bold=True, is_rtl=True)
 
-    # 3. BODY TEXT & PARAGRAPHS WITH INLINE BOLDING (Gras) & CROWDED PARAGRAPH SPACING
-    bold_phrases = [
-        "الحمد لله في", "الحمد لله،", office_profile.notary_block()[:40],
-        "انعقد بين الطرف الأول البائعين", "انعقد بين الطرف الأول البائع", "انعقد بين الطرف الأول الواهب", "انعقد بين الطرف الأول المتنازل", "انعقد بين الطرف الأول",
-        "الطرف الأول البائعين", "الطرف الأول البائع", "الطرف الأول الواهب", "الطرف الأول المتنازل", "الطرف الأول",
-        "أولا السيدة:", "ثانيا السيدة:", "ثالثا السيدة:", "رابعا السيدة:",
-        "الطرف الثاني المشترية:", "الطرف الثاني المشتري:", "الطرف الثاني الموهوب له:", "الطرف الثاني المتنازل له:", "الطرف الثاني",
-        "الفصل الأول:", "الفصل الثاني:", "الفصل الثالث:", "الفصل الرابع:", "الفصل الخامس:", "الفصل السادس:",
-        "وأبرم العقد بين طرفيه", "وأبرم العقد", "ورسم بدفتر مسودات أولهما", "ورسم بدفتر مسودات"
-    ]
+    # 3. BODY TEXT & PARAGRAPHS: ONLY Title & Foussoul Headings are BOLD (Gras)
+    bold_patterns = r"((?:فصل\s+تمهيدي|الفصل\s+(?:الأول|الاول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر|الحادي\s+عشر|الثاني\s+عشر))[^\:\n]*\:?)"
 
     lines = text.split("\n")
     for line in lines:
@@ -466,64 +601,53 @@ def generate_docx_from_transcription(title: str, text: str, metadata: dict = Non
             continue
             
         p = doc.add_paragraph()
+        set_paragraph_rtl(p)
         p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
         p.paragraph_format.line_spacing = 1.15
-        p.paragraph_format.space_before = Pt(2)
+        p.paragraph_format.space_before = Pt(0)
         p.paragraph_format.space_after = Pt(3)
         
-        # Inline bold parsing for phrases
-        curr_text = line_str
-        while curr_text:
-            earliest_pos = -1
-            found_phrase = None
-            for bp in bold_phrases:
-                pos = curr_text.find(bp)
-                if pos != -1 and (earliest_pos == -1 or pos < earliest_pos):
-                    earliest_pos = pos
-                    found_phrase = bp
-                    
-            if earliest_pos == -1:
-                r_norm = p.add_run(curr_text)
-                apply_run_font(r_norm, font_name="Traditional Arabic", size_pt=13, is_bold=False)
-                break
-            else:
-                if earliest_pos > 0:
-                    r_pre = p.add_run(curr_text[:earliest_pos])
-                    apply_run_font(r_pre, font_name="Traditional Arabic", size_pt=13, is_bold=False)
-                    
-                phrase_end = earliest_pos + len(found_phrase)
-                if phrase_end < len(curr_text) and curr_text[phrase_end] == ":":
-                    phrase_end += 1
-                    
-                r_b = p.add_run(curr_text[earliest_pos:phrase_end])
-                apply_run_font(r_b, font_name="Traditional Arabic", size_pt=13.5, is_bold=True)
-                
-                curr_text = curr_text[phrase_end:]
+        parts = re.split(bold_patterns, line_str)
+        for part in parts:
+            if not part:
+                continue
+            is_bold_heading = bool(re.match(bold_patterns, part))
+            run = p.add_run(part)
+            apply_run_font(run, font_name="Simplified Arabic", size_pt=13.5, is_bold=is_bold_heading, is_rtl=True)
 
-    doc.add_paragraph() # Spacer
+    sp2_p = doc.add_paragraph() # Spacer
+    set_paragraph_rtl(sp2_p)
 
-    # 4. BOTTOM FOOTER TABLE (Bordered Box with 2 Columns)
+    # 4. BOTTOM FOOTER TABLE (Bordered Box with 2 Columns & Center Divider Line)
     tbl_ftr = doc.add_table(rows=1, cols=2)
     tbl_ftr.alignment = WD_TABLE_ALIGNMENT.CENTER
+    tbl_ftr.autofit = False
+    set_table_borders(tbl_ftr, has_inside_v=True)
+    set_table_rtl(tbl_ftr)
+    
     ftr_cells = tbl_ftr.rows[0].cells
+    ftr_cells[0].width = Inches(3.5)
+    ftr_cells[1].width = Inches(3.5)
     
-    # Left Footer Cell
+    # Right Footer Cell (Main Notary - appears on Visual Right under RTL bidiVisual)
     p_f1 = ftr_cells[0].paragraphs[0]
+    set_paragraph_rtl(p_f1)
     p_f1.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_f1 = p_f1.add_run("الأستاذ سامي الجوادي\nب ت و ع 04481027دد")
-    r_f1.font.name = "Traditional Arabic"
-    r_f1.font.size = Pt(12)
-    r_f1.font.bold = True
-    r_f1.font.color.rgb = RGBColor(0, 0, 0)
+    p_f1.paragraph_format.line_spacing = 1.0
+    p_f1.paragraph_format.space_before = Pt(0)
+    p_f1.paragraph_format.space_after = Pt(0)
+    r_f1 = p_f1.add_run(office_profile.signature_block())
+    apply_run_font(r_f1, font_name="Simplified Arabic", size_pt=14, is_bold=True, is_rtl=True)
     
-    # Right Footer Cell
+    # Left Footer Cell (Co-notary / Seated assistant - appears on Visual Left under RTL bidiVisual)
     p_f2 = ftr_cells[1].paragraphs[0]
+    set_paragraph_rtl(p_f2)
     p_f2.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    r_f2 = p_f2.add_run(office_profile.signature_block())
-    r_f2.font.name = "Traditional Arabic"
-    r_f2.font.size = Pt(12)
-    r_f2.font.bold = True
-    r_f2.font.color.rgb = RGBColor(0, 0, 0)
+    p_f2.paragraph_format.line_spacing = 1.0
+    p_f2.paragraph_format.space_before = Pt(0)
+    p_f2.paragraph_format.space_after = Pt(0)
+    r_f2 = p_f2.add_run(office_profile.jaliss_signature_block())
+    apply_run_font(r_f2, font_name="Simplified Arabic", size_pt=14, is_bold=True, is_rtl=True)
 
     buf = io.BytesIO()
     doc.save(buf)

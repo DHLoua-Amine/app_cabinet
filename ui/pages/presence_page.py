@@ -364,6 +364,7 @@ class PresencePage(QWidget):
         self.table_view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table_view.customContextMenuRequested.connect(self.show_context_menu)
         self.table_view.doubleClicked.connect(self.on_row_double_clicked)
+        self.table_view.clicked.connect(self.on_cell_clicked)
         self.main_layout.addWidget(self.table_view)
 
         self.update_translations()
@@ -420,6 +421,35 @@ class PresencePage(QWidget):
             client_id = str(row.get("ID Client", "")).strip()
             if client_id:
                 self.client_selected.emit(client_id)
+
+    def on_cell_clicked(self, index):
+        if not index.isValid():
+            return
+        if index.column() == 0:  # Photo Column
+            row_idx = index.row()
+            if hasattr(self, 'model') and self.model and row_idx < len(self.model.df):
+                row = self.model.df.iloc[row_idx]
+                client_id = str(row.get("ID Client", "")).strip()
+                client_name = str(row.get("Client", "")).strip() or ("Client" if self.lang == "fr" else "حريف")
+                photo_path = str(row.get("PhotoPath", "")).strip()
+                
+                img_src = None
+                if photo_path and os.path.exists(photo_path):
+                    img_src = photo_path
+                elif photo_path:
+                    rel_p = PROFILES_DIR / os.path.basename(photo_path)
+                    if rel_p.exists():
+                        img_src = str(rel_p)
+                if not img_src and client_id:
+                    cf = PROFILES_DIR / f"{client_id}.jpg"
+                    if cf.exists():
+                        img_src = str(cf)
+                
+                from PySide6.QtGui import QImage
+                qimg = QImage(img_src) if img_src else None
+                from ui.dialogs.face_preview_dialog import FacePreviewDialog
+                dlg = FacePreviewDialog(qimg, client_name, "known" if client_id else "new", client_id, lang=self.lang, parent=self)
+                dlg.exec()
 
     RECENT_PAGE = 200
 

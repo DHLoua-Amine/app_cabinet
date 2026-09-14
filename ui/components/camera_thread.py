@@ -209,7 +209,7 @@ class CameraThread(QThread):
                         
                         # Evaluate face crop quality (sharpness, lighting, resolution)
                         crop_quality = self._evaluate_face_quality(crop)
-                        if crop_quality < 20.0:
+                        if crop_quality < 28.0:
                             continue  # Automatically discard blurry/bad frame, wait for sharp next frame
 
                         matched_id, score = self.face_engine.match_face(embedding, prebuilt_cache=self.face_cache)
@@ -243,14 +243,7 @@ class CameraThread(QThread):
                                 try:
                                     PROFILES_DIR.mkdir(parents=True, exist_ok=True)
                                     prof_path = PROFILES_DIR / f"{matched_id}.jpg"
-                                    should_write = True
-                                    if prof_path.exists():
-                                        try:
-                                            old_img = cv2.imread(str(prof_path))
-                                            if old_img is not None and self._evaluate_face_quality(old_img) >= crop_quality:
-                                                should_write = False
-                                        except Exception:
-                                            pass
+                                    should_write = not prof_path.exists()
                                     if should_write:
                                         cv2.imwrite(str(prof_path), crop)
                                 except Exception:

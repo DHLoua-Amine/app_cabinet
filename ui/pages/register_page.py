@@ -24,12 +24,12 @@ class CaseTableModel(QAbstractTableModel):
         is_fr = self.lang == "fr"
         if is_fr:
             self.headers = [
-                "N° Dossier", "Nom du Client", "Type de Contrat",
+                "N° Dossier", "Première Partie", "Seconde Partie", "Type de Contrat",
                 "Objet du Contrat", "Statut du Dossier", "Date de Création"
             ]
         else:
             self.headers = [
-                "رقم الملف", "اسم الحريف", "نوع العقد",
+                "رقم الملف", "الطرف الأول", "الطرف الثاني", "نوع العقد",
                 "موضوع العقد", "مآل الملف", "تاريخ الإنجاز"
             ]
 
@@ -39,6 +39,33 @@ class CaseTableModel(QAbstractTableModel):
     def columnCount(self, parent=QModelIndex()):
         return len(self.headers)
 
+    def _get_party_names_from_row(self, row_data):
+        p1 = (row_data.get("party1_name") or "").strip()
+        p2 = (row_data.get("party2_name") or "").strip()
+
+        if p1 or p2:
+            return p1 or "—", p2 or "—"
+
+        client_name = (row_data.get("client_name") or "").strip()
+        title = (row_data.get("title") or "").strip()
+        desc = (row_data.get("description") or "").strip()
+
+        raw_parties = ""
+        if "الأطراف المربوطة بالعقد:" in desc:
+            raw_parties = desc.split("الأطراف المربوطة بالعقد:")[-1].split("—")[0].strip()
+        elif "(" in title and ")" in title:
+            raw_parties = title.split("(")[1].split(")")[0].strip()
+
+        if raw_parties:
+            if " & " in raw_parties:
+                parts = raw_parties.split(" & ")
+                return parts[0].strip(), "\n".join([p.strip() for p in parts[1:]])
+            elif " ضد " in raw_parties:
+                parts = raw_parties.split(" ضد ")
+                return parts[0].strip(), "\n".join([p.strip() for p in parts[1:]])
+
+        return client_name or "—", "—"
+
     def data(self, index, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or not (0 <= index.row() < len(self._data)):
             return None
@@ -46,33 +73,35 @@ class CaseTableModel(QAbstractTableModel):
         row_data = self._data[index.row()]
         col = index.column()
 
+        p1_name, p2_name = self._get_party_names_from_row(row_data)
+
         if role == Qt.ItemDataRole.DisplayRole:
             is_fr = self.lang == "fr"
             if col == 0:
                 return str(row_data.get("case_id", ""))
             elif col == 1:
-                return str(row_data.get("client_name", "Inconnu / غير معروف"))
+                return p1_name
             elif col == 2:
-                # Clean service type language based on selection
+                return p2_name
+            elif col == 3:
                 val = row_data.get("service_type", "")
                 return self.clean_service_type_lang(val, is_fr)
-            elif col == 3:
+            elif col == 4:
                 val = row_data.get("title", "")
                 return self.clean_val_lang(val, is_fr)
-            elif col == 4:
+            elif col == 5:
                 val = row_data.get("status", "")
                 return self.clean_val_lang(val, is_fr)
-            elif col == 5:
+            elif col == 6:
                 raw_date = row_data.get("created_at", "")
                 if raw_date:
                     return str(raw_date).split()[0]
                 return ""
                 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            # Align right for Arabic, left for French
             if self.lang == "ar":
-                return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+            return int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
 
         return None
 
@@ -380,7 +409,7 @@ class RegisterPage(QWidget):
         def build(report):
             report(0, len(rows))
             df = pd.DataFrame(rows)
-            cols = ["case_id", "client_name", "service_type", "title", "status", "created_at"]
+            cols = ["case_id", "party1_name", "party2_name", "service_type", "title", "status", "created_at"]
             df = df[[c for c in cols if c in df.columns]]
             report(len(rows) // 2, len(rows))
             data = create_executive_excel(df, sheet_name='Registre')
@@ -403,10 +432,6 @@ class RegisterPage(QWidget):
         self._retitle_row_bar()
         
         # Stats labels
-        # "Dossiers En Cours" counted new + in progress + awaiting signature, which
-        # is every dossier that is not archived. The number was useful; the label
-        # was not true. The label now matches what is counted.
-        # ("الإنجaz" also had the Latin letters "az" typed into the middle of it.)
         self.lbl_total_title.setText("Total des Dossiers" if is_fr else "إجمالي الملفات")
         self.lbl_prog_title.setText("Dossiers actifs (non archivés)" if is_fr
                                     else "ملفات نشطة (غير مؤرشفة)")
@@ -424,35 +449,15 @@ class RegisterPage(QWidget):
         # Combobox Options (Disconnect signal temporarily to avoid infinite loops)
         self.status_combo.blockSignals(True)
         self.status_combo.clear()
-        self.type_combo.blockSignals(True)
-        self.type_combo.clear()
         self.status_options = ["Tous les statuts" if is_fr else "جميع مآلات الملفات", "جديد", "قيد الإنجاز", "في انتظار التوقيع", "تام ومسجل"]
-        self.type_options = [
-            "Tous les types" if is_fr else "جميع أنواع العقود",
-            "عقد بيع عقار (دفتر خانة)",
-            "عقد بيع عقار (غير مسجل)",
-            "عقد وعد بيع",
-            "عقد مقاسمة رضائية",
-            "عقد مقاسمة قضائية",
-            "عقد هبة",
-            "حجة وفاة",
-            "فريضة تريكة",
-            "رفض ميراث",
-            "عقد زواج",
-            "عقد ترهين عقاري",
-            "عقد تنازل",
-            "محضر استجواب",
-            "شهادة ملكية",
-            "توكيل رسمي",
-            "عقد كراء",
-            "كتب تكميلي",
-            "كتب توضيحي",
-            "استشارة قانونية"
-        ]
         self.status_combo.addItems(self.status_options)
-        self.type_combo.addItems(self.type_options)
         self.status_combo.blockSignals(False)
-        self.type_combo.blockSignals(False)
+
+        import contract_templates
+        contract_templates.populate_categorized_contract_types(
+            self.type_combo,
+            first_item=("Tous les types" if is_fr else "جميع أنواع العقود")
+        )
 
         # Pagination buttons
         self.prev_btn.setText("Page Précédente" if is_fr else "الصفحة السابقة")
@@ -465,8 +470,6 @@ class RegisterPage(QWidget):
             self.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
 
     def load_data(self):
-        # Filtering happens in SQL now (see apply_filters), so the page no longer needs
-        # to hold all 20,000 dossiers in Python just to search them.
         self.apply_filters()
 
     def on_filter_date_changed(self, _qdate=None):
@@ -478,15 +481,10 @@ class RegisterPage(QWidget):
         self.date_from_edit.setDate(QDate.currentDate().addDays(-90))
         self.date_to_edit.setDate(QDate.currentDate())
         self.status_combo.setCurrentIndex(0)
+        self.type_combo.setCurrentIndex(0)
         self.apply_filters()
 
     def apply_filters(self):
-        """
-        Filters in SQL rather than looping over every dossier on the UI thread.
-
-        The old loop walked all 20,000 cases per filter change (measured 150–614 ms of
-        frozen window each time). SQLite does the same selection against its indexes.
-        """
         search_q = self.search_input.text().strip()
         date_from = self.date_from_edit.date().toPython().isoformat()
         date_to = self.date_to_edit.date().toPython().isoformat()
@@ -497,9 +495,14 @@ class RegisterPage(QWidget):
 
         service_type = ""
         if hasattr(self, 'type_combo') and self.type_combo.currentIndex() > 0:
-            service_type = self.type_combo.currentText().strip()
+            c_data = self.type_combo.currentData()
+            if c_data == "HEADER":
+                service_type = ""
+            elif c_data:
+                service_type = str(c_data).strip()
+            else:
+                service_type = self.type_combo.currentText().strip()
 
-        # A read that FAILED is reported; it is not an empty register.
         try:
             self.filtered_cases = reception.search_cases(
                 search_text=search_q, status=status, service_type=service_type,
@@ -513,18 +516,12 @@ class RegisterPage(QWidget):
                  if self.lang == "fr" else
                  "تعذّرت قراءة السجل. هذا ليس سجلا فارغا — "
                  "تحقّق من قاعدة البيانات."))
-        self.all_cases = self.filtered_cases   # kept for the export snapshot
+        self.all_cases = self.filtered_cases
         self.current_page = 1
         self.update_stats()
         self.update_table_view()
 
     def _status_filter_value(self, label):
-        """
-        Maps a translated status label back to what is stored in the database.
-
-        Statuses are written in Arabic; the French labels are display-only, so matching
-        the French text against the column would return nothing.
-        """
         fr_to_ar = {
             "Nouveau": "جديد",
             "En cours": "قيد الإنجاز",
@@ -533,23 +530,8 @@ class RegisterPage(QWidget):
             "Finalisé": "تام ومسجل",
         }
         return fr_to_ar.get(label.strip(), label.strip())
-        self.update_table_view()
 
     def update_stats(self):
-        """
-        Fills the three dashboard cards with office-wide figures.
-
-        Two things were wrong here. "Total des Dossiers" was len(filtered_cases),
-        so leaving a search in the box silently turned the office total into a
-        filtered count under a label that still said "Total" - measured at 2 when
-        the office held 5. And "Dossiers En Cours" added new, in-progress and
-        awaiting-signature together - measured at 3 when exactly 1 dossier was in
-        progress - which is a "not yet archived" figure, not a workload one.
-
-        The cards now describe the whole office and are labelled for what they
-        actually count. How many rows the current filter shows is a separate,
-        separately-labelled figure below the filters.
-        """
         is_fr = self.lang == "fr"
         counts = reception.count_cases_by_status()
 
@@ -557,7 +539,6 @@ class RegisterPage(QWidget):
         self.lbl_prog_val.setText(str(counts.get("active", 0)))
         self.lbl_final_val.setText(str(counts.get("finalised", 0)))
 
-        # The breakdown behind "actifs", so the number is not a black box.
         self.card_progress.setToolTip(
             ("Dossiers non archiv\u00e9s : {n} nouveaux, {p} en cours, "
              "{a} en attente de signature.").format(
@@ -572,7 +553,6 @@ class RegisterPage(QWidget):
         self.update_filtered_count_label(counts.get("total", 0))
 
     def update_filtered_count_label(self, office_total=None):
-        """States how many dossiers the current filter shows, and out of how many."""
         lbl = getattr(self, "lbl_filtered_count", None)
         if lbl is None:
             return
@@ -592,18 +572,14 @@ class RegisterPage(QWidget):
             lbl.setStyleSheet("font-size: 12px; color: #b45309; font-weight: 600;")
 
     def update_table_view(self):
-        # 1. Slice data for current page pagination
         start_idx = (self.current_page - 1) * self.page_size
         end_idx = start_idx + self.page_size
         page_data = self.filtered_cases[start_idx:end_idx]
 
-        # 2. Update model.
-        # No Qt parent: parenting to the page made Qt keep every model ever built,
-        # which grew memory without bound. self.model holds the only reference, so the
-        # previous one is released as soon as it is replaced.
         previous = getattr(self, "model", None)
         self.model = CaseTableModel(page_data, self.lang)
         self.table_view.setModel(self.model)
+        self.table_view.resizeRowsToContents()
         if previous is not None:
             previous.deleteLater()
 

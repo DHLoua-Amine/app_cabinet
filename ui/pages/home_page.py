@@ -201,8 +201,28 @@ class HomePage(QWidget):
         
         self.quick_avatar = QLabel(self.fiche_content)
         self.quick_avatar.setFixedSize(90, 90)
-        self.quick_avatar.setStyleSheet("border-radius: 45px; background-color: #e2e8f0;")
+        self.quick_avatar.setStyleSheet("border-radius: 45px; background-color: #e2e8f0; border: 2px solid #cbd5e1;")
         self.quick_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.quick_avatar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.quick_avatar.mousePressEvent = lambda e: self.open_enlarged_face_preview()
+
+        self.zoom_photo_btn = QPushButton("🔍 تكبير الصورة" if self.lang != "fr" else "🔍 Agrandir la photo", self.fiche_content)
+        self.zoom_photo_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f1f5f9;
+                color: #1e293b;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 4px 8px;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #e2e8f0;
+                color: #0f172a;
+            }
+        """)
+        self.zoom_photo_btn.clicked.connect(self.open_enlarged_face_preview)
         
         self.quick_status = QLabel(self.fiche_content)
         self.quick_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -238,6 +258,7 @@ class HomePage(QWidget):
         self.quick_delete_btn.setVisible(False)
 
         self.fiche_content_layout.addWidget(self.quick_avatar, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.fiche_content_layout.addWidget(self.zoom_photo_btn, alignment=Qt.AlignmentFlag.AlignCenter)
         self.fiche_content_layout.addWidget(self.quick_status, alignment=Qt.AlignmentFlag.AlignCenter)
         self.fiche_content_layout.addWidget(self.quick_name, alignment=Qt.AlignmentFlag.AlignCenter)
         self.fiche_content_layout.addWidget(self.quick_details, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -665,3 +686,16 @@ class HomePage(QWidget):
     def update_language(self, lang_code):
         self.lang = lang_code
         self.update_translations()
+
+    def open_enlarged_face_preview(self, client_id=None):
+        cid = client_id or self.selected_face_id
+        if not cid or cid not in self.session_faces:
+            return
+        face = self.session_faces[cid]
+        qimg = face.get("crop_qimg")
+        name = face.get("name", "Nouveau Client" if self.lang == "fr" else "زائر جديد")
+        status = face.get("status", "new")
+        
+        from ui.dialogs.face_preview_dialog import FacePreviewDialog
+        dlg = FacePreviewDialog(qimg, name, status, str(cid), lang=self.lang, parent=self)
+        dlg.exec()

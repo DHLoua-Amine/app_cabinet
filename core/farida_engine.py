@@ -4,14 +4,15 @@ Compliant with the Tunisian Code of Personal Status (مجلة الأحوال ا�
 
 Features:
 1. Exact Shares Calculation (الفروض والأنصبة الشرعية)
-2. Pre-estate Deductions (الخصوم والديون ومصاريف الجنازة قبل قسمة التركة - الفصل 87 م.أ.ش)
-3. Mandatory Bequest (الوصية الواجبة لأولاد الابن وأولاد البنت - الفصلان 191 و 192 م.أ.ش)
-4. Real Estate Surface & Parts Mapping (توزيع مناب العقار بالأمتار المربعة والأجزاء)
-5. Deficit Awl (العول) & Surplus Restoration (الرد على البنات والفروع - الفصل 143 م.أ.ش)
-6. Direct Generation of Notarial Deed Text (صياغة نص الفريضة لعدول الإشهاد)
-7. Professional DOCX Export for Office Archive (تصدير الفريضة لملف Word رسمية)
+2. Mandatory Bequest (الوصية الواجبة لأولاد الابن وأولاد البنت - الفصلان 191 و 192 م.أ.ش)
+3. Real Estate Surface & Parts Mapping (توزيع مناب العقار بالأمتار المربعة والأجزاء)
+4. Deficit Awl (العول) & Surplus Restoration (الرد على البنات والفروع - الفصل 143 م.أ.ش)
+5. Direct Generation of Notarial Deed Text (صياغة نص الفريضة لعدول الإشهاد)
+6. Professional DOCX Export for Office Archive (تصدير الفريضة لملف Word رسمية)
 """
 
+import re
+import json
 from math import gcd
 from functools import reduce
 import docx
@@ -28,19 +29,13 @@ def calculate_lcm_list(numbers):
 class TunisianFaridaEngine:
     """
     Computes Tunisian Farida inheritance shares, base origin (أصل الفريضة),
-    pre-estate deductions, obligatory bequest, real estate mapping, and export.
-    Uses TND currency format and clean notarial text.
+    mandatory bequest, real estate mapping, and export.
+    Uses clean notarial text.
     """
 
-    def calculate_farida(self, heirs_dict: dict, gross_estate: float = 0.0,
-                         funeral_expenses: float = 0.0, debts: float = 0.0,
-                         property_area_m2: float = 0.0, property_parts: float = 0.0) -> dict:
+    def _compute_shares(self, heirs_dict: dict, property_area_m2: float = 0.0, property_parts: float = 0.0) -> dict:
 
-        # ── 1. DEDUCTIONS & NET ESTATE ─────────────────────────────────────────
-        total_deductions = max(0.0, float(funeral_expenses)) + max(0.0, float(debts))
-        net_estate = max(0.0, float(gross_estate) - total_deductions)
-
-        # ── 2. CLEAN INPUTS ───────────────────────────────────────────────────
+        # ── 1. CLEAN INPUTS ───────────────────────────────────────────────────
         husband = heirs_dict.get('husband', False)
         wife = heirs_dict.get('wife', False) if not husband else False
         wives_count = max(1, int(heirs_dict.get('wives_count', 1))) if wife else 1
@@ -67,10 +62,19 @@ class TunisianFaridaEngine:
 
         nephew_full_count = max(0, int(heirs_dict.get('nephew_full_count', 0)))
         nephew_pat_count = max(0, int(heirs_dict.get('nephew_pat_count', 0)))
-        uncle_full = heirs_dict.get('uncle_full', False)
-        uncle_pat = heirs_dict.get('uncle_pat', False)
+        
+        uncle_full_input = heirs_dict.get('uncle_full_count', 1 if heirs_dict.get('uncle_full') else 0)
+        uncle_full_count = max(0, int(uncle_full_input))
+        
+        uncle_pat_input = heirs_dict.get('uncle_pat_count', 1 if heirs_dict.get('uncle_pat') else 0)
+        uncle_pat_count = max(0, int(uncle_pat_input))
+        
         cousin_full_count = max(0, int(heirs_dict.get('cousin_full_count', 0)))
         cousin_pat_count = max(0, int(heirs_dict.get('cousin_pat_count', 0)))
+        
+        great_nephew_count = max(0, int(heirs_dict.get('great_nephew_count', 0)))
+        great_cousin_count = max(0, int(heirs_dict.get('great_cousin_count', 0)))
+        uterine_relatives_count = max(0, int(heirs_dict.get('uterine_relatives_count', 0)))
 
         predeceased_children = max(0, int(heirs_dict.get('predeceased_children_count', 0)))
 
@@ -79,14 +83,12 @@ class TunisianFaridaEngine:
 
         fixed_shares = {}
 
-        # ── 3. MANDATORY BEQUEST (الوصية الواجبة) ──────────────────────────────
-        obligatory_bequest_amount = 0.0
-        estate_for_heirs = net_estate
-        if predeceased_children > 0 and net_estate > 0:
-            obligatory_bequest_amount = net_estate * (1.0 / 3.0)
-            estate_for_heirs = net_estate - obligatory_bequest_amount
+        # ── 2. MANDATORY BEQUEST (الوصية الواجبة) ──────────────────────────────
+        obligatory_bequest_ratio = 0.0
+        if predeceased_children > 0:
+            obligatory_bequest_ratio = 1.0 / 3.0
 
-        # ── 4. SPOUSE ──────────────────────────────────────────────────────────
+        # ── 3. SPOUSE ──────────────────────────────────────────────────────────
         if husband:
             if has_descendants:
                 fixed_shares['الزوج'] = (1, 4)
@@ -99,7 +101,7 @@ class TunisianFaridaEngine:
             else:
                 fixed_shares[w_label] = (1, 4)
 
-        # ── 5. MOTHER & GRANDMOTHERS ──────────────────────────────────────────
+        # ── 4. MOTHER & GRANDMOTHERS ──────────────────────────────────────────
         num_siblings = full_brothers_count + full_sisters_count + pat_brothers_count + pat_sisters_count + mat_siblings_count
         if mother:
             if has_descendants or num_siblings >= 2:
@@ -110,7 +112,7 @@ class TunisianFaridaEngine:
             if maternal_grandmother or paternal_grandmother:
                 fixed_shares['الجدة'] = (1, 6)
 
-        # ── 6. FATHER & GRANDFATHER ─────────────────────────────────────────
+        # ── 5. FATHER & GRANDFATHER ─────────────────────────────────────────
         if father:
             if has_male_descendants:
                 fixed_shares['الأب (فرضا)'] = (1, 6)
@@ -120,7 +122,7 @@ class TunisianFaridaEngine:
             if has_male_descendants:
                 fixed_shares['الجد لأب'] = (1, 6)
 
-        # ── 7. DAUGHTERS & GRANDDAUGHTERS ─────────────────────────────────────
+        # ── 6. DAUGHTERS & GRANDDAUGHTERS ─────────────────────────────────────
         if daughters_count > 0 and sons_count == 0:
             if daughters_count == 1:
                 fixed_shares['البنت'] = (1, 2)
@@ -135,14 +137,14 @@ class TunisianFaridaEngine:
         elif sons_count == 0 and daughters_count == 1 and granddaughters_count > 0:
             fixed_shares['بنات الابن (تكملة الثلثين)'] = (1, 6)
 
-        # ── 8. MATERNAL SIBLINGS (الإخوة لأم) ──────────────────────────────────
+        # ── 7. MATERNAL SIBLINGS (الإخوة لأم) ──────────────────────────────────
         if mat_siblings_count > 0 and sons_count == 0 and grandsons_count == 0 and not father and not paternal_grandfather:
             if mat_siblings_count == 1:
                 fixed_shares['الأخ/الأخت لأم'] = (1, 6)
             else:
                 fixed_shares['الإخوة والأخوات لأم'] = (1, 3)
 
-        # ── 9. FULL & PATERNAL SISTERS ─────────────────────────────────────────
+        # ── 8. FULL & PATERNAL SISTERS ─────────────────────────────────────────
         if sons_count == 0 and grandsons_count == 0 and not father and full_brothers_count == 0 and full_sisters_count > 0 and daughters_count == 0 and granddaughters_count == 0:
             if full_sisters_count == 1:
                 fixed_shares['الأخت الشقيقة'] = (1, 2)
@@ -155,9 +157,36 @@ class TunisianFaridaEngine:
             else:
                 fixed_shares['الأخوات لأب'] = (2, 3)
 
-        # ── 10. CALCULATE BASE ORIGIN & AWL ───────────────────────────────────
+        # ── 9. CALCULATE DYNAMIC BASE ORIGIN & TASHIH ──────────────────────────
         denominators = [d for n, d in fixed_shares.values()]
-        base_origin = calculate_lcm_list(denominators) if denominators else 24
+        
+        # Determine taasib heads for Tashih (correction of shares)
+        taasib_heads = 0
+        if sons_count > 0:
+            taasib_heads = (sons_count * 2) + daughters_count
+        elif sons_count == 0 and grandsons_count > 0:
+            taasib_heads = (grandsons_count * 2) + granddaughters_count
+        elif father and sons_count == 0 and grandsons_count == 0:
+            taasib_heads = 1
+        elif sons_count == 0 and grandsons_count == 0 and not father and full_brothers_count > 0:
+            taasib_heads = (full_brothers_count * 2) + full_sisters_count
+        elif sons_count == 0 and grandsons_count == 0 and not father and full_brothers_count == 0 and pat_brothers_count > 0:
+            taasib_heads = (pat_brothers_count * 2) + pat_sisters_count
+        elif sons_count == 0 and grandsons_count == 0 and not father and not paternal_grandfather and full_brothers_count == 0 and pat_brothers_count == 0:
+            if nephew_full_count > 0: taasib_heads = nephew_full_count
+            elif nephew_pat_count > 0: taasib_heads = nephew_pat_count
+            elif great_nephew_count > 0: taasib_heads = great_nephew_count
+            elif uncle_full_count > 0: taasib_heads = uncle_full_count
+            elif uncle_pat_count > 0: taasib_heads = uncle_pat_count
+            elif cousin_full_count > 0: taasib_heads = cousin_full_count
+            elif cousin_pat_count > 0: taasib_heads = cousin_pat_count
+            elif great_cousin_count > 0: taasib_heads = great_cousin_count
+            elif uterine_relatives_count > 0: taasib_heads = uterine_relatives_count
+
+        if denominators:
+            base_origin = calculate_lcm_list(denominators)
+        else:
+            base_origin = taasib_heads if taasib_heads > 0 else 1
 
         shares_count = {}
         total_fixed_shares = 0
@@ -167,109 +196,101 @@ class TunisianFaridaEngine:
             total_fixed_shares += sh
 
         is_awl = total_fixed_shares > base_origin
-        final_origin = total_fixed_shares if is_awl else base_origin
-        remaining_shares = max(0, base_origin - total_fixed_shares)
+        if is_awl:
+            base_origin = total_fixed_shares
+            remaining_shares = 0
+        else:
+            remaining_shares = max(0, base_origin - total_fixed_shares)
 
-        # ── 11. TAASIB & EXTENDED AGNATES (العصوبة بالذات وبالغير) ──────────────
+        # Apply Tashih if remaining shares cannot be evenly divided by taasib heads
+        if remaining_shares > 0 and taasib_heads > 1:
+            g = gcd(int(remaining_shares), int(taasib_heads))
+            multiplier = taasib_heads // g
+            if multiplier > 1:
+                base_origin *= multiplier
+                for h_k in shares_count:
+                    shares_count[h_k] *= multiplier
+                remaining_shares *= multiplier
+
+        final_origin = base_origin
+
+        # ── 10. TAASIB DISTRIBUTION ──────────────────────────────────────────
         taasib_shares = {}
-        
-        if sons_count > 0:
-            total_heads = (sons_count * 2) + daughters_count
-            if total_heads > 0 and remaining_shares > 0:
-                head_value = remaining_shares / float(total_heads)
+        if remaining_shares > 0 and taasib_heads > 0:
+            one_head_share = remaining_shares // taasib_heads
+            if sons_count > 0:
                 if sons_count > 0:
-                    taasib_shares['الأبناء (ذكور)'] = round(head_value * 2 * sons_count, 2)
+                    taasib_shares['الأبناء (ذكور)'] = int(one_head_share * 2 * sons_count)
                 if daughters_count > 0:
-                    taasib_shares['البنات (مع الإبن تعصيبا)'] = round(head_value * daughters_count, 2)
-                remaining_shares = 0
-
-        elif sons_count == 0 and grandsons_count > 0:
-            total_heads = (grandsons_count * 2) + granddaughters_count
-            if total_heads > 0 and remaining_shares > 0:
-                head_value = remaining_shares / float(total_heads)
+                    taasib_shares['البنات (مع الإبن تعصيبا)'] = int(one_head_share * daughters_count)
+            elif sons_count == 0 and grandsons_count > 0:
                 if grandsons_count > 0:
-                    taasib_shares['أبناء الابن (ذكور)'] = round(head_value * 2 * grandsons_count, 2)
+                    taasib_shares['أبناء الابن (ذكور)'] = int(one_head_share * 2 * grandsons_count)
                 if granddaughters_count > 0:
-                    taasib_shares['بنات الابن (تعصيبا)'] = round(head_value * granddaughters_count, 2)
-                remaining_shares = 0
-
-        elif father and sons_count == 0 and grandsons_count == 0:
-            if remaining_shares > 0:
-                taasib_shares['الأب (تعصيبا)'] = remaining_shares
-                remaining_shares = 0
-
-        elif sons_count == 0 and grandsons_count == 0 and not father and full_brothers_count > 0:
-            total_heads = (full_brothers_count * 2) + full_sisters_count
-            if total_heads > 0 and remaining_shares > 0:
-                head_value = remaining_shares / float(total_heads)
+                    taasib_shares['بنات الابن (تعصيبا)'] = int(one_head_share * granddaughters_count)
+            elif father and sons_count == 0 and grandsons_count == 0:
+                taasib_shares['الأب (تعصيبا)'] = int(remaining_shares)
+            elif sons_count == 0 and grandsons_count == 0 and not father and full_brothers_count > 0:
                 if full_brothers_count > 0:
-                    taasib_shares['الإخوة الأشقاء'] = round(head_value * 2 * full_brothers_count, 2)
+                    taasib_shares['الإخوة الأشقاء'] = int(one_head_share * 2 * full_brothers_count)
                 if full_sisters_count > 0:
-                    taasib_shares['الأخوات الشقيقات'] = round(head_value * full_sisters_count, 2)
-                remaining_shares = 0
-
-        elif sons_count == 0 and grandsons_count == 0 and not father and full_brothers_count == 0 and pat_brothers_count > 0:
-            total_heads = (pat_brothers_count * 2) + pat_sisters_count
-            if total_heads > 0 and remaining_shares > 0:
-                head_value = remaining_shares / float(total_heads)
+                    taasib_shares['الأخوات الشقيقات'] = int(one_head_share * full_sisters_count)
+            elif sons_count == 0 and grandsons_count == 0 and not father and full_brothers_count == 0 and pat_brothers_count > 0:
                 if pat_brothers_count > 0:
-                    taasib_shares['الإخوة لأب'] = round(head_value * 2 * pat_brothers_count, 2)
+                    taasib_shares['الإخوة لأب'] = int(one_head_share * 2 * pat_brothers_count)
                 if pat_sisters_count > 0:
-                    taasib_shares['الأخوات لأب'] = round(head_value * pat_sisters_count, 2)
-                remaining_shares = 0
-
-        # EXTENDED AGNATES (أبناء الإخوة والعمومة عصبة بالنفس)
-        elif remaining_shares > 0 and sons_count == 0 and grandsons_count == 0 and not father and not paternal_grandfather and full_brothers_count == 0 and pat_brothers_count == 0:
-            if nephew_full_count > 0:
-                taasib_shares[f'أبناء الأخ الشقيق (عدد {nephew_full_count})'] = remaining_shares
-                remaining_shares = 0
-            elif nephew_pat_count > 0:
-                taasib_shares[f'أبناء الأخ لأب (عدد {nephew_pat_count})'] = remaining_shares
-                remaining_shares = 0
-            elif uncle_full:
-                taasib_shares['العم الشقيق'] = remaining_shares
-                remaining_shares = 0
-            elif uncle_pat:
-                taasib_shares['العم لأب'] = remaining_shares
-                remaining_shares = 0
-            elif cousin_full_count > 0:
-                taasib_shares[f'أبناء العم الشقيق (عدد {cousin_full_count})'] = remaining_shares
-                remaining_shares = 0
-            elif cousin_pat_count > 0:
-                taasib_shares[f'أبناء العم لأب (عدد {cousin_pat_count})'] = remaining_shares
-                remaining_shares = 0
+                    taasib_shares['الأخوات لأب'] = int(one_head_share * pat_sisters_count)
+            elif sons_count == 0 and grandsons_count == 0 and not father and not paternal_grandfather and full_brothers_count == 0 and pat_brothers_count == 0:
+                if nephew_full_count > 0:
+                    taasib_shares[f'أبناء الأخ الشقيق (عدد {nephew_full_count})'] = int(remaining_shares)
+                elif nephew_pat_count > 0:
+                    taasib_shares[f'أبناء الأخ لأب (عدد {nephew_pat_count})'] = int(remaining_shares)
+                elif great_nephew_count > 0:
+                    taasib_shares[f'أبناء ابن الأخ (عدد {great_nephew_count})'] = int(remaining_shares)
+                elif uncle_full_count > 0:
+                    lbl_u = 'العم الشقيق' if uncle_full_count == 1 else f'الأعمام الأشقاء (عدد {uncle_full_count})'
+                    taasib_shares[lbl_u] = int(remaining_shares)
+                elif uncle_pat_count > 0:
+                    lbl_u = 'العم لأب' if uncle_pat_count == 1 else f'الأعمام لأب (عدد {uncle_pat_count})'
+                    taasib_shares[lbl_u] = int(remaining_shares)
+                elif cousin_full_count > 0:
+                    taasib_shares[f'أبناء العم الشقيق (عدد {cousin_full_count})'] = int(remaining_shares)
+                elif cousin_pat_count > 0:
+                    taasib_shares[f'أبناء العم لأب (عدد {cousin_pat_count})'] = int(remaining_shares)
+                elif great_cousin_count > 0:
+                    taasib_shares[f'أبناء ابن العم (عدد {great_cousin_count})'] = int(remaining_shares)
+                elif uterine_relatives_count > 0:
+                    taasib_shares[f'ذو الرحم / القرابة الرحمية (الفصل 144 م.أ.ش - عدد {uterine_relatives_count})'] = int(remaining_shares)
 
         # RESTORATION TO DAUGHTERS & BLOOD RELATIVES (الرد على البنات - الفصل 143 م.أ.ش)
         is_radd = False
-        if not is_awl and remaining_shares > 0 and sons_count == 0 and grandsons_count == 0 and not father and full_brothers_count == 0 and pat_brothers_count == 0:
+        if not is_awl and remaining_shares > 0 and taasib_heads == 0:
             is_radd = True
             if daughters_count > 0:
                 if 'البنت' in shares_count:
                     shares_count['البنت (فرضا ورداً - الفصل 143)'] = shares_count.pop('البنت') + remaining_shares
                 elif 'البنات' in shares_count:
                     shares_count['البنات (فرضا ورداً - الفصل 143)'] = shares_count.pop('البنات') + remaining_shares
-                remaining_shares = 0
 
         # ── 11. FINAL RESULTS LIST ─────────────────────────────────────────────
         results_list = []
-        if obligatory_bequest_amount > 0:
+        if obligatory_bequest_ratio > 0:
             results_list.append({
                 "heir": "أولاد الابن/البنت (وصية واجبة - الفصل 191)",
                 "shares": "—",
                 "base_origin": final_origin,
                 "fraction": "1/3 الثلث",
                 "percentage": 33.33,
-                "amount": round(obligatory_bequest_amount, 3),
                 "area_m2": round(property_area_m2 * (1.0 / 3.0), 2) if property_area_m2 > 0 else 0.0,
                 "parts": round(property_parts * (1.0 / 3.0), 2) if property_parts > 0 else 0.0
             })
 
         for heir, sh in list(shares_count.items()) + list(taasib_shares.items()):
-            ratio = sh / float(final_origin)
-            percentage = ratio * (66.67 if obligatory_bequest_amount > 0 else 100.0)
-            amount = ratio * estate_for_heirs
-            area_m2 = ratio * (property_area_m2 * (2.0/3.0 if obligatory_bequest_amount > 0 else 1.0))
-            parts = ratio * (property_parts * (2.0/3.0 if obligatory_bequest_amount > 0 else 1.0))
+            sh_int = int(sh) if isinstance(sh, (int, float)) and float(sh).is_integer() else sh
+            ratio = float(sh) / float(final_origin)
+            percentage = ratio * (66.67 if obligatory_bequest_ratio > 0 else 100.0)
+            area_m2 = ratio * (property_area_m2 * (2.0/3.0 if obligatory_bequest_ratio > 0 else 1.0))
+            parts = ratio * (property_parts * (2.0/3.0 if obligatory_bequest_ratio > 0 else 1.0))
 
             count = 1
             if "الأبناء" in heir:
@@ -280,74 +301,256 @@ class TunisianFaridaEngine:
                 count = full_brothers_count
             elif "الأخوات الشقيقات" in heir:
                 count = full_sisters_count
+            elif "الزوجات" in heir:
+                count = wives_count
 
-            single_sh = round(sh / float(count), 3) if count > 0 else sh
-            single_percentage = round(percentage / float(count), 2) if count > 0 else percentage
-            single_amount = round(amount / float(count), 3) if count > 0 else amount
-            single_area_m2 = round(area_m2 / float(count), 2) if count > 0 else area_m2
-            single_parts = round(parts / float(count), 2) if count > 0 else parts
+            single_sh = round(float(sh) / float(count), 2) if count > 0 else sh_int
+            if isinstance(single_sh, float) and single_sh.is_integer():
+                single_sh = int(single_sh)
+            single_percentage = round(percentage / float(count), 2) if count > 0 else round(percentage, 2)
+            single_area_m2 = round(area_m2 / float(count), 2) if count > 0 else round(area_m2, 2)
+            single_parts = round(parts / float(count), 2) if count > 0 else round(parts, 2)
 
             results_list.append({
                 "heir": heir,
                 "count": count,
-                "shares": sh,
+                "shares": sh_int,
                 "single_shares": single_sh,
                 "base_origin": final_origin,
-                "fraction": f"{sh}/{final_origin}",
+                "fraction": f"{sh_int}/{final_origin}",
                 "percentage": round(percentage, 2),
                 "single_percentage": single_percentage,
-                "amount": round(amount, 3),
-                "single_amount": single_amount,
                 "area_m2": round(area_m2, 2),
                 "single_area_m2": single_area_m2,
                 "parts": round(parts, 2),
                 "single_parts": single_parts
             })
 
-        legal_summary_text = self._build_notarial_legal_text(
-            gross_estate, total_deductions, net_estate, final_origin, results_list, property_area_m2, property_parts
-        )
-
         return {
-            "gross_estate": gross_estate,
-            "funeral_expenses": funeral_expenses,
-            "debts": debts,
-            "total_deductions": total_deductions,
-            "net_estate": net_estate,
             "base_origin": final_origin,
             "is_awl": is_awl,
             "is_radd": is_radd,
-            "heirs_summary": results_list,
-            "legal_notarial_text": legal_summary_text,
-            "property_area_m2": property_area_m2,
-            "property_parts": property_parts
+            "results": results_list
         }
 
-    def _build_notarial_legal_text(self, gross: float, deductions: float, net: float, origin: int, results: list, area_m2: float, parts: float) -> str:
-        lines = []
-        if gross > 0:
-            lines.append(f"أولاً - التركة والتكاليف: بلغت التركة الجملية للهالك ({gross:,.3f} TND)، وبعد طرح التكاليف والديون ومصاريف الجنازة المقدرة بـ ({deductions:,.3f} TND)، استقر صافي التركة المعد للقسمة على ({net:,.3f} TND).")
-        lines.append(f"ثانياً - انحصار الورثة والفريضة: ثبتت وفاة الهالك وانحصار ورثته الشرعيين ومناب كل واحد منهم في الفريضة التوثيقية المخرجة من أصل ({origin}) سهماً كما يلي:")
+    def calculate_farida(self, heirs_dict: dict,
+                         contract_type: str = "فريضة شرعية",
+                         applicant_name: str = "", applicant_cin: str = "",
+                         deceased_name: str = "", hujja_num: str = "", hujja_date: str = "", hujja_court: str = "",
+                         title_num: str = "", property_name: str = "", location: str = "",
+                         property_area_m2: float = 0.0, property_parts: float = 0.0,
+                         heir_details: dict = None,
+                         property_type: str = "مسكن رئيسي",
+                         predeceased_death_date: str = "") -> dict:
+
+        res = self._compute_shares(heirs_dict, property_area_m2, property_parts)
         
+        legal_text = self._build_notarial_legal_text(
+            origin=res["base_origin"],
+            results=res["results"],
+            contract_type=contract_type,
+            applicant_name=applicant_name,
+            applicant_cin=applicant_cin,
+            deceased_name=deceased_name,
+            hujja_num=hujja_num,
+            hujja_date=hujja_date,
+            hujja_court=hujja_court,
+            title_num=title_num,
+            property_name=property_name,
+            location=location,
+            area_m2=property_area_m2,
+            parts=property_parts,
+            heir_details=heir_details,
+            property_type=property_type,
+            predeceased_death_date=predeceased_death_date
+        )
+
+        return {
+            "contract_type": contract_type,
+            "applicant_name": applicant_name,
+            "applicant_cin": applicant_cin,
+            "deceased_name": deceased_name,
+            "hujja_num": hujja_num,
+            "hujja_date": hujja_date,
+            "hujja_court": hujja_court,
+            "title_num": title_num,
+            "property_name": property_name,
+            "location": location,
+            "base_origin": res["base_origin"],
+            "is_awl": res["is_awl"],
+            "is_radd": res["is_radd"],
+            "heirs_summary": res["results"],
+            "legal_notarial_text": legal_text,
+            "property_area_m2": property_area_m2,
+            "property_parts": property_parts,
+            "heir_details": heir_details or {}
+        }
+
+    def _build_notarial_legal_text(self, origin: int, results: list,
+                                 contract_type: str = "فريضة شرعية",
+                                 applicant_name: str = "", applicant_cin: str = "",
+                                 deceased_name: str = "", hujja_num: str = "", hujja_date: str = "", hujja_court: str = "",
+                                 title_num: str = "", property_name: str = "", location: str = "",
+                                 area_m2: float = 0.0, parts: float = 0.0,
+                                 heir_details: dict = None,
+                                 property_type: str = "",
+                                 predeceased_death_date: str = "") -> str:
+        lines = []
+        import datetime
+        try:
+            import office_profile
+            prof = office_profile.load()
+            name_val = (prof.get("display_name") or prof.get("notary_name") or "").strip()
+            notary_title = f"الأستاذ(ة) {name_val}" if name_val else "عدل الإشهاد"
+            court_val = (prof.get("court") or "").strip()
+            court_str = f" بـ {court_val}" if court_val else ""
+        except Exception:
+            notary_title = "عدل الإشهاد"
+            court_str = ""
+
+        now = datetime.datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+
+        is_partial = (contract_type == "فريضة جزئية")
+        contract_title = "فريضة جزئية" if is_partial else "فريضة شرعية"
+        
+        # 1. Official Notarial Opening
+        if "الأستاذ" in notary_title:
+            p1 = f"الحمد لله وحده، في يوم [التاريخ] الموافق لـ {date_str}، نحن {notary_title} وجليسه عدلا الإشهاد بدائرة قضاء المحكمة الابتدائية{court_str}."
+        else:
+            p1 = f"الحمد لله وحده، في يوم [التاريخ] الموافق لـ {date_str}، نحن عدلا الإشهاد بدائرة قضاء المحكمة الابتدائية{court_str}."
+        if applicant_name:
+            cin_str = f" صاحب(ة) بطاقة التعريف الوطنية عدد {applicant_cin}" if applicant_cin else ""
+            p1 += f"\nوبطلب من السيد(ة): {applicant_name}{cin_str}، قصد القيام بـ{contract_title}"
+        else:
+            p1 += f"\nوبطلب من طالب الإشهاد قصد القيام بـ{contract_title}"
+            
+        if deceased_name:
+            p1 += f" للمتوفى (أو المتوفية): {deceased_name}."
+        else:
+            p1 += f" للمتوفى (أو المتوفية)."
+        lines.append(p1)
+
+        # 2. Real Estate Specification (For Partial Farida)
+        if is_partial or title_num or property_name:
+            prop_desc = []
+            if title_num: prop_desc.append(f"موضوع الرسم العقاري عدد {title_num}")
+            if property_name: prop_desc.append(f"المسمى \"{property_name}\"")
+            if location: prop_desc.append(f"الكائن بـ {location}")
+            if area_m2 > 0: prop_desc.append(f"والبالغ جملة مساحته {area_m2} م²")
+            if parts > 0: prop_desc.append(f"والمجزأ إلى {parts} جزءاً")
+            
+            if prop_desc:
+                lines.append(f"موضوع العقار: " + " ".join(prop_desc) + ".")
+
+        if is_partial:
+            lines.append("على أن هذه الفريضة الجزئية لا تكون بمعزل عن فريضة كل من الموروثين السابقين وانجرار أصل التركة.")
+
+        # 3. Death Certificate Reference & Heirs Succession
+        hujja_parts = []
+        if hujja_num: hujja_parts.append(f"عدد {hujja_num}")
+        if hujja_court: hujja_parts.append(f"الصادرة عن {hujja_court}")
+        if hujja_date: hujja_parts.append(f"بتاريخ {hujja_date}")
+        
+        hujja_str = " ".join(hujja_parts) if hujja_parts else "المستندة إلى حجة الوفاة الرسمية"
+        
+        lines.append(f"وحيث ثبتت وفاة الهالك وأحاط بإرثه حسب {hujja_str}، وانحصار ورثته الشرعيين ومناب كل واحد منهم على قاعدة للذكر مثل حظ الأنثيين في الفريضة التوثيقية المخرجة من أصل ({origin}) سهماً كما يلي:")
+
+        # 4. Heir Shares Breakdown (Individually Itemized Rows - No Group Summaries, No Emojis)
+        item_counter = 1
         for r in results:
             cnt = r.get("count", 1)
-            if cnt > 1:
-                unit_label = "لكل ابن واحد" if "الأبناء" in r['heir'] else ("لكل بنت واحدة" if "البنات" in r['heir'] else f"لكل فرد - عدد {cnt}")
-                item_str = f"• {r['heir']} (عدد {cnt}): استحق {unit_label} ({r['single_shares']}) سهماً من أصل ({origin}) سهماً بنسبة ({r['single_percentage']}%)، وبما يعادل مبلغ ({r['single_amount']:,.3f} TND)."
-                if area_m2 > 0:
-                    item_str += f" ومساحة ({r['single_area_m2']} م² {unit_label}). ومناب المجموع الجملي ({r['area_m2']} م²)."
-                if parts > 0:
-                    item_str += f" ومناب ({r['single_parts']} جزءاً {unit_label})."
-            else:
-                item_str = f"• {r['heir']}: استحق ({r['shares']}) سهماً من أصل ({origin}) سهماً بنسبة ({r['percentage']}%)، وبما يعادل مبلغ ({r['amount']:,.3f} TND)."
-                if area_m2 > 0:
-                    item_str += f" ومساحة ({r['area_m2']} م²)."
-                if parts > 0:
-                    item_str += f" ومناب ({r['parts']} جزءاً من رسم التجزئة)."
-            lines.append(item_str)
+            single_shares = r.get("single_shares", r["shares"])
+            single_perc = r.get("single_percentage", r["percentage"])
+            single_area = r.get("single_area_m2", 0.0)
+            single_parts = r.get("single_parts", 0.0)
 
-        lines.append("وعليه استقرت الفريضة التوثيقية التونسية وتم توزيع التركة طبقا للأحكام الشرعية والقانونية والله الموفق.")
-        return "\n".join(lines)
+            prefix = None
+            if "الأبناء" in r['heir'] or ("ابن" in r['heir'] and "ابن الابن" not in r['heir'] and "بنت" not in r['heir']):
+                prefix = "son_"
+            elif "البنات" in r['heir'] or ("بنت" in r['heir'] and "بنت الابن" not in r['heir']):
+                prefix = "daughter_"
+            elif "الزوجات" in r['heir'] or "الزوجة" in r['heir']:
+                prefix = "wife_"
+            elif "أبناء الابن" in r['heir'] or "ابن الابن" in r['heir']:
+                prefix = "grandson_"
+            elif "بنات الابن" in r['heir'] or "بنت الابن" in r['heir']:
+                prefix = "granddaughter_"
+            elif "الإخوة الأشقاء" in r['heir'] or "أخ شقيق" in r['heir']:
+                prefix = "full_brother_"
+            elif "الأخوات الشقيقات" in r['heir'] or "أخت شقيقة" in r['heir']:
+                prefix = "full_sister_"
+
+            if prefix and cnt >= 1:
+                for sub_i in range(1, cnt + 1):
+                    hk = f"{prefix}{sub_i}"
+                    hd = (heir_details or {}).get(hk, {})
+                    h_name = hd.get("name", "").strip()
+                    h_cin = hd.get("cin", "").strip()
+                    h_civ = hd.get("civil_status", "").strip()
+
+                    is_female = (prefix in ["daughter_", "wife_", "granddaughter_", "full_sister_"])
+                    owner_word = "صاحبة" if is_female else "صاحب"
+                    share_verb = "ينحصر منابها الشرعي" if is_female else "ينحصر منابه الشرعي"
+                    area_word = "ومساحتها" if is_female else "ومساحته"
+                    parts_word = "ومنابها" if is_female else "ومنابه"
+
+                    label_prefix = "الابن" if prefix == "son_" else ("البنت" if prefix == "daughter_" else ("الزوجة" if prefix == "wife_" else "الوارث"))
+                    disp_name = f"{label_prefix} {h_name}" if h_name else f"{label_prefix} {sub_i}"
+                    cin_str = ""
+                    if h_cin: cin_str += f" ({owner_word} بطاقة التعريف الوطنية عدد {h_cin})"
+                    if h_civ: cin_str += f" (ومضمون ولادته/وفاته {h_civ})"
+
+                    line = f"{item_counter}. {disp_name}{cin_str}: {share_verb} في ({single_shares}) سهماً من أصل ({origin}) سهماً، بنسبة (%{single_perc})."
+                    if single_area > 0:
+                        line += f" {area_word} ({single_area} م²)."
+                    if single_parts > 0:
+                        line += f" {parts_word} ({single_parts} جزءاً)."
+                    lines.append(line)
+                    item_counter += 1
+            else:
+                s_key = None
+                if "الزوج" in r['heir'] and "الزوجة" not in r['heir']: s_key = "husband"
+                elif "الأب" in r['heir'] and "الأبناء" not in r['heir']: s_key = "father"
+                elif "الأم" in r['heir']: s_key = "mother"
+                elif "الجد لأب" in r['heir']: s_key = "paternal_grandfather"
+                elif "الجدة لأم" in r['heir']: s_key = "maternal_grandmother"
+                elif "الجدة لأب" in r['heir']: s_key = "paternal_grandmother"
+
+                hd = (heir_details or {}).get(s_key, {}) if s_key else {}
+                h_name = hd.get("name", "").strip()
+                h_cin = hd.get("cin", "").strip()
+                h_civ = hd.get("civil_status", "").strip()
+
+                is_female = ("الزوجة" in r['heir'] or "الأم" in r['heir'] or "الجدة" in r['heir'])
+                owner_word = "صاحبة" if is_female else "صاحب"
+                share_verb = "ينحصر منابها الشرعي" if is_female else "ينحصر منابه الشرعي"
+
+                disp_name = f"{r['heir']} {h_name}".strip() if h_name else r['heir']
+                cin_str = ""
+                if h_cin: cin_str += f" ({owner_word} بطاقة التعريف الوطنية عدد {h_cin})"
+                if h_civ: cin_str += f" (ومضمون ولادته/وفاته {h_civ})"
+
+                line = f"{item_counter}. {disp_name}{cin_str}: {share_verb} في ({r['shares']}) سهماً من أصل ({origin}) سهماً، بنسبة (%{r['percentage']})."
+                if r.get("area_m2", 0) > 0:
+                    line += f" ومساحته(ا) ({r['area_m2']} م²)."
+                if r.get("parts", 0) > 0:
+                    line += f" ومنابه(ا) ({r['parts']} جزءاً)."
+                lines.append(line)
+                item_counter += 1
+
+        # 5. Fiscal System & Property Classification
+        if property_type == "مسكن رئيسي":
+            lines.append("النظام الجبائي والإعفاءات: يستفيد الورثة من الإعفاء الجبائي المقرر للمسكن الرئيسي للمتوفى في حدود ألف متر مربع (1000 م²) طبق أحكام مجلة معاليم التسجيل والطابع الجبائي.")
+        elif property_type == "أرض فلاحية":
+            lines.append("النظام الجبائي والحيطة: تخضع الفريضة لمقتضيات الحفاظ على الأراضي الفلاحية والمساحات المسقية وقوانين التجزئة الفلاحية.")
+
+        # 6. Official Closing & Draft Registry Book Recording
+        lines.append(
+            "هذا ما تم تلقيه وتلي على الحاضرين فوافقوا وأمضوا ورسم بدفتر مسودات أولهما صحيفة............ "
+            "تحت عدد............ أجره والمصاريف القانونية مستوفاة والله الموفق."
+        )
+        return "\n\n".join(lines)
 
     def export_farida_docx(self, result: dict, output_path: str):
         """Generates an official notary Word document for the Farida calculation matching authentic notary standards."""
@@ -359,6 +562,11 @@ class TunisianFaridaEngine:
             section.bottom_margin = Inches(0.8)
             section.left_margin = Inches(0.8)
             section.right_margin = Inches(0.8)
+            try:
+                import docx_generator
+                docx_generator.set_section_rtl(section)
+            except Exception:
+                pass
 
         # ── 1. OFFICIAL NOTARY OFFICE HEADER ─────────────────────────────────
         try:
@@ -375,10 +583,20 @@ class TunisianFaridaEngine:
         # Top Header Table (Bilingual Notary Header)
         header_table = doc.add_table(rows=1, cols=2)
         header_table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        try:
+            import docx_generator
+            docx_generator.set_table_rtl(header_table)
+        except Exception:
+            pass
+
         header_cells = header_table.rows[0].cells
         
         # Right Side: Arabic Header
         p_ar = header_cells[0].paragraphs[0]
+        try:
+            docx_generator.set_rtl(p_ar)
+        except Exception:
+            pass
         p_ar.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         r_ar = p_ar.add_run(f"مكتب الأستاذ: {notary_name}\nعدل إشهاد")
         r_ar.bold = True
@@ -401,41 +619,71 @@ class TunisianFaridaEngine:
         if office_phone:
             p_fr.add_run(f"\nTél: {office_phone}")
 
-        doc.add_paragraph("═" * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_div = doc.add_paragraph("═" * 50)
+        p_div.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        try:
+            docx_generator.set_rtl(p_div)
+        except Exception:
+            pass
 
         # ── 2. DEED TITLE ────────────────────────────────────────────────────
+        c_title = result.get("contract_type", "فريضة شرعية")
         title_p = doc.add_paragraph()
+        try:
+            docx_generator.set_rtl(title_p)
+        except Exception:
+            pass
         title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = title_p.add_run("فريضة شرعية وحجة تركة")
+        run = title_p.add_run(f"إشهاد بـ {c_title}")
         run.bold = True
         run.font.size = Pt(18)
         run.font.name = "Traditional Arabic"
         run.font.color.rgb = RGBColor(15, 23, 42)
 
-        # ── 3. PREAMBLE & ESTATE DETAILS ─────────────────────────────────────
-        doc.add_heading("أولاً - بيان التركة والتكاليف والخصومات الشرعية:", level=2)
-        p_info = doc.add_paragraph()
-        p_info.paragraph_format.line_spacing = 1.3
-        p_info.add_run(f"• إجمالي التركة الجملي: {result.get('gross_estate', 0):,.3f} دينار توني\n")
-        p_info.add_run(f"• مصاريف الجنازة والديون المستحقة: {result.get('total_deductions', 0):,.3f} دينار\n")
-        p_info.add_run(f"• صافي التركة المعدة للقسمة الشرعية: {result.get('net_estate', 0):,.3f} دينار\n").bold = True
-        if result.get("property_area_m2", 0) > 0:
-            p_info.add_run(f"• المساحة الجملية للعقار: {result.get('property_area_m2')} م²\n")
-        if result.get("property_parts", 0) > 0:
-            p_info.add_run(f"• مناب التجزئة بالعقار: {result.get('property_parts')} جزءاً\n")
+        # ── 3. REAL ESTATE DETAILS (IF APPLICABLE) ───────────────────────────
+        if result.get("property_area_m2", 0) > 0 or result.get("property_parts", 0) > 0:
+            h1 = doc.add_heading("أولاً - بيان بيانات العقار والتجزئة:", level=2)
+            try:
+                docx_generator.set_rtl(h1)
+            except Exception:
+                pass
+            p_info = doc.add_paragraph()
+            try:
+                docx_generator.set_rtl(p_info)
+            except Exception:
+                pass
+            p_info.paragraph_format.line_spacing = 1.3
+            if result.get("property_area_m2", 0) > 0:
+                p_info.add_run(f"المساحة الجملية للعقار: {result.get('property_area_m2')} م²\n")
+            if result.get("property_parts", 0) > 0:
+                p_info.add_run(f"مناب التجزئة بالعقار: {result.get('property_parts')} جزءاً\n")
 
         # ── 4. SHARES & DISTRIBUTION TABLE ──────────────────────────────────
-        doc.add_heading(f"ثانياً - جدول توزيع المنابات والأنصبة الشرعية (أصل الفريضة: {result.get('base_origin')} سهماً):", level=2)
+        h2 = doc.add_heading(f"جدول توزيع المنابات والأنصبة الشرعية (أصل الفريضة: {result.get('base_origin')} سهماً):", level=2)
+        try:
+            docx_generator.set_rtl(h2)
+        except Exception:
+            pass
         summary = result.get("heirs_summary", [])
         
-        table = doc.add_table(rows=1, cols=6)
+        table = doc.add_table(rows=1, cols=5)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
+        try:
+            docx_generator.set_table_rtl(table)
+        except Exception:
+            pass
+
         hdr_cells = table.rows[0].cells
-        headers = ["الوارث الشرعي", "عدد السهام", "الفك والكسر", "النسبة %", "المبلغ بالدينار", "مناب العقار والأجزاء"]
+        headers = ["الوارث الشرعي", "عدد السهام", "الفك والكسر", "النسبة %", "مناب العقار والأجزاء"]
         for i, h_text in enumerate(headers):
             hdr_cells[i].text = h_text
-            hdr_cells[i].paragraphs[0].runs[0].font.bold = True
-            hdr_cells[i].paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p_h = hdr_cells[i].paragraphs[0]
+            try:
+                docx_generator.set_rtl(p_h)
+            except Exception:
+                pass
+            p_h.runs[0].font.bold = True
+            p_h.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
         for item in summary:
             row_cells = table.add_row().cells
@@ -443,25 +691,46 @@ class TunisianFaridaEngine:
             row_cells[1].text = str(item["shares"])
             row_cells[2].text = str(item["fraction"])
             row_cells[3].text = f"%{item['percentage']}"
-            row_cells[4].text = f"{item['amount']:,.3f} د.ت"
             
             prop_str = ""
             if item.get("area_m2", 0) > 0:
                 prop_str += f"{item['area_m2']} م²"
             if item.get("parts", 0) > 0:
                 prop_str += f" | {item['parts']} جزء"
-            row_cells[5].text = prop_str if prop_str else "—"
+            row_cells[4].text = prop_str if prop_str else "—"
+
+            for c in row_cells:
+                try:
+                    docx_generator.set_rtl(c.paragraphs[0])
+                except Exception:
+                    pass
 
         # ── 5. LEGAL NOTARIAL TEXT ──────────────────────────────────────────
-        doc.add_heading("ثالثاً - نص التوثيق والتوزيع الشرعي (صياغة العدول):", level=2)
+        h3 = doc.add_heading("نص التوثيق والتوزيع الشرعي (صياغة العدول):", level=2)
+        try:
+            docx_generator.set_rtl(h3)
+        except Exception:
+            pass
         p_deed = doc.add_paragraph(result.get("legal_notarial_text", ""))
+        try:
+            docx_generator.set_rtl(p_deed)
+        except Exception:
+            pass
         p_deed.style.font.size = Pt(13)
         p_deed.style.font.name = "Traditional Arabic"
         p_deed.paragraph_format.line_spacing = 1.4
 
         # ── 6. SIGNATURE BLOCK ───────────────────────────────────────────────
-        doc.add_paragraph("\nوذلك تمامها شهد بصحتها ومطابقتها للشريعة والقانون.")
+        p_end = doc.add_paragraph("\nوذلك تمامها شهد بصحتها ومطابقتها للشريعة والقانون.")
+        try:
+            docx_generator.set_rtl(p_end)
+        except Exception:
+            pass
         p_sig = doc.add_paragraph("\nعدلا الإشهاد                                                       طالب الإشهاد")
+        try:
+            docx_generator.set_rtl(p_sig)
+        except Exception:
+            pass
         p_sig.alignment = WD_ALIGN_PARAGRAPH.RIGHT
         p_sig.runs[0].font.bold = True
         p_sig.runs[0].font.size = Pt(13)
@@ -469,11 +738,19 @@ class TunisianFaridaEngine:
         doc.save(output_path)
 
 
+def _clean_extracted_text(val: str) -> str:
+    if not val or not isinstance(val, str):
+        return ""
+    cleaned = re.sub(r'[*`_]', '', val)
+    cleaned = cleaned.strip(" :：\n\t\"'")
+    return cleaned
+
+
 def parse_hujjat_wafat_text(text: str) -> dict:
     """
-    Parses a Hujjat Wafat / Death Certificate text (or OCR result)
-    specifically extracting surviving heirs from clauses like:
-    "وقد ترك(ت) : زوجها/زوجته/والده/والدته/أبناءه/بناته..."
+    Parses a Hujjat Wafat / Death Certificate text (or Vision OCR result)
+    extracting surviving heirs from clauses like:
+    "وقد تركت : ابنيها من زوجها المتوفى قبلها الطاهر الثوشاني وهما الرشيدين سعاد وجلول ومن غير الوارث عادل والوارث لا غير..."
     
     Returns a dictionary ready for calculate_farida!
     """
@@ -495,23 +772,67 @@ def parse_hujjat_wafat_text(text: str) -> dict:
         'full_brothers_count': 0,
         'full_sisters_count': 0,
         'predeceased_children_count': 0,
-        'names': []
+        'names': [],
+        'deceased_name': '',
+        'applicant_name': '',
+        'applicant_cin': '',
+        'hujja_num': '',
+        'hujja_date': '',
+        'hujja_court': ''
     }
 
-    import re
+    import re, json
+
+    # 0. Check if AI Vision returned JSON block inside text
+    if '{' in t and '}' in t:
+        try:
+            m_json = re.search(r'\{.*\}', t, re.DOTALL)
+            if m_json:
+                data = json.loads(m_json.group(0))
+                if isinstance(data, dict):
+                    if 'sons_count' in data: heirs['sons_count'] = int(data['sons_count'])
+                    if 'daughters_count' in data: heirs['daughters_count'] = int(data['daughters_count'])
+                    if 'husband_alive' in data: heirs['husband'] = bool(data['husband_alive'])
+                    if 'wife_alive' in data: heirs['wife'] = bool(data['wife_alive'])
+                    if 'father_alive' in data: heirs['father'] = bool(data['father_alive'])
+                    if 'mother_alive' in data: heirs['mother'] = bool(data['mother_alive'])
+                    if 'deceased_name' in data: heirs['deceased_name'] = _clean_extracted_text(data['deceased_name'])
+                    if 'applicant_name' in data: heirs['applicant_name'] = _clean_extracted_text(data['applicant_name'])
+                    if 'hujja_date' in data: heirs['hujja_date'] = _clean_extracted_text(data['hujja_date'])
+                    if heirs['sons_count'] > 0 or heirs['daughters_count'] > 0 or heirs['husband'] or heirs['wife']:
+                        return heirs
+        except Exception:
+            pass
+
     clause_match = re.search(r"(وقد تركت?|أحاط بتركه|انحصر ورثته?|الورثة الشرعيين?)\s*[:：]?(.*?)(ولم ترك|ولم يترك|هذا ما تم|وذلك تمامها|$)", t, re.DOTALL)
     clause_text = clause_match.group(2) if clause_match else t
 
-    # 1. Spouse check
-    if re.search(r"زوجها\s+المتوفى\s+قبلها", clause_text):
-        heirs['husband'] = False
-    elif re.search(r"\bزوجها\b", clause_text) and "المتوفى قبلها" not in clause_text:
-        heirs['husband'] = True
+    # Determine gender of deceased strictly
+    is_female_deceased = bool(re.search(r"(المتوفاة|المتوفية|المتوفات|الهالكة|الموروثة|المرحومة|زوجها|أرملة)", t))
+    is_male_deceased = bool(re.search(r"(المتوفى|الهالك|الموروث|المرحوم|زوجته)", t)) and not is_female_deceased
 
-    if re.search(r"زوجته\s+المتوفاة\s+قبله", clause_text):
-        heirs['wife'] = False
-    elif re.search(r"\b(زوجته|زوجاته|أرملة|حرمته)\b", clause_text):
-        heirs['wife'] = True
+    # 1. Spouse check
+    if is_female_deceased:
+        heirs['wife'] = False  # Deceased is female -> She has NO wife!
+        if re.search(r"زوجها\s+(المتوفى|الهالك)\s+قبلها", clause_text) or "المتوفى قبلها" in clause_text or "الهالك قبلها" in clause_text or "توفي قبلها" in clause_text:
+            heirs['husband'] = False
+        elif re.search(r"\bزوجها\b", clause_text):
+            heirs['husband'] = True
+        else:
+            heirs['husband'] = False
+    elif is_male_deceased:
+        heirs['husband'] = False  # Deceased is male -> He has NO husband!
+        if re.search(r"زوجته\s+(المتوفاة|الهالكة)\s+قبله", clause_text) or "المتوفاة قبله" in clause_text or "الهالكة قبله" in clause_text or "توفيت قبله" in clause_text:
+            heirs['wife'] = False
+        elif re.search(r"\b(زوجته|زوجاته|أرملة|حرمته)\b", clause_text):
+            heirs['wife'] = True
+        else:
+            heirs['wife'] = False
+    else:
+        if re.search(r"زوجها\s+(المتوفى|الهالك)\s+قبلها", clause_text) or "المتوفى قبلها" in clause_text:
+            heirs['husband'] = False
+        elif re.search(r"زوجته\s+(المتوفاة|الهالكة)\s+قبله", clause_text) or "المتوفاة قبله" in clause_text:
+            heirs['wife'] = False
 
     # 2. Parents check
     if re.search(r"\b(والده|أبوه|أبيه)\b", clause_text) and "المتوفى قبل" not in clause_text:
@@ -519,29 +840,177 @@ def parse_hujjat_wafat_text(text: str) -> dict:
     if re.search(r"\b(والدته|أمه|أمي)\b", clause_text) and "المتوفاة قبل" not in clause_text:
         heirs['mother'] = True
 
-    stop_words = {
-        "الذكر", "مثل", "حظ", "الأنثيين", "وهم", "وهن", "منها", "منه", "غير", "التركة",
-        "ابن", "إبن", "ابنه", "إبنه", "وابنه", "وإبنه", "أبناء", "أبناؤه", "أبنائه",
-        "بنت", "بنته", "وبنته", "ابنة", "ابنته", "بنات", "بناته", "زوجة", "زوجته", "وزوجته"
-    }
+    # Extract non-heir names (predeceased husband/wife names & explicitly excluded non-inheritors)
+    non_heir_names = set()
+    for m in re.finditer(r"(?:زوجها\s+(?:المتوفى|الهالك)\s+قبلها|زوجته\s+(?:المتوفاة|الهالكة)\s+قبله|من\s+غير\s+الوارث)\s+([^\s،.]+)", clause_text):
+        non_heir_names.add(m.group(1).strip())
 
-    # 3. Sons check (أبناء، ابن، ولد)
-    sons_match = re.search(r"(أبناؤه?|أبنائه?|أبناءها|أبنائها|أبنائهن|إبنه|ابنه|أولاده)\s*(?:منه|منها)?\s*[:：]?\s*([^،.\n]+)", clause_text)
-    if sons_match:
-        sons_part = re.split(r"(بناته?|بناتها|ابنته|بنته)", sons_match.group(2))[0]
-        s_names = [n.strip() for n in re.split(r"[،,و\s]+", sons_part) if len(n.strip()) > 2 and n.strip() not in stop_words]
-        if len(s_names) > 0:
-            heirs['sons_count'] = max(1, len(s_names))
-            heirs['names'].extend(s_names)
+    # Common female names in Tunisia & feminine gender endings
+    female_names = {'سعاد', 'فاطمة', 'مريم', 'عائشة', 'أميرة', 'نادرة', 'سارة', 'ليلى', 'منيرة', 'وسيلة', 'نعيمة', 'خديجة', 'زينب', 'لطيفة', 'سامية', 'سلمى', 'هناء', 'رباب', 'نجلاء', 'سميرة', 'جنات', 'آسية', 'سمية', 'إلهام', 'حياة', 'نبيلة', 'جميلة', 'سليمة', 'مبروكة', 'صالحة', 'وجدان', 'فوزية', 'عزيزة'}
 
-    # 4. Daughters check (بنات، ابنة، بنت)
-    daug_match = re.search(r"(بناته?|بناتها|بناتهن|ابنته|إبنته|بنته)\s*(?:منه|منها)?\s*[:：]?\s*([^،.\n]+)", clause_text)
-    if daug_match:
-        daug_part = re.split(r"(أبناؤه?|أبنائه?|إبنه|ابنه|أولاده)", daug_match.group(2))[0]
-        d_names = [n.strip() for n in re.split(r"[،,و\s]+", daug_part) if len(n.strip()) > 2 and n.strip() not in stop_words]
-        if len(d_names) > 0:
-            heirs['daughters_count'] = max(1, len(d_names))
-            heirs['names'].extend(d_names)
+    # 3. Dual & Multi-children names list (e.g. ابنيها... وهما الرشيدين سعاد وجلول)
+    names_match = re.search(r"وهما\s+(?:الرشيدين|البالغين|المذكورين)?\s*([^\n،.]+?)(?:ومن\s+غير|\s+والوارث|ولم|$)", clause_text)
+    if names_match:
+        raw_phrase = names_match.group(1)
+        stop_words = {'الرشيدين', 'البالغين', 'المذكورين', 'من', 'ابنيها', 'ابنيه', 'ولدها', 'ولديه', 'ولديها', 'منهم', 'منها', 'زوجها', 'المتوفى', 'قبلها', 'الهالك', 'الرشيدان'}
+        raw_list = [_clean_extracted_text(n.strip().lstrip('و').strip()) for n in re.split(r"[،,\s]+", raw_phrase) if n.strip()]
+        raw_list = [n for n in raw_list if n and n not in stop_words]
+        valid_names = [n for n in raw_list if n not in non_heir_names]
+        if valid_names:
+            for name in valid_names:
+                if name in female_names or name.endswith('ة') or name.endswith('اء'):
+                    heirs['daughters_count'] += 1
+                else:
+                    heirs['sons_count'] += 1
+                heirs['names'].append(name)
+
+    # 4. Standard Sons & Daughters regex if not extracted via names list
+    if heirs['sons_count'] == 0 and heirs['daughters_count'] == 0:
+        # Dual terms (ابنيها / ولدين / ابنين / ابنتيها / بنتين)
+        if re.search(r"\b(ابنيها|ابنيه|ولدين|ابنين|ولديها)\b", clause_text):
+            heirs['sons_count'] = 1
+            heirs['daughters_count'] = 1
+        elif re.search(r"\b(ابنتيها|ابنتين|bنتين)\b", clause_text):
+            heirs['daughters_count'] = 2
+
+        sons_match = re.search(r"(أبناؤه?|أبنائه?|أبناءها|أبنائها|أبنائهن|إبنه|ابنه|أولاده)\s*(?:منه|منها)?\s*[:：]?\s*([^،.\n]+)", clause_text)
+        if sons_match:
+            sons_part = re.split(r"(بناته?|بناتها|ابنته|بنته)", sons_match.group(2))[0]
+            stop_words = {"الذكر", "مثل", "حظ", "الأنثيين", "وهم", "وهن", "منها", "منه", "غير", "التركة", "ابن", "إبن", "ابنه"}
+            s_names = [n.strip() for n in re.split(r"[،,و\s]+", sons_part) if len(n.strip()) > 2 and n.strip() not in stop_words and n.strip() not in non_heir_names]
+            if len(s_names) > 0:
+                heirs['sons_count'] = max(1, len(s_names))
+                heirs['names'].extend(s_names)
+
+        daug_match = re.search(r"(بناته?|بناتها|بناتهن|ابنته|إبنته|بنته)\s*(?:منه|منها)?\s*[:：]?\s*([^،.\n]+)", clause_text)
+        if daug_match:
+            stop_words = {"الذكر", "مثل", "حظ", "الأنثيين", "وهم", "وهن", "منها", "منه", "غير", "التركة", "بنت", "بنته"}
+            daug_part = re.split(r"(أبناؤه?|أبنائه?|إبنه|ابنه|أولاده)", daug_match.group(2))[0]
+            d_names = [n.strip() for n in re.split(r"[،,و\s]+", daug_part) if len(n.strip()) > 2 and n.strip() not in stop_words and n.strip() not in non_heir_names]
+            if len(d_names) > 0:
+                heirs['daughters_count'] = max(1, len(d_names))
+
+        # Explicit digits match
+        s_num = re.search(r"(\d+)\s*(أبناء|أولاد|ابن)", clause_text)
+        if s_num: heirs['sons_count'] = int(s_num.group(1))
+        d_num = re.search(r"(\d+)\s*(بنات|إناث|بنت)", clause_text)
+        if d_num: heirs['daughters_count'] = int(d_num.group(1))
+
+    # 5. Extract metadata (Deceased, Applicant, CIN, Hujja Num, Court, Date)
+    clean_text_for_dec = re.sub(r'زوج(?:ها|ته)\s+(?:المتوفى|المتوفاة|الهالك|الهالكة)\s+(?:قبلها|قبله)\s+[^\n،.]+', '', t)
+    m_dec = re.search(r"(?:يعرفان|يعرفون|وفاة|اسم)?\s*(?:المتوفاة|المتوفية|المتوفات|المتوفى|الهالكة|الهالك|المرحومة|المرحوم|الموروثة|الموروث)\s*[:：]?\s*([^\n،.:]+?)(?:\s+وإبنة|\s+إبنة|\s+شهد|\s+توفيت|\s+في|\s+بتونس|\s+معرفة|\s+حسبما|\s+المعروفة|\s+المعروف|\s+وتركت|\s+ورثتها|\s+قاطن|\s+صناعة|\n|$)", clean_text_for_dec)
+    if m_dec: heirs['deceased_name'] = _clean_extracted_text(m_dec.group(1))
+
+    m_app = re.search(r"السيد(?:ة)?\s*[:：]?\s*([^\n،.]+?)(?:\s+المولود|\s+صناعتها|\s+القاطن|\s+بطاقة|\s+بوصفها|$)", t)
+    if m_app: heirs['applicant_name'] = _clean_extracted_text(m_app.group(1))
+
+    m_cin = re.search(r"بطاقة\s+تعريف[^\d]*(\d{8})", t)
+    if m_cin: heirs['applicant_cin'] = _clean_extracted_text(m_cin.group(1))
+
+    m_crt = re.search(r"(محكمة\s+ناحية\s+[^\n،.]+)", t)
+    if m_crt: heirs['hujja_court'] = _clean_extracted_text(m_crt.group(1))
+
+    m_num = re.search(r"(?:عدد\s+المادة|عدد)\s*[:：]?\s*([\d\/]+)", t)
+    if m_num: heirs['hujja_num'] = _clean_extracted_text(m_num.group(1))
+
+    m_dt = re.search(r"حرر\s+(?:بتونس|في)\s+([^\n،.]+)", t)
+    if m_dt: heirs['hujja_date'] = _clean_extracted_text(m_dt.group(1))
+
+    heirs['names'] = [_clean_extracted_text(n) for n in heirs['names'] if _clean_extracted_text(n)]
 
     return heirs
+
+
+def parse_title_document_text(text: str) -> dict:
+    """
+    Parses an authentic Tunisian Property Title Certificate (شهادة ملكية - Titre Foncier)
+    text or Vision OCR output, extracting title number, property name, location,
+    content type, total area in m², total parts (التجزئة), original title, and co-owners.
+    """
+    if not text or not isinstance(text, str):
+        return {}
+
+    res = {
+        "title_num": "",
+        "property_name": "",
+        "property_content": "",
+        "location": "",
+        "property_area_m2": 0.0,
+        "property_parts": 0.0,
+        "original_title": "",
+        "owners": []
+    }
+
+    t = text.strip()
+
+    # 1. Title number match (معرف الرسم العقاري: 56733 بن عروس)
+    t_match = re.search(r"(?:معرف\s+الرسم\s+العقاري|الرسم\s+العقاري\s+عدد|رسم\s+عقاري\s+عدد|معرف\s+الرسم)\s*[:：]?\s*([^\n،./]+)", t)
+    if t_match:
+        val = _clean_extracted_text(t_match.group(1))
+        if "شهادة" not in val and "الإدارة" not in val:
+            res["title_num"] = val
+
+    # 2. Property name match (إسم العقار: حدائق الحي الرياضي)
+    name_match = re.search(r"(?:إسم\s+العقار|اسم\s+العقار|المسماة|المسمى)\s*[:：]?\s*[\"«'“]?([^\"»'”\n،./]+)", t)
+    if name_match:
+        val = _clean_extracted_text(name_match.group(1))
+        if "شهادة" not in val and "الإدارة" not in val:
+            res["property_name"] = val
+
+    # 3. Property Content (محتوى العقار: أرض صالحة للبناء)
+    cnt_match = re.search(r"محتوى\s+العقار\s*[:：]?\s*([^\n،./]+)", t)
+    if cnt_match:
+        val = _clean_extracted_text(cnt_match.group(1))
+        if "شهادة" not in val:
+            res["property_content"] = val
+
+    # 4. Location match (موقع العقار: فندق الشوشة / الكائن بـ...)
+    loc_match = re.search(r"(?:موقع\s+العقار|الكائن\s+بـ|الموقع)\s*[:：]?\s*([^\n،./]+)", t)
+    if loc_match:
+        val = _clean_extracted_text(loc_match.group(1))
+        if "شهادة" not in val:
+            res["location"] = val
+
+    # 5. Area in m2 (المساحة: 3190 م.م or 3190 م²)
+    area_match = re.search(r"المساحة\s*[:：]?\s*(\d+(?:\.\d+)?)\s*(?:م\.م|م²|متر\s+مربع|متر)?", t)
+    if not area_match:
+        area_match = re.search(r"(\d+(?:\.\d+)?)\s*(?:م\.م|م²)", t)
+    if area_match:
+        try:
+            res["property_area_m2"] = float(area_match.group(1))
+        except ValueError:
+            pass
+
+    # 6. Parts match (التجزئة: 3190 or عدد الأجزاء: 4608000)
+    parts_match = re.search(r"(?:التجزئة|عدد\s+الأجزاء)\s*[:：]?\s*(\d+(?:\.\d+)?)", t)
+    if parts_match:
+        try:
+            res["property_parts"] = float(parts_match.group(1))
+        except ValueError:
+            pass
+
+    # 7. Original Title (الرسم(و.م) الأصلي(ة): 50208 بن عروس)
+    orig_match = re.search(r"(?:الرسم\s*\(و\.م\)\s*الأصلي\(ة\)|الرسم\s+الأصلي)\s*[:：]?\s*([^\n،./]+)", t)
+    if orig_match:
+        val = _clean_extracted_text(orig_match.group(1))
+        if "شهادة" not in val:
+            res["original_title"] = val
+
+    # 8. Extract Co-owners Table Block (هوية المالكين ومواضيع الملكية)
+    owner_blocks = re.findall(
+        r"(\d+\/\d+)\s+([^\n]+?)\s+(?:صاحب|صاحبة)?\s*بطاقة\s+تعريف\s*(?:الوطنية)?\s*(?:عدد)?\s*(\d{8})[^\n]*\n(?:[^\n]*موضوع\s+الملكية\s*[:：]?\s*([\d\.,]+)\s*جزء)?",
+        t
+    )
+    for b in owner_blocks:
+        raw_name = _clean_extracted_text(b[1])
+        if " " in raw_name and re.search(r"^\d+/\d+", raw_name):
+            raw_name = re.sub(r"^\d+/\d+\s*", "", raw_name)
+        res["owners"].append({
+            "order": b[0],
+            "name": raw_name,
+            "cin": _clean_extracted_text(b[2]) if b[2] else "",
+            "parts": float(b[3].replace(',', '.')) if b[3] else 0.0
+        })
+
+    return res
 

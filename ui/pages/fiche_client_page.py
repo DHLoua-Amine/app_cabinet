@@ -4,8 +4,169 @@ import time
 import datetime
 from pathlib import Path
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, QPushButton, QTabWidget, QTableView, QHeaderView, QFrame, QFileDialog, QMessageBox, QDoubleSpinBox, QProgressBar, QTextEdit, QScrollArea, QListWidget, QListWidgetItem, QGridLayout, QMenu, QDialog, QDialogButtonBox
-from PySide6.QtCore import Qt, QSize, Signal, QThread, QAbstractTableModel, QModelIndex
-from PySide6.QtGui import QIcon, QAction, QCursor, QImageReader, QValidator
+from PySide6.QtCore import Qt, QSize, Signal, QThread, QAbstractTableModel, QModelIndex, QRectF
+from PySide6.QtGui import QIcon, QAction, QCursor, QImageReader, QValidator, QPixmap, QPainter, QColor, QFont, QPen, QPainterPath
+
+def create_doc_type_icon(ext: str, size: int = 128) -> QIcon:
+    """Creates a high-quality custom QIcon for document file types."""
+    pm = QPixmap(size, size)
+    pm.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pm)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    
+    ext = ext.lower()
+    
+    if ext in [".docx", ".doc"]:
+        # Microsoft Word Theme
+        bg_rect = QRectF(16, 12, size - 32, size - 24)
+        painter.setPen(QPen(QColor("#cbd5e1"), 1.5))
+        painter.setBrush(QColor("#ffffff"))
+        painter.drawRoundedRect(bg_rect, 8, 8)
+        
+        # Word Blue Top Accent
+        header_rect = QRectF(16, 12, size - 32, 28)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#185abd")) # Microsoft Word Blue
+        painter.drawRoundedRect(header_rect, 8, 8)
+        
+        # Document text lines
+        painter.setPen(QPen(QColor("#cbd5e1"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(68, 48, 104, 48)
+        painter.drawLine(68, 60, 104, 60)
+        painter.drawLine(68, 72, 96, 72)
+        
+        # Word Badge (Left square with W logo)
+        badge_rect = QRectF(22, 34, 42, 48)
+        painter.setBrush(QColor("#104a9e"))
+        painter.setPen(QPen(QColor("#ffffff"), 2))
+        painter.drawRoundedRect(badge_rect, 6, 6)
+        
+        f = painter.font()
+        f.setFamily("Arial")
+        f.setPixelSize(28)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(QColor("#ffffff"))
+        painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, "W")
+        
+        # Bottom label bar: "WORD"
+        lbl_rect = QRectF(22, 90, size - 44, 20)
+        painter.setBrush(QColor("#185abd"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(lbl_rect, 4, 4)
+        
+        f.setPixelSize(11)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(QColor("#ffffff"))
+        painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignCenter, "MS WORD")
+
+    elif ext == ".pdf":
+        # PDF Theme
+        bg_rect = QRectF(16, 12, size - 32, size - 24)
+        painter.setPen(QPen(QColor("#cbd5e1"), 1.5))
+        painter.setBrush(QColor("#ffffff"))
+        painter.drawRoundedRect(bg_rect, 8, 8)
+        
+        # PDF Red Header
+        header_rect = QRectF(16, 12, size - 32, 28)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#dc2626")) # PDF Red
+        painter.drawRoundedRect(header_rect, 8, 8)
+        
+        # PDF Badge
+        badge_rect = QRectF(22, 34, 84, 48)
+        painter.setBrush(QColor("#b91c1c"))
+        painter.setPen(QPen(QColor("#ffffff"), 1.5))
+        painter.drawRoundedRect(badge_rect, 6, 6)
+        
+        f = painter.font()
+        f.setFamily("Arial")
+        f.setPixelSize(22)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(QColor("#ffffff"))
+        painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, "PDF")
+        
+        # Bottom label bar
+        lbl_rect = QRectF(22, 90, size - 44, 20)
+        painter.setBrush(QColor("#dc2626"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(lbl_rect, 4, 4)
+        
+        f.setPixelSize(11)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignCenter, "DOCUMENT PDF")
+
+    elif ext in [".xlsx", ".xls", ".csv"]:
+        # Excel Theme
+        bg_rect = QRectF(16, 12, size - 32, size - 24)
+        painter.setPen(QPen(QColor("#cbd5e1"), 1.5))
+        painter.setBrush(QColor("#ffffff"))
+        painter.drawRoundedRect(bg_rect, 8, 8)
+        
+        # Excel Green Header
+        header_rect = QRectF(16, 12, size - 32, 28)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#107c41")) # Excel Green
+        painter.drawRoundedRect(header_rect, 8, 8)
+        
+        # Excel Badge
+        badge_rect = QRectF(22, 34, 42, 48)
+        painter.setBrush(QColor("#0b5c30"))
+        painter.setPen(QPen(QColor("#ffffff"), 2))
+        painter.drawRoundedRect(badge_rect, 6, 6)
+        
+        f = painter.font()
+        f.setFamily("Arial")
+        f.setPixelSize(28)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(QColor("#ffffff"))
+        painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, "X")
+        
+        # Bottom label bar
+        lbl_rect = QRectF(22, 90, size - 44, 20)
+        painter.setBrush(QColor("#107c41"))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.drawRoundedRect(lbl_rect, 4, 4)
+        
+        f.setPixelSize(11)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(QColor("#ffffff"))
+        painter.drawText(lbl_rect, Qt.AlignmentFlag.AlignCenter, "EXCEL")
+        
+    else:
+        # Generic File Theme
+        bg_rect = QRectF(16, 12, size - 32, size - 24)
+        painter.setPen(QPen(QColor("#cbd5e1"), 1.5))
+        painter.setBrush(QColor("#f8fafc"))
+        painter.drawRoundedRect(bg_rect, 8, 8)
+        
+        # Header
+        header_rect = QRectF(16, 12, size - 32, 28)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor("#475569"))
+        painter.drawRoundedRect(header_rect, 8, 8)
+        
+        f = painter.font()
+        f.setFamily("Arial")
+        f.setPixelSize(14)
+        f.setBold(True)
+        painter.setFont(f)
+        painter.setPen(QColor("#ffffff"))
+        painter.drawText(header_rect, Qt.AlignmentFlag.AlignCenter, ext.upper().replace(".", "") if ext else "FILE")
+        
+        # Document lines
+        painter.setPen(QPen(QColor("#94a3b8"), 3, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
+        painter.drawLine(30, 52, 98, 52)
+        painter.drawLine(30, 66, 98, 66)
+        painter.drawLine(30, 80, 75, 80)
+        
+    painter.end()
+    return QIcon(pm)
 
 class MoneySpinBox(QDoubleSpinBox):
     def __init__(self, parent=None):
@@ -213,6 +374,9 @@ class FicheClientPage(QWidget):
         self.banner_avatar = QLabel(self.banner_card)
         self.banner_avatar.setFixedSize(60, 60)
         self.banner_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.banner_avatar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.banner_avatar.setToolTip("تكبير الصورة" if self.lang != "fr" else "Agrandir la photo")
+        self.banner_avatar.mousePressEvent = lambda e: self.open_enlarged_face_preview()
         
         self.banner_name = QLabel("Nouveau Client / حريف جديد", self.banner_card)
         self.banner_name.setStyleSheet("font-size: 20px; font-weight: 800; color: #0369a1;")
@@ -487,6 +651,13 @@ class FicheClientPage(QWidget):
         form_grid.addWidget(self._tr_label("Lieu d'émission CIN :", "مكان إصدار البطاقة :"), 11, 2)
         form_grid.addWidget(self.cin_issue_place_input, 11, 3)
 
+        # Row 12 (Client Notes Box)
+        self.notes_input = QTextEdit(self.tab_civil)
+        self.notes_input.setMaximumHeight(80)
+        self.notes_input.setPlaceholderText("أدخل ملاحظات خاصة بهذا الحريف..." if self.lang == "ar" else "Notes et remarques sur le client...")
+        form_grid.addWidget(self._tr_label("Remarques / Notes :", "ملاحظات الحريف :"), 12, 0)
+        form_grid.addWidget(self.notes_input, 12, 1, 1, 3)
+
         fields_container.addLayout(form_grid, stretch=3)
         civil_layout.addLayout(fields_container)
 
@@ -552,22 +723,29 @@ class FicheClientPage(QWidget):
         self.docs_list.setMovement(QListWidget.Movement.Static)
         self.docs_list.setStyleSheet("""
             QListWidget {
-                background-color: #ffffff;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                color: #1e293b;
-                padding: 10px;
+                background-color: #f8fafc;
+                border: 1.5px solid #cbd5e1;
+                border-radius: 10px;
+                color: #0f172a;
+                padding: 12px;
             }
             QListWidget::item {
-                background-color: #1e293b;
-                border: 1px solid #334155;
-                border-radius: 8px;
-                padding: 10px;
-                margin: 5px;
+                background-color: #ffffff;
+                border: 1.5px solid #cbd5e1;
+                border-radius: 10px;
+                padding: 8px;
+                margin: 6px;
+                color: #1e293b;
+                font-weight: 600;
             }
             QListWidget::item:hover {
-                border-color: #2563eb;
-                background-color: #243249;
+                border: 1.5px solid #2563eb;
+                background-color: #eff6ff;
+            }
+            QListWidget::item:selected {
+                background-color: #dbeafe;
+                border: 1.5px solid #2563eb;
+                color: #1e3a8a;
             }
         """)
         # Large enough that a scanned page is actually recognisable, with a grid cell
@@ -667,6 +845,8 @@ class FicheClientPage(QWidget):
             Qt.LayoutDirection.LeftToRight if is_fr else Qt.LayoutDirection.RightToLeft)
 
     def load_client_data(self):
+        if hasattr(self, "tabs"):
+            self.tabs.setCurrentIndex(0)
         self.client_not_found = False
         if not self.is_new:
             # Load real client data
@@ -750,6 +930,8 @@ class FicheClientPage(QWidget):
         self.address_input.setPlainText(self.client_data.get("address") or "")
         self.company_name_input.setText(self.client_data.get("company_name") or "")
         self.company_rc_input.setText(self.client_data.get("company_rc") or "")
+        if hasattr(self, "notes_input"):
+            self.notes_input.setPlainText(self.client_data.get("notes") or "")
 
         # Update headers and visuals
         self.update_header_visuals()
@@ -1118,6 +1300,7 @@ class FicheClientPage(QWidget):
                 company_rc=self.company_rc_input.text().strip(),
                 titre_foncier=self.tf_input.text().strip(),
                 wilaya=self.wilaya_combo.currentText(),
+                notes=self.notes_input.toPlainText().strip() if hasattr(self, "notes_input") else "",
                 is_new=self.is_new
             )
         except reception.ClientIdConflict as e:
@@ -1181,6 +1364,14 @@ class FicheClientPage(QWidget):
                 if len(file_paths) > 1:
                     with open(file_paths[1], "rb") as f:
                         back_bytes = f.read()
+
+                if self.client_id and str(self.client_id).upper() != "NEW":
+                    stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    if front_bytes:
+                        reception.save_client_document(self.client_id, front_bytes, f"بطاقة_تعريف_وجه_أول_{stamp}.jpg")
+                    if back_bytes:
+                        reception.save_client_document(self.client_id, back_bytes, f"بطاقة_تعريف_وجه_ثاني_{stamp}.jpg")
+                    self.load_client_documents()
 
                 api_key = config.load_saved_api_keys("gemini") or os.environ.get("GEMINI_API_KEY", "")
                 self.ocr_thread = OCRThread(front_bytes, back_bytes, api_key)
@@ -1289,17 +1480,17 @@ class FicheClientPage(QWidget):
         # ── Header row: title + status ────────────────────────────────────
         title_row = QHBoxLayout()
         title_lbl = QLabel(f" {'Dossier N°' if is_fr else 'ملف رقم'} {cid} — {title}", card)
-        title_lbl.setStyleSheet("font-weight: 800; font-size: 14px; color: #ffffff;")
+        title_lbl.setStyleSheet("font-weight: 800; font-size: 14px; color: #1e3a8a;")
 
         status_lbl = QLabel(f"● {status}", card)
         if "جديد" in status or "Nouveau" in status:
-            status_lbl.setStyleSheet("color: #38bdf8; font-weight: bold;")
+            status_lbl.setStyleSheet("color: #0284c7; font-weight: bold;")
         elif "إنجاز" in status or "cours" in status:
-            status_lbl.setStyleSheet("color: #fbbf24; font-weight: bold;")
+            status_lbl.setStyleSheet("color: #d97706; font-weight: bold;")
         elif "توقيع" in status or "attente" in status:
-            status_lbl.setStyleSheet("color: #c084fc; font-weight: bold;")
+            status_lbl.setStyleSheet("color: #9333ea; font-weight: bold;")
         else:
-            status_lbl.setStyleSheet("color: #34d399; font-weight: bold;")
+            status_lbl.setStyleSheet("color: #16a34a; font-weight: bold;")
 
         title_row.addWidget(title_lbl, stretch=1)
         title_row.addWidget(status_lbl)
@@ -1307,21 +1498,21 @@ class FicheClientPage(QWidget):
 
         # ── Meta row & Notes/Remarques ────────────────────────────────────
         meta_lbl = QLabel(f"{'Type' if is_fr else 'نوع العقد'}: {service_type}  |  {'Création' if is_fr else 'التاريخ'}: {str(created_at).split()[0]}", card)
-        meta_lbl.setStyleSheet("color: #64748b; font-size: 12px;")
+        meta_lbl.setStyleSheet("color: #475569; font-size: 12px; font-weight: 600;")
         card_lay.addWidget(meta_lbl)
 
         # ── Notes / Remarques section ──────────────────────────────────────────
-        notes_text = (cs.get("payment_notes") or cs.get("notes") or "").strip()
+        notes_text = (cs.get("payment_notes") or cs.get("notes") or cs.get("description") or "").strip()
         if notes_text:
-            notes_lbl = QLabel(f"<b>{'Remarques' if is_fr else 'ملاحظات'}:</b> {notes_text}", card)
+            notes_lbl = QLabel(f"<b>{'Remarques' if is_fr else 'ملاحظات الملف'}:</b> {notes_text}", card)
             notes_lbl.setWordWrap(True)
             notes_lbl.setStyleSheet("""
                 QLabel {
-                    background-color: #f8fafc;
+                    background-color: #f1f5f9;
                     border: 1px solid #cbd5e1;
                     border-radius: 6px;
                     padding: 8px 12px;
-                    color: #1e293b;
+                    color: #0f172a;
                     font-size: 12px;
                     margin-top: 4px;
                     margin-bottom: 4px;
@@ -1348,7 +1539,7 @@ class FicheClientPage(QWidget):
         status_combo.setCurrentIndex(idx)
         status_combo.currentIndexChanged.connect(lambda index, cid=cid, sc=status_combo: self.change_case_status(cid, sc.currentText()))
 
-        pay_btn = QPushButton("Finances" if self.lang == "fr" else "الخلاص", card)
+        pay_btn = QPushButton("Finances" if self.lang == "fr" else "الخلاص والتسبيقات", card)
         pay_btn.setProperty("class", "SecondaryButton")
         pay_btn.clicked.connect(lambda checked=False, cid=cid, tot=total_amount, av=avance_amount, notes=payment_notes: self.open_payment_dialog_full(cid, tot, av, notes))
 
@@ -1371,33 +1562,38 @@ class FicheClientPage(QWidget):
             case_docs = []
 
         if case_docs:
-            docs_sep = QLabel(f" {'Documents' if is_fr else 'وثائق الملف'} ({len(case_docs)}) :", card)
-            docs_sep.setStyleSheet("font-size:11px; color:#64748b; font-weight:bold; margin-top:4px;")
+            docs_sep = QLabel(f" {'Documents du dossier' if is_fr else 'وثائق ومحررات الملف المرتبطة'} ({len(case_docs)}) :", card)
+            docs_sep.setStyleSheet("font-size:12px; color:#1e3a8a; font-weight:bold; margin-top:6px;")
             card_lay.addWidget(docs_sep)
 
             IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
 
-            # Every document is listed. This used to be case_docs[:5], which hid the
-            # rest of a case's paperwork with nothing on screen to say so.
             for doc in case_docs:
                 dpath = doc["path"]
                 dname = doc["name"]
                 clean_name = dname.replace(f"Dossier_{cid}_", "").replace(f"Reçu_Paiement_{cid}_", "")
                 is_image = Path(dname).suffix.lower() in IMAGE_EXTS
 
-                doc_row = QHBoxLayout()
+                doc_frame = QFrame(card)
+                doc_frame.setStyleSheet("""
+                    QFrame {
+                        background-color: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 8px;
+                        padding: 4px;
+                    }
+                """)
+                doc_row = QHBoxLayout(doc_frame)
+                doc_row.setContentsMargins(6, 4, 6, 4)
                 doc_row.setSpacing(8)
 
-                # Thumbnail for image attachments, so a scanned receipt or ID is
-                # visible at a glance instead of being just a filename.
-                thumb_lbl = QLabel(card)
-                thumb_lbl.setFixedSize(56, 56)
+                thumb_lbl = QLabel(doc_frame)
+                thumb_lbl.setFixedSize(48, 48)
                 thumb_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 thumb_lbl.setStyleSheet(
-                    "border:1px solid #334155; border-radius:6px; background:#0f172a;")
+                    "border:1px solid #cbd5e1; border-radius:6px; background:#ffffff;")
                 if is_image and os.path.exists(dpath):
-                    # Cached at display size (bounded LRU) — never the full-resolution image.
-                    pm = pixmap_cache.scaled_preview(dpath, 54, 54)
+                    pm = pixmap_cache.scaled_preview(dpath, 46, 46)
                     if not pm.isNull():
                         thumb_lbl.setPixmap(pm)
                         thumb_lbl.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
@@ -1407,35 +1603,43 @@ class FicheClientPage(QWidget):
                     else:
                         thumb_lbl.setText("🖼️")
                 else:
-                    thumb_lbl.setText("📄" if Path(dname).suffix.lower() != ".pdf" else "📕")
-                    thumb_lbl.setStyleSheet(
-                        "border:1px solid #334155; border-radius:6px; background:#0f172a; font-size:22px;")
+                    ext = Path(dname).suffix.lower()
+                    word_icon_pm = create_doc_type_icon(ext, 46).pixmap(46, 46)
+                    thumb_lbl.setPixmap(word_icon_pm)
+                    thumb_lbl.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+                    thumb_lbl.mousePressEvent = (
+                        lambda ev, d=doc, c_docs=case_docs: self._open_gallery_dialog(d, c_docs))
+                    if ext in [".docx", ".doc"]:
+                        thumb_lbl.setToolTip(f"Microsoft Word: {dname}")
+                    elif ext == ".pdf":
+                        thumb_lbl.setToolTip(f"Document PDF: {dname}")
+                    else:
+                        thumb_lbl.setToolTip(dname)
 
-                doc_lbl = QLabel(f"{clean_name}\n{doc['size_kb']} KB", card)
-                doc_lbl.setStyleSheet("font-size:11px; color:#cbd5e1;")
+                doc_lbl = QLabel(f"<b>{clean_name}</b><br><span style='color:#64748b;'>{doc['size_kb']} KB</span>", doc_frame)
+                doc_lbl.setStyleSheet("font-size:12px; color:#1e293b;")
                 doc_lbl.setWordWrap(True)
                 doc_lbl.setToolTip(dname)
 
-                dl_btn = QPushButton("👁️", card)
+                dl_btn = QPushButton("👁️", doc_frame)
                 dl_btn.setFixedSize(32, 28)
-                dl_btn.setStyleSheet("font-size:13px; padding:0px; background:#1e293b; color:#38bdf8; border:1px solid #334155; border-radius:4px;")
+                dl_btn.setStyleSheet("font-size:13px; padding:0px; background:#ffffff; color:#0284c7; border:1px solid #cbd5e1; border-radius:4px;")
                 dl_btn.setToolTip("معاينة الوثيقة / Ouvrir la galerie")
                 dl_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
                 dl_btn.clicked.connect(lambda chk=False, d=doc, c_docs=case_docs: self._open_gallery_dialog(d, c_docs))
 
-                del_btn = QPushButton("🗑️", card)
+                del_btn = QPushButton("🗑️", doc_frame)
                 del_btn.setFixedSize(32, 28)
-                del_btn.setStyleSheet("font-size:13px; padding:0px; background:#1e293b; color:#ef4444; border:1px solid #334155; border-radius:4px;")
+                del_btn.setStyleSheet("font-size:13px; padding:0px; background:#ffffff; color:#dc2626; border:1px solid #cbd5e1; border-radius:4px;")
                 del_btn.setToolTip("حذف الوثيقة / Supprimer")
                 del_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-                del_btn.clicked.connect(lambda chk=False, n=dname: self._delete_case_doc(n))
                 del_btn.clicked.connect(lambda chk=False, n=dname: self._delete_case_doc(n))
 
                 doc_row.addWidget(thumb_lbl)
                 doc_row.addWidget(doc_lbl, stretch=1)
                 doc_row.addWidget(dl_btn)
                 doc_row.addWidget(del_btn)
-                card_lay.addLayout(doc_row)
+                card_lay.addWidget(doc_frame)
 
         return card
 
@@ -1668,38 +1872,13 @@ class FicheClientPage(QWidget):
         row_num.addWidget(num_input, stretch=1)
         lay.addLayout(row_num)
 
-        # Contract type (Pure Arabic Options)
+        # Contract type (Categorized Options from contract_templates)
         type_lbl = QLabel("نوع العقد :" if not is_fr else "Type de contrat :")
         type_combo = QComboBox()
-        type_combo.addItems([
-            "عقد بيع عقار (دفتر خانة)",
-            "عقد بيع عقار (غير مسجل)",
-            "عقد وعد بيع",
-            "عقد مقاسمة رضائية",
-            "عقد مقاسمة قضائية",
-            "عقد هبة",
-            "حجة وفاة",
-            "فريضة تريكة",
-            "رفض ميراث",
-            "عقد زواج",
-            "عقد ترهين عقاري",
-            "عقد تنازل",
-            "محضر استجواب",
-            "شهادة ملكية",
-            "توكيل رسمي",
-            "عقد كراء",
-            "كتب تكميلي",
-            "كتب توضيحي",
-            "استشارة قانونية"
-        ])
+        import contract_templates
+        contract_templates.populate_categorized_contract_types(type_combo)
         lay.addWidget(type_lbl)
         lay.addWidget(type_combo)
-
-        # Title
-        title_lbl = QLabel("عنوان العقد التفصيلي :" if not is_fr else "Objet détaillé du contrat :")
-        title_input = QLineEdit()
-        lay.addWidget(title_lbl)
-        lay.addWidget(title_input)
 
         # Notes / Description
         desc_lbl = QLabel("ملاحظات العقد :" if not is_fr else "Notes du contrat :")
@@ -1759,10 +1938,6 @@ class FicheClientPage(QWidget):
         lay.addWidget(btn_box)
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            if not title_input.text().strip():
-                QMessageBox.warning(self, "خطأ", "عنوان العقد إجباري." if not is_fr else "L'objet du contrat est obligatoire.")
-                return
-
             tot_v = tot_spin.value()
             av_v = av_spin.value()
             if av_v >= tot_v and tot_v > 0:
@@ -1776,7 +1951,7 @@ class FicheClientPage(QWidget):
             new_id = reception.create_case(
                 client_id=self.client_id,
                 service_type=type_combo.currentText(),
-                title=title_input.text().strip(),
+                title=type_combo.currentText().strip(),
                 description=desc_input.toPlainText().strip(),
                 total_amount=tot_v,
                 avance_amount=av_v,
@@ -1838,18 +2013,13 @@ class FicheClientPage(QWidget):
             # Custom icons based on extensions
             ext = Path(dname).suffix.lower()
             if ext in [".png", ".jpg", ".jpeg", ".webp", ".bmp"]:
-                # Real preview of the attachment, scaled to the list's icon size and
-                # cached. QIcon(dpath) decoded the full-resolution image every time the
-                # list was rebuilt — a 600 KB scan costs far more than the 96px shown.
                 pm = pixmap_cache.scaled_preview(dpath, 128, 128) if os.path.exists(dpath) else None
                 if pm is not None and not pm.isNull():
                     item.setIcon(QIcon(pm))
                 else:
-                    item.setIcon(QIcon.fromTheme("image-x-generic"))
-            elif ext == ".pdf":
-                item.setIcon(QIcon.fromTheme("document-pdf"))
+                    item.setIcon(create_doc_type_icon(ext, 128))
             else:
-                item.setIcon(QIcon.fromTheme("text-x-generic"))
+                item.setIcon(create_doc_type_icon(ext, 128))
                 
             self.docs_list.addItem(item)
 
@@ -1891,7 +2061,14 @@ class FicheClientPage(QWidget):
     def open_selected_document(self, item):
         path = item.data(Qt.ItemDataRole.UserRole)
         if path and os.path.exists(path):
-            self._open_gallery_dialog(path)
+            ext = Path(path).suffix.lower()
+            if ext in [".docx", ".doc", ".pdf"]:
+                try:
+                    os.startfile(path)
+                except Exception as ex:
+                    QMessageBox.warning(self, "Document", f"Impossible d'ouvrir le fichier:\n{ex}")
+            else:
+                self._open_gallery_dialog(path)
 
     def show_docs_context_menu(self, point):
         item = self.docs_list.itemAt(point)
@@ -2194,5 +2371,21 @@ class FicheClientPage(QWidget):
     def open_farida_dialog(self):
         from ui.components.farida_dialog import TunisianFaridaDialog
         dlg = TunisianFaridaDialog(self, lang=self.lang, client_id=self.client_id)
+        dlg.exec()
+
+    def open_enlarged_face_preview(self):
+        if not self.client_id:
+            return
+        from PySide6.QtGui import QImage
+        qimg = None
+        prof_path = PROFILES_DIR / f"{self.client_id}.jpg"
+        if prof_path.exists():
+            qimg = QImage(str(prof_path))
+        elif hasattr(self, "_current_avatar_qimg") and self._current_avatar_qimg:
+            qimg = self._current_avatar_qimg
+        
+        full_name = self.client_data.get("full_name") or f"{self.client_data.get('prenom','')} {self.client_data.get('nom','')}".strip() or "Client"
+        from ui.dialogs.face_preview_dialog import FacePreviewDialog
+        dlg = FacePreviewDialog(qimg, full_name, "known", str(self.client_id), lang=self.lang, parent=self)
         dlg.exec()
 

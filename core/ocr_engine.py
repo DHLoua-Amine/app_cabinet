@@ -343,8 +343,7 @@ def _call_gemini_vision(image_bytes: bytes, api_key: str, model_name: str, promp
 
     # Primary stable Google AI Studio models
     model_pairs = [
-        ("v1beta", "gemini-3.6-flash"),
-        ("v1beta", "gemini-2.5-flash")
+        ("v1beta", "gemini-3.6-flash")
     ]
 
     last_failure = ("server", "")
@@ -565,3 +564,89 @@ def _call_openai_vision(image_bytes: bytes, api_key: str, model_name: str, promp
         msg = f" خطأ من خادم OpenAI (HTTP {r.status_code})."
 
     return {"success": False, "transcription": "", "error": msg}
+
+
+def extract_handwritten_notary_script(image_bytes: bytes, api_key: str = "", provider: str = "", model: str = "") -> dict:
+    """
+    Extracts text from handwritten notary documents, Death Certificates (حجة وفاة),
+    and Property Titles (شهادة ملكية) using AI Vision OCR.
+    Includes explicit instructions for auto-orientation (180 deg rotated images) & legal heir extraction.
+    """
+    if not provider or not api_key:
+        try:
+            import config
+            provider, model = config.load_ai_engine()
+            api_key = config.load_saved_api_keys(provider)
+        except Exception:
+            provider = provider or "google"
+
+    prompt = (
+        "أنت خبير محلف في قراءة وتفريغ الوثائق الرسمية وحجج الوفاة ورسوم الملكية التونسية.\n"
+        "تنبيه هـام جداً: الصورة المرفقة قد تكون مستديرة أو مقلوبة رأساً على عقب (مثلاً تدوير 180 درجة).\n"
+        "يرجى التحديق جيداً وتدوير الصورة ذهنياً بقراءتها بالاتجاه الصحيح 100%.\n"
+        "قم بتفريغ كامل نص الوثيقة كلمة بكلمة باللغة العربية.\n"
+        "إذا كانت الوثيقة حجة وفاة، يرجى كتابة النص وتحديد الورثة الشرعيين (الزوج/الزوجة، الآباء، الأبناء والبنات وأسماؤهم) بشكل واضح صريح."
+    )
+
+    if provider == "openai":
+        res = _call_openai_vision(image_bytes, api_key, model or "gpt-4o", prompt=prompt)
+    else:
+        res = _call_gemini_vision(image_bytes, api_key, model or "gemini-3.6-flash", prompt=prompt)
+
+    if res.get("success") and res.get("transcription"):
+        return {"success": True, "full_text": res["transcription"], "property_desc": res["transcription"]}
+    return {"success": False, "full_text": "", "error": res.get("error") or "تعذّر استخراج النص من الصورة المرفقة."}
+
+
+TUNISIAN_TITLE_DOC_PROMPT = """
+أنت خبير محلف في قراءة وتفريغ شهادات الملكية والرسوم العقارية الصادرة عن الإدارة الجهوية للملكية العقارية بالجمهورية التونسية.
+تنبيه هـام جداً: الصورة المرفقة قد تكون مستديرة أو مقلوبة رأساً على عقب (مثلاً تدوير 180 درجة). يرجى التحديق جيداً وقراءتها بالاتجاه الصحيح 100%.
+
+قم باستخراج البيانات الرسمية الدقيقة المكتوبة في شهادة الملكية التالية:
+1. معرف الرسم العقاري (مثال: معرف الرسم العقاري: 56733 بن عروس)
+2. إسم العقار (مثال: إسم العقار : حدائق الحي الرياضي)
+3. محتوى العقار (مثال: محتوى العقار : أرض صالحة للبناء)
+4. موقع العقار (مثال: موقع العقار : فندق الشوشة)
+5. المساحة الجملية بالمتر المربع (مثال: المساحة : 3190 م.م)
+6. التجزئة / عدد الأجزاء (مثال: التجزئة : 3190)
+7. الرسم الأصلي (مثال: الرسم(و.م) الأصلي(ة): 50208 بن عروس)
+8. هوية المالكين وحصصهم وأرقام بطاقات تعريفهم الوطنية (مثال: 1/1 زين العابدين بن محمد... صاحب بطاقة تعريف... موضوع الملكية: 212.66 جزء).
+
+قم بكتابة نص التفريغ بالكامل ودقيق جداً.
+"""
+
+
+def extract_title_document_data(image_bytes: bytes, api_key: str = "", provider: str = "", model_name: str = "gemini-3.6-flash") -> dict:
+    """Extracts structured fields from a Property Title Certificate image using AI Vision OCR."""
+    if not image_bytes:
+        return {"success": False, "error": "لم يتم تقديم صورة لشهادة الملكية."}
+
+    if not provider or not api_key:
+        try:
+            import config
+            provider, model = config.load_ai_engine()
+            api_key = config.load_saved_api_keys(provider)
+        except Exception:
+            provider = provider or "google"
+
+    if provider == "openai":
+        res = _call_openai_vision(image_bytes, api_key, model_name or "gpt-4o", prompt=TUNISIAN_TITLE_DOC_PROMPT)
+    else:
+        res = _call_gemini_vision(image_bytes, api_key, model_name or "gemini-3.6-flash", prompt=TUNISIAN_TITLE_DOC_PROMPT)
+
+    if not res.get("success"):
+        return res
+
+    raw_text = res.get("transcription", "")
+    try:
+        from farida_engine import parse_title_document_text
+    except ImportError:
+        from core.farida_engine import parse_title_document_text
+
+    parsed = parse_title_document_text(raw_text)
+    return {
+        "success": True,
+        "data": parsed,
+        "raw_text": raw_text
+    }
+

@@ -4,7 +4,7 @@ import html
 import datetime
 import time
 from pathlib import Path
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QComboBox, QPushButton, QTabWidget, QFrame, QFileDialog, QMessageBox, QProgressBar, QListWidget, QListWidgetItem, QGridLayout, QScrollArea, QMenu
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QComboBox, QPushButton, QTabWidget, QFrame, QFileDialog, QMessageBox, QProgressBar, QListWidget, QListWidgetItem, QGridLayout, QScrollArea, QMenu, QRadioButton, QButtonGroup, QDateEdit
 from PySide6.QtCore import Qt, Signal, QThread, QTimer
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QCursor
 
@@ -417,6 +417,19 @@ class ScannerPage(QWidget):
         
         self.clients_list = []
 
+        # Audio recording state
+        self.recorded_file_path = ""
+        self.audio_bytes = None
+        self.audio_mime = "audio/wav"
+        self.rec_seconds = 0
+        self.audio_recorder = AudioRecorder()
+        self.audio_recorder.recording_started.connect(self.on_recording_started)
+        self.audio_recorder.recording_stopped.connect(self.on_recording_stopped)
+        self.audio_recorder.error_occurred.connect(self.on_recording_error)
+
+        self.rec_timer = QTimer(self)
+        self.rec_timer.timeout.connect(self._update_rec_timer_display)
+
         self.init_ui()
         self.load_clients_list()
         self.populate_contract_types()
@@ -497,6 +510,141 @@ class ScannerPage(QWidget):
         selectors_box.addWidget(self.btn_farida)
         left_lay.addLayout(selectors_box)
 
+        # Single Unified Dossier Selector Box & Custom Dossier Number Input
+        dossier_box = QHBoxLayout()
+        self.lbl_dossier = QLabel("الملف التوثيقي المربوط :" if self.lang == "ar" else "Dossier associé :", left_panel)
+        self.lbl_dossier.setStyleSheet("font-size:13px; font-weight:700; color:#1e3a8a; border:none;")
+        self.dossier_combo = QComboBox(left_panel)
+        self.dossier_combo.setFixedHeight(36)
+        self.dossier_combo.setStyleSheet("""
+            QComboBox {
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 0 10px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QComboBox:hover {
+                border-color: #3b82f6;
+            }
+        """)
+        self.dossier_combo.addItem("-- إنشاء ملف جديد لهذا العقد --" if self.lang == "ar" else "-- Nouveau dossier --", "")
+        self.dossier_combo.currentIndexChanged.connect(self.on_dossier_combo_changed)
+
+        self.lbl_dossier_num = QLabel("رقم الملف :" if self.lang == "ar" else "N° Dossier :", left_panel)
+        self.lbl_dossier_num.setStyleSheet("font-size:13px; font-weight:700; color:#1e3a8a; border:none;")
+        
+        self.var_dossier_num = QLineEdit(left_panel)
+        self.var_dossier_num.setFixedHeight(36)
+        self.var_dossier_num.setPlaceholderText("رقم الملف (مثال: 105)" if self.lang == "ar" else "N° dossier (ex: 105)")
+        self.var_dossier_num.setStyleSheet("""
+            QLineEdit {
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 0 10px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QLineEdit:focus {
+                border-color: #3b82f6;
+            }
+            QLineEdit:disabled {
+                background-color: #f1f5f9;
+                color: #64748b;
+            }
+        """)
+
+        dossier_box.addWidget(self.lbl_dossier)
+        dossier_box.addWidget(self.dossier_combo, 2)
+        dossier_box.addWidget(self.lbl_dossier_num)
+        dossier_box.addWidget(self.var_dossier_num, 1)
+        left_lay.addLayout(dossier_box)
+
+        # ── Dedicated Contract Date Selection Box (إعدادات تاريخ تحرير العقد) ──
+        date_box_frame = QFrame(left_panel)
+        date_box_frame.setObjectName("date_box_frame")
+        date_box_frame.setStyleSheet("""
+            QFrame#date_box_frame {
+                background-color: #f8fafc;
+                border: 1px solid #cbd5e1;
+                border-radius: 8px;
+                padding: 4px;
+            }
+        """)
+        date_box_lay = QVBoxLayout(date_box_frame)
+        date_box_lay.setContentsMargins(10, 6, 10, 6)
+        date_box_lay.setSpacing(6)
+
+        header_date_lay = QHBoxLayout()
+        lbl_date_title = QLabel("تاريخ تحرير العقد :" if self.lang == "ar" else "Date de rédaction :", date_box_frame)
+        lbl_date_title.setStyleSheet("font-size:13px; font-weight:700; color:#1e3a8a; border:none;")
+        header_date_lay.addWidget(lbl_date_title)
+        
+        self.radio_date_auto = QRadioButton("تلقائي (تاريخ اليوم)" if self.lang == "ar" else "Automatique (Aujourd'hui)", date_box_frame)
+        self.radio_date_custom = QRadioButton("تحديد تاريخ مخصص" if self.lang == "ar" else "Date personnalisée", date_box_frame)
+        self.radio_date_auto.setChecked(True)
+        self.radio_date_auto.setStyleSheet("font-size:12px; font-weight:bold; color:#0f172a;")
+        self.radio_date_custom.setStyleSheet("font-size:12px; font-weight:bold; color:#0f172a;")
+        
+        header_date_lay.addWidget(self.radio_date_auto)
+        header_date_lay.addWidget(self.radio_date_custom)
+        
+        from PySide6.QtCore import QDate
+        from ui.components.calendar_utils import configure_calendar
+        
+        self.custom_date_edit = QDateEdit(QDate.currentDate(), date_box_frame)
+        self.custom_date_edit.setCalendarPopup(True)
+        self.custom_date_edit.setDisplayFormat("yyyy/MM/dd")
+        self.custom_date_edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.custom_date_edit.setFixedHeight(32)
+        self.custom_date_edit.setEnabled(False)
+        self.custom_date_edit.setStyleSheet("""
+            QDateEdit {
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 0 8px;
+                font-size: 13px;
+                font-weight: bold;
+            }
+            QDateEdit:disabled {
+                background-color: #f1f5f9;
+                color: #94a3b8;
+            }
+        """)
+        configure_calendar(self.custom_date_edit)
+        header_date_lay.addWidget(self.custom_date_edit)
+        
+        date_box_lay.addLayout(header_date_lay)
+        
+        # Live formatted date badge/preview
+        self.lbl_date_preview = QLabel(date_box_frame)
+        self.lbl_date_preview.setWordWrap(True)
+        self.lbl_date_preview.setStyleSheet("""
+            QLabel {
+                background-color: #eff6ff;
+                color: #1e40af;
+                border: 1px solid #bfdbfe;
+                border-radius: 6px;
+                padding: 6px 10px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+        """)
+        date_box_lay.addWidget(self.lbl_date_preview)
+        
+        # Connect signals
+        self.radio_date_auto.toggled.connect(self.on_date_mode_changed)
+        self.radio_date_custom.toggled.connect(self.on_date_mode_changed)
+        self.custom_date_edit.dateChanged.connect(self.on_custom_date_changed)
+        
+        left_lay.addWidget(date_box_frame)
+
         # ── Collapsible Section 1: CIN Cards & Registered Clients ──
         self.sec_cin = CollapsibleSection(("1. Cartes d'identité et clients enregistrés" if self.lang == "fr" else "1. بطاقات التعريف الوطنية والحرفاء المسجلين"), expanded=False, parent=left_panel)
         self.parties_lay = QHBoxLayout()
@@ -522,218 +670,98 @@ class ScannerPage(QWidget):
         self.sec_cin.add_widget(self.procuration_input)
         left_lay.addWidget(self.sec_cin)
 
-        # ── Collapsible Section 2: Voice Audio Dictation (3 tabs inside) ──
-        self.sec_audio = CollapsibleSection(("2. Dictée vocale des clauses du contrat" if self.lang == "fr" else "2. التسجيل والإملاء الصوتي لفصول العقد"), expanded=False, parent=left_panel)
-        self.audio_tabs = QTabWidget()
-        
-        # Tab 1: Mic
-        self.sub_tab_mic = QWidget()
-        mic_lay = QVBoxLayout(self.sub_tab_mic)
+        # ── Collapsible Section 2: Audio & Live Dictation Box (الإملاء والكتابة المباشرة) ──
+        self.sec_audio = CollapsibleSection(
+            ("2. Dictée et transcription orale (Optionnel)" if self.lang == "fr" else "2. الإملاء والكتابة المباشرة والتفريغ الصوتي (اختياري)"),
+            expanded=False,
+            parent=left_panel
+        )
+
+        self.audio_tabs = QTabWidget(self.sec_audio)
+        self.audio_tabs.setStyleSheet("""
+            QTabWidget::pane { border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; }
+            QTabBar::tab { background: #f1f5f9; color: #475569; padding: 8px 14px; font-weight: bold; border-radius: 4px; margin-right: 4px; }
+            QTabBar::tab:selected { background: #1e3a8a; color: #ffffff; }
+        """)
+
+        # Tab 1: Live Dictation Mic
+        tab_mic = QWidget()
+        mic_lay = QVBoxLayout(tab_mic)
+        mic_lay.setSpacing(8)
+
+        self.mic_status_lbl = QLabel("حالة المايكروفون : جاهز للتسجيل" if self.lang != "fr" else "Statut micro : Prêt", tab_mic)
+        self.mic_status_lbl.setStyleSheet("color: #475569; font-size: 12px;")
+        mic_lay.addWidget(self.mic_status_lbl)
+
         mic_btn_lay = QHBoxLayout()
-        self.start_mic_btn = QPushButton("Enregistrer" if self.lang == "fr" else "🎙️ بدء التسجيل", self.sub_tab_mic)
+        self.start_mic_btn = QPushButton("🎙️ بدء التسجيل" if self.lang != "fr" else "🎙️ Démarrer", tab_mic)
         self.start_mic_btn.setProperty("class", "PrimaryButton")
         self.start_mic_btn.clicked.connect(self.start_recording)
 
-        self.stop_mic_btn = QPushButton("Arrêter" if self.lang == "fr" else "⏹️ إيقاف التسجيل", self.sub_tab_mic)
+        self.stop_mic_btn = QPushButton("⏹️ إيقاف" if self.lang != "fr" else "⏹️ Arrêter", tab_mic)
         self.stop_mic_btn.setProperty("class", "SecondaryButton")
         self.stop_mic_btn.setEnabled(False)
         self.stop_mic_btn.clicked.connect(self.stop_recording)
 
-        self.save_audio_btn = QPushButton("Sauvegarder" if self.lang == "fr" else "💾 حفظ التسجيل", self.sub_tab_mic)
-        self.save_audio_btn.setStyleSheet("background-color: #eff6ff; color: #1d4ed8; border: 1px solid #93c5fd; font-weight: bold; border-radius: 6px; padding: 6px 14px;")
+        mic_btn_lay.addWidget(self.start_mic_btn)
+        mic_btn_lay.addWidget(self.stop_mic_btn)
+        mic_lay.addLayout(mic_btn_lay)
+
+        mic_actions_lay = QHBoxLayout()
+        self.save_audio_btn = QPushButton("💾 حفظ التسجيل" if self.lang != "fr" else "💾 Enregistrer", tab_mic)
+        self.save_audio_btn.setProperty("class", "SecondaryButton")
         self.save_audio_btn.setVisible(False)
         self.save_audio_btn.clicked.connect(self.save_audio_to_laptop)
 
-        self.delete_audio_btn = QPushButton("Supprimer" if self.lang == "fr" else "🗑️ حذف التسجيل", self.sub_tab_mic)
-        self.delete_audio_btn.setStyleSheet("background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; font-weight: bold; border-radius: 6px; padding: 6px 14px;")
+        self.delete_audio_btn = QPushButton("🗑️ حذف التسجيل" if self.lang != "fr" else "🗑️ Supprimer", tab_mic)
+        self.delete_audio_btn.setProperty("class", "SecondaryButton")
         self.delete_audio_btn.setVisible(False)
         self.delete_audio_btn.clicked.connect(self.clear_audio_recording)
 
-        mic_btn_lay.addWidget(self.start_mic_btn)
-        mic_btn_lay.addWidget(self.stop_mic_btn)
-        mic_btn_lay.addWidget(self.save_audio_btn)
-        mic_btn_lay.addWidget(self.delete_audio_btn)
-        mic_lay.addLayout(mic_btn_lay)
-        self.mic_status_lbl = QLabel(("Statut : prêt" if self.lang == "fr" else "حالة المايكروفون : جاهز"), self.sub_tab_mic)
-        self.mic_status_lbl.setStyleSheet("color: #64748b; font-style: italic;")
-        mic_lay.addWidget(self.mic_status_lbl)
-        self.audio_tabs.addTab(self.sub_tab_mic, "تسجيل مايكروفون")
-        
-        # Tab 2: File Import
-        self.sub_tab_file = QWidget()
-        file_lay = QVBoxLayout(self.sub_tab_file)
-        file_btn_lay = QHBoxLayout()
-        self.upload_audio_btn = QPushButton(("Choisir un fichier audio" if self.lang == "fr" else "📁 اختيار ملف صوتي"), self.sub_tab_file)
-        self.upload_audio_btn.setProperty("class", "SecondaryButton")
-        self.upload_audio_btn.clicked.connect(self.upload_audio_file)
+        mic_actions_lay.addWidget(self.save_audio_btn)
+        mic_actions_lay.addWidget(self.delete_audio_btn)
+        mic_lay.addLayout(mic_actions_lay)
 
-        self.delete_file_btn = QPushButton(("Supprimer" if self.lang == "fr" else "🗑️ حذف الملف"), self.sub_tab_file)
-        self.delete_file_btn.setStyleSheet("background-color: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; font-weight: bold; border-radius: 6px; padding: 6px 14px;")
+        # Tab 2: Upload Audio File
+        tab_file = QWidget()
+        file_lay = QVBoxLayout(tab_file)
+        file_lay.setSpacing(8)
+
+        self.upload_file_btn = QPushButton("📁 اختيار ملف صوتي من الجهاز" if self.lang != "fr" else "📁 Parcourir fichier audio", tab_file)
+        self.upload_file_btn.setProperty("class", "SecondaryButton")
+        self.upload_file_btn.clicked.connect(self.upload_audio_file)
+        file_lay.addWidget(self.upload_file_btn)
+
+        self.audio_path_lbl = QLabel("لا يوجد ملف" if self.lang != "fr" else "Aucun fichier", tab_file)
+        self.audio_path_lbl.setStyleSheet("color: #64748b; font-size: 11px;")
+        file_lay.addWidget(self.audio_path_lbl)
+
+        self.delete_file_btn = QPushButton("🗑️ حذف الملف الصوتي" if self.lang != "fr" else "🗑️ Supprimer le fichier", tab_file)
+        self.delete_file_btn.setProperty("class", "SecondaryButton")
         self.delete_file_btn.setVisible(False)
         self.delete_file_btn.clicked.connect(self.clear_audio_recording)
+        file_lay.addWidget(self.delete_file_btn)
 
-        file_btn_lay.addWidget(self.upload_audio_btn)
-        file_btn_lay.addWidget(self.delete_file_btn)
-        file_lay.addLayout(file_btn_lay)
-        self.audio_path_lbl = QLabel(("Aucun fichier" if self.lang == "fr" else "لا يوجد ملف"), self.sub_tab_file)
-        file_lay.addWidget(self.audio_path_lbl)
-        self.audio_tabs.addTab(self.sub_tab_file, "استيراد ملف صوتي")
-        
-        # Tab 3: Text Direct Input
-        self.sub_tab_text = QWidget()
-        text_lay = QVBoxLayout(self.sub_tab_text)
-        self.transcription_output = QTextEdit(self.sub_tab_text)
-        text_lay.addWidget(self.transcription_output)
-        self.audio_tabs.addTab(self.sub_tab_text, "إملاء وكتابة مباشرة")
-        
+        # Tab 3: Text Transcription Output
+        tab_trans = QWidget()
+        trans_lay = QVBoxLayout(tab_trans)
+        self.transcription_output = QTextEdit(tab_trans)
+        self.transcription_output.setPlaceholderText("النص المفرغ من التسجيل الصوتي سيعرض هنا..." if self.lang != "fr" else "Le texte transcrit s'affichera ici...")
+        self.transcription_output.setMinimumHeight(80)
+        trans_lay.addWidget(self.transcription_output)
+
+        self.audio_tabs.addTab(tab_mic, "تسجيل مباشر" if self.lang != "fr" else "Enregistrement")
+        self.audio_tabs.addTab(tab_file, "رفع ملف صوتي" if self.lang != "fr" else "Fichier audio")
+        self.audio_tabs.addTab(tab_trans, "النص المفرغ" if self.lang != "fr" else "Transcription")
+
         self.sec_audio.add_widget(self.audio_tabs)
         left_lay.addWidget(self.sec_audio)
-
-        # ── Collapsible Section 3: Variables Form ──
-        self.sec_vars = CollapsibleSection(
-            "3. Variables du contrat" if self.lang == "fr"
-            else "3. الحقول التحريرية والتفاصيل المادية للعقد",
-            expanded=False, parent=left_panel)
-        vars_grid = QGridLayout()
-        vars_grid.setSpacing(8)
-        
-        self.var_p1_name = QLineEdit(self.sec_vars)
-        self.var_p1_cin = QLineEdit(self.sec_vars)
-        self.var_p1_job = QLineEdit(self.sec_vars)
-        self.var_p1_addr = QLineEdit(self.sec_vars)
-        
-        self.var_p2_name = QLineEdit(self.sec_vars)
-        self.var_p2_cin = QLineEdit(self.sec_vars)
-        self.var_p2_job = QLineEdit(self.sec_vars)
-        self.var_p2_addr = QLineEdit(self.sec_vars)
-        
-        self.var_property_desc = QTextEdit(self.sec_vars)
-        self.var_property_desc.setMaximumHeight(50)
-        self.var_ownership_origin = QTextEdit(self.sec_vars)
-        self.var_ownership_origin.setMaximumHeight(50)
-        self.var_price_num = QLineEdit(self.sec_vars)
-        self.var_price_words = QLineEdit(self.sec_vars)
-        
-        self.var_prop_title = QLineEdit(self.sec_vars)
-        self.var_titre_foncier = QLineEdit(self.sec_vars)
-        self.var_titre_gov = QLineEdit(self.sec_vars)
-        self.var_prop_location = QLineEdit(self.sec_vars)
-        self.var_prop_area = QLineEdit(self.sec_vars)
-        
-        self.var_witness1_name = QLineEdit(self.sec_vars)
-        self.var_witness1_cin = QLineEdit(self.sec_vars)
-        self.var_witness2_name = QLineEdit(self.sec_vars)
-        self.var_witness2_cin = QLineEdit(self.sec_vars)
-        
-        # Labels follow the selected language instead of showing both at once. They
-        # are kept on self so update_language() can retranslate them; anonymous
-        # QLabel(...) calls in a grid cannot be reached again after construction,
-        # which is why this whole section stayed bilingual whatever the setting.
-        is_fr = self.lang == "fr"
-        self.var_labels = {}
-
-        def vlabel(key, fr, ar, bold=False):
-            text = fr if is_fr else ar
-            lb = QLabel(f"<b>{text}</b>" if bold else text, self.sec_vars)
-            lb.setStyleSheet(
-                "font-size:12px; font-weight:700; color:#1e3a8a; border:none;" if bold
-                else "font-size:12px; color:#475569; border:none;")
-            self.var_labels[key] = (lb, fr, ar, bold)
-            return lb
-
-        # Uniform control heights so the rows line up instead of stepping up and down.
-        for w in (self.var_p1_name, self.var_p1_cin, self.var_p1_job, self.var_p1_addr,
-                  self.var_p2_name, self.var_p2_cin, self.var_p2_job, self.var_p2_addr,
-                  self.var_price_num, self.var_price_words,
-                  self.var_prop_title, self.var_titre_foncier, self.var_titre_gov,
-                  self.var_prop_location, self.var_prop_area,
-                  self.var_witness1_name, self.var_witness1_cin,
-                  self.var_witness2_name, self.var_witness2_cin):
-            w.setFixedHeight(34)
-        for te in (self.var_property_desc, self.var_ownership_origin):
-            te.setMinimumHeight(60)
-            te.setMaximumHeight(70)
-
-        # Inputs take the space; label columns stay narrow and fixed.
-        vars_grid.setColumnStretch(1, 1)
-        vars_grid.setColumnStretch(3, 1)
-        vars_grid.setColumnMinimumWidth(0, 130)
-        vars_grid.setColumnMinimumWidth(2, 130)
-        vars_grid.setVerticalSpacing(10)
-        vars_grid.setHorizontalSpacing(10)
-
-        vars_grid.addWidget(vlabel("p1", "Partie 1", "الطرف الأول", bold=True), 0, 0, 1, 4)
-        vars_grid.addWidget(vlabel("p1_name", "Nom", "الاسم واللقب"), 1, 0)
-        vars_grid.addWidget(self.var_p1_name, 1, 1)
-        vars_grid.addWidget(vlabel("p1_cin", "CIN", "رقم بطاقة التعريف"), 1, 2)
-        vars_grid.addWidget(self.var_p1_cin, 1, 3)
-        vars_grid.addWidget(vlabel("p1_job", "Métier", "المهنة"), 2, 0)
-        vars_grid.addWidget(self.var_p1_job, 2, 1)
-        vars_grid.addWidget(vlabel("p1_addr", "Adresse", "العنوان"), 2, 2)
-        vars_grid.addWidget(self.var_p1_addr, 2, 3)
-
-        vars_grid.addWidget(vlabel("p2", "Partie 2", "الطرف الثاني", bold=True), 3, 0, 1, 4)
-        vars_grid.addWidget(vlabel("p2_name", "Nom", "الاسم واللقب"), 4, 0)
-        vars_grid.addWidget(self.var_p2_name, 4, 1)
-        vars_grid.addWidget(vlabel("p2_cin", "CIN", "رقم بطاقة التعريف"), 4, 2)
-        vars_grid.addWidget(self.var_p2_cin, 4, 3)
-        vars_grid.addWidget(vlabel("p2_job", "Métier", "المهنة"), 5, 0)
-        vars_grid.addWidget(self.var_p2_job, 5, 1)
-        vars_grid.addWidget(vlabel("p2_addr", "Adresse", "العنوان"), 5, 2)
-        vars_grid.addWidget(self.var_p2_addr, 5, 3)
-
-        vars_grid.addWidget(vlabel("obj", "Objet du contrat", "العقار والموضوع", bold=True), 6, 0, 1, 4)
-        vars_grid.addWidget(vlabel("prop_title", "Nom de l'immeuble", "اسم العقار"), 7, 0)
-        vars_grid.addWidget(self.var_prop_title, 7, 1)
-        vars_grid.addWidget(vlabel("titre_foncier", "N° Titre foncier", "رقم الرسم العقاري"), 7, 2)
-        vars_grid.addWidget(self.var_titre_foncier, 7, 3)
-
-        vars_grid.addWidget(vlabel("titre_gov", "Gouvernorat", "ولاية الرسم"), 8, 0)
-        vars_grid.addWidget(self.var_titre_gov, 8, 1)
-        vars_grid.addWidget(vlabel("prop_location", "Emplacement", "موقع العقار الكائن بـ"), 8, 2)
-        vars_grid.addWidget(self.var_prop_location, 8, 3)
-
-        vars_grid.addWidget(vlabel("prop_area", "Superficie (m²)", "المساحة (م²)"), 9, 0)
-        vars_grid.addWidget(self.var_prop_area, 9, 1)
-
-        vars_grid.addWidget(vlabel("obj_desc", "Objet et limites", "توصيف العقار والحدود"), 10, 0)
-        vars_grid.addWidget(self.var_property_desc, 10, 1, 1, 3)
-        vars_grid.addWidget(vlabel("obj_origin", "Origine de propriété", "أصل الملكية"), 11, 0)
-        vars_grid.addWidget(self.var_ownership_origin, 11, 1, 1, 3)
-        vars_grid.addWidget(vlabel("price_num", "Prix (chiffres)", "الثمن بالأرقام"), 12, 0)
-        vars_grid.addWidget(self.var_price_num, 12, 1)
-        vars_grid.addWidget(vlabel("price_words", "Prix (lettres)", "الثمن بالحروف"), 12, 2)
-        vars_grid.addWidget(self.var_price_words, 12, 3)
-
-        vars_grid.addWidget(vlabel("wit", "Témoins", "الشهود", bold=True), 13, 0, 1, 4)
-        vars_grid.addWidget(vlabel("w1", "Témoin 1", "الشاهد الأول"), 14, 0)
-        vars_grid.addWidget(self.var_witness1_name, 14, 1)
-        vars_grid.addWidget(vlabel("w1_cin", "CIN témoin 1", "بطاقة الشاهد الأول"), 14, 2)
-        vars_grid.addWidget(self.var_witness1_cin, 14, 3)
-        vars_grid.addWidget(vlabel("w2", "Témoin 2", "الشاهد الثاني"), 15, 0)
-        vars_grid.addWidget(self.var_witness2_name, 15, 1)
-        vars_grid.addWidget(vlabel("w2_cin", "CIN témoin 2", "بطاقة الشاهد الثاني"), 15, 2)
-        vars_grid.addWidget(self.var_witness2_cin, 15, 3)
-
-        self.sec_vars.add_layout(vars_grid)
-
-        self.quick_witness_btn = QPushButton(
-            "Remplir les témoins" if is_fr else "تعبئة الشهود", self.sec_vars)
-        self.quick_witness_btn.setProperty("class", "SecondaryButton")
-        self.quick_witness_btn.clicked.connect(self.quick_fill_witnesses)
-        self.sec_vars.add_widget(self.quick_witness_btn)
-        
-        self.refresh_vars_btn = QPushButton(("Actualiser les modifications" if self.lang == "fr" else "إعادة تحديث المحرر بالتعديلات الحالية"), self.sec_vars)
-        self.refresh_vars_btn.setProperty("class", "PrimaryButton")
-        self.refresh_vars_btn.clicked.connect(self.refresh_contract_preview_text)
-        self.sec_vars.add_widget(self.refresh_vars_btn)
-        
-        left_lay.addWidget(self.sec_vars)
 
         # Progress bar & Actions
         self.progress_bar = QProgressBar(left_panel)
         self.progress_bar.setVisible(False)
         self.progress_bar.setStyleSheet("QProgressBar { max-height: 14px; }")
+        left_lay.addWidget(self.progress_bar)
         left_lay.addWidget(self.progress_bar)
 
         btn_box = QHBoxLayout()
@@ -838,30 +866,6 @@ class ScannerPage(QWidget):
         self.copy_btn.clicked.connect(self.copy_contract_text)
         right_lay.addWidget(self.copy_btn)
 
-        # Legal Audit Controls
-        self.audit_btn = QPushButton(("Vérifier le contrat et détecter les risques" if self.lang == "fr" else "فحص العقد واكتشاف الثغرات الآن"), right_panel)
-        self.audit_btn.setProperty("class", "SecondaryButton")
-        self.audit_btn.clicked.connect(self.run_legal_audit)
-        right_lay.addWidget(self.audit_btn)
-
-        # Audit conformité scroll area
-        self.audit_scroll = QScrollArea(right_panel)
-        self.audit_scroll.setWidgetResizable(True)
-        self.audit_scroll.setMinimumHeight(150)
-        self.audit_scroll.setStyleSheet("QScrollArea { border: 1.5px solid #cbd5e1; border-radius: 8px; background: #ffffff; }")
-        
-        self.audit_container = QWidget()
-        self.audit_lay = QVBoxLayout(self.audit_container)
-        self.audit_lay.setContentsMargins(8, 8, 8, 8)
-        self.audit_lay.setSpacing(6)
-        
-        self.audit_status_lbl = QLabel(("Aucune vérification effectuée" if self.lang == "fr" else "لم يتم فحص العقد بعد"), self.audit_container)
-        self.audit_status_lbl.setStyleSheet("color: #64748b; font-style: italic;")
-        self.audit_lay.addWidget(self.audit_status_lbl)
-        
-        self.audit_scroll.setWidget(self.audit_container)
-        right_lay.addWidget(self.audit_scroll)
-
         # Exports
         exports_box = QHBoxLayout()
         self.export_word_btn = QPushButton("Word (.docx)", right_panel)
@@ -889,9 +893,31 @@ class ScannerPage(QWidget):
         self.client_count_lbl.setStyleSheet("color: #475569; font-size: 11px;")
         right_lay.addWidget(self.client_count_lbl)
 
+        self.add_extra_client_btn = QPushButton("➕ إضافة / اختيار حريف إضافي من الأرشيف", right_panel)
+        self.add_extra_client_btn.setFixedHeight(34)
+        self.add_extra_client_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.add_extra_client_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #f0fdf4;
+                color: #15803d;
+                border: 1.5px dashed #86efac;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 0 12px;
+            }
+            QPushButton:hover {
+                background-color: #dcfce7;
+                border-color: #4ade80;
+            }
+        """)
+        self.add_extra_client_btn.clicked.connect(self.open_add_extra_client_dialog)
+        right_lay.addWidget(self.add_extra_client_btn)
+
         self.archive_list = QListWidget(right_panel)
         self.archive_list.setMinimumHeight(120)
         self.archive_list.setStyleSheet("QListWidget { border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; }")
+        self.archive_list.itemChanged.connect(self.on_archive_item_changed)
         right_lay.addWidget(self.archive_list)
 
         self.archive_btn = QPushButton("أرشفة العقد المختار في مجلدات الحرفاء المحددين", right_panel)
@@ -907,18 +933,54 @@ class ScannerPage(QWidget):
 
     # ── IA Provider selection ──
     def filter_clients(self, text):
-        """
-        Searches the whole client table, not just the rows already loaded.
-
-        Hiding rows in a list capped at 1,000 meant every client past that point was
-        unreachable; the query now goes to the database so any client can be found.
-        """
         q = (text or "").strip()
         if not q:
-            self._populate_client_list(
-                reception.get_all_clients_summary(limit=self.CLIENT_LIST_PAGE), searching=False)
+            self.refresh_chosen_clients_archive_list()
             return
-        self._populate_client_list(reception.search_clients_summary(q), searching=True)
+
+        search_results = reception.search_clients_summary(q)
+        checked_cids = set()
+        for i in range(self.archive_list.count()):
+            item = self.archive_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                cid = item.data(Qt.ItemDataRole.UserRole)
+                if cid:
+                    checked_cids.add(cid)
+
+        self.archive_list.clear()
+
+        # Keep already checked/chosen clients checked
+        for cid in checked_cids:
+            c = reception.get_client_by_id(cid)
+            if c:
+                fn = c.get("full_name") or f"{c.get('prenom','')} {c.get('nom','')}".strip()
+                cin_num = c.get("cin_number", "—")
+                item = QListWidgetItem(f"✓ {fn} (CIN: {cin_num}) [محدد]")
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item.setCheckState(Qt.CheckState.Checked)
+                item.setData(Qt.ItemDataRole.UserRole, cid)
+                self.archive_list.addItem(item)
+
+        # Add search results
+        for c in search_results:
+            cid = c.get("client_id")
+            if cid in checked_cids:
+                continue
+            fn = c.get("name") or f"{c.get('prenom','')} {c.get('nom','')}".strip()
+            item = QListWidgetItem(f"{fn} (CIN: {c.get('cin', '—')})")
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            item.setData(Qt.ItemDataRole.UserRole, cid)
+            self.archive_list.addItem(item)
+
+        try:
+            total = reception.count_clients()
+        except Exception:
+            total = 0
+        shown = len(search_results)
+        if hasattr(self, "client_count_lbl"):
+            self.client_count_lbl.setText(f"نتائج البحث في أرشيف الحرفاء: {shown} من مجموع {total} حريف")
+            self.client_count_lbl.setStyleSheet("color: #1e40af; font-size: 11px; font-weight: bold;")
 
     # -- Party cards ---------------------------------------------------------
     # Each party used to get its own QComboBox filled one addItem() at a time with all
@@ -977,7 +1039,7 @@ class ScannerPage(QWidget):
         combo = QComboBox(card)
         combo.setModel(self._ensure_client_model())
         self._select_client_in_combo(combo, party["client_id"])
-        combo.currentIndexChanged.connect(lambda _, i=idx: on_selected(i))
+        combo.currentIndexChanged.connect(lambda _, i=idx, cb=combo: on_selected(i, cb))
         card_lay.addWidget(QLabel("حريف مسجل :"))
         card_lay.addWidget(combo)
 
@@ -1093,15 +1155,117 @@ class ScannerPage(QWidget):
             self.p2_parties.pop()
         self.rebuild_parties_ui()
 
-    def on_p1_client_selected(self, idx):
-        sender = self.sender()
-        if isinstance(sender, QComboBox):
-            self.p1_parties[idx]["client_id"] = sender.currentData()
+    def update_dossiers_combo(self):
+        if not hasattr(self, "dossier_combo"):
+            return
+        try:
+            client_ids = []
+            for p in self.p1_parties + self.p2_parties:
+                cid = p.get("client_id")
+                if cid and cid not in client_ids:
+                    client_ids.append(cid)
 
-    def on_p2_client_selected(self, idx):
-        sender = self.sender()
+            current_data = self.dossier_combo.currentData()
+            self.dossier_combo.clear()
+            self.dossier_combo.addItem("-- إنشاء ملف جديد لهذا العقد --" if self.lang == "ar" else "-- Nouveau dossier --", "")
+
+            added_cases = set()
+            for cid in client_ids:
+                client = reception.get_client_by_id(cid) or {}
+                c_name = client.get("full_name") or f"حريف {cid}"
+                cases = reception.get_client_cases(cid)
+                for cs in cases:
+                    case_id = cs.get("case_id")
+                    if case_id and case_id not in added_cases:
+                        added_cases.add(case_id)
+                        title = cs.get("title") or cs.get("service_type") or "ملف"
+                        status = cs.get("status", "جديد")
+                        self.dossier_combo.addItem(f"ملف عدد {case_id} — {title} ({c_name} | {status})", case_id)
+
+            idx = self.dossier_combo.findData(current_data)
+            if idx >= 0:
+                self.dossier_combo.setCurrentIndex(idx)
+        except Exception as ex:
+            print("update_dossiers_combo error:", ex)
+
+    def on_dossier_combo_changed(self, idx=None):
+        if not hasattr(self, "dossier_combo") or not hasattr(self, "var_dossier_num"):
+            return
+        selected_id = self.dossier_combo.currentData()
+        if selected_id:
+            self.var_dossier_num.setText(str(selected_id))
+            self.var_dossier_num.setEnabled(False)
+        else:
+            self.var_dossier_num.clear()
+            self.var_dossier_num.setEnabled(True)
+
+    def on_p1_client_selected(self, idx, combo=None):
+        sender = combo if isinstance(combo, QComboBox) else self.sender()
         if isinstance(sender, QComboBox):
-            self.p2_parties[idx]["client_id"] = sender.currentData()
+            cid = sender.currentData()
+            self.p1_parties[idx]["client_id"] = cid
+            if cid:
+                client = reception.get_client_by_id(cid)
+                if client:
+                    while len(self.p1_extracted) <= idx:
+                        self.p1_extracted.append({})
+                    self.p1_extracted[idx] = {
+                        "full_name": client.get("full_name") or f"{client.get('prenom','')} {client.get('nom','')}".strip(),
+                        "cin_number": client.get("cin_number", ""),
+                        "issue_date": client.get("cin_issue_date") or client.get("cin_date_place", ""),
+                        "birth_date": client.get("birth_date", ""),
+                        "birth_place": client.get("birth_place", ""),
+                        "job": client.get("profession", ""),
+                        "address": client.get("address", ""),
+                        "father_name": client.get("father_name", ""),
+                        "grandfather_name": client.get("grandfather_name", ""),
+                    }
+                    if idx == 0:
+                        self.contract_vars["party1_name"] = self.p1_extracted[0]["full_name"]
+                        self.contract_vars["party1_cin"] = self.p1_extracted[0]["cin_number"]
+                        self.contract_vars["party1_job"] = self.p1_extracted[0]["job"]
+                        self.contract_vars["party1_addr"] = self.p1_extracted[0]["address"]
+                        self.update_ui_fields_from_state()
+            else:
+                if idx < len(self.p1_extracted):
+                    self.p1_extracted[idx] = {}
+            self.update_dossiers_combo()
+            self.refresh_contract_preview_text()
+            self.refresh_chosen_clients_archive_list()
+
+    def on_p2_client_selected(self, idx, combo=None):
+        sender = combo if isinstance(combo, QComboBox) else self.sender()
+        if isinstance(sender, QComboBox):
+            cid = sender.currentData()
+            self.p2_parties[idx]["client_id"] = cid
+            if cid:
+                client = reception.get_client_by_id(cid)
+                if client:
+                    while len(self.p2_extracted) <= idx:
+                        self.p2_extracted.append({})
+                    self.p2_extracted[idx] = {
+                        "full_name": client.get("full_name") or f"{client.get('prenom','')} {client.get('nom','')}".strip(),
+                        "cin_number": client.get("cin_number", ""),
+                        "issue_date": client.get("cin_issue_date") or client.get("cin_date_place", ""),
+                        "birth_date": client.get("birth_date", ""),
+                        "birth_place": client.get("birth_place", ""),
+                        "job": client.get("profession", ""),
+                        "address": client.get("address", ""),
+                        "father_name": client.get("father_name", ""),
+                        "grandfather_name": client.get("grandfather_name", ""),
+                    }
+                    if idx == 0:
+                        self.contract_vars["party2_name"] = self.p2_extracted[0]["full_name"]
+                        self.contract_vars["party2_cin"] = self.p2_extracted[0]["cin_number"]
+                        self.contract_vars["party2_job"] = self.p2_extracted[0]["job"]
+                        self.contract_vars["party2_addr"] = self.p2_extracted[0]["address"]
+                        self.update_ui_fields_from_state()
+            else:
+                if idx < len(self.p2_extracted):
+                    self.p2_extracted[idx] = {}
+            self.update_dossiers_combo()
+            self.refresh_contract_preview_text()
+            self.refresh_chosen_clients_archive_list()
 
     def upload_cin_image(self, p_type, idx, face):
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1117,8 +1281,6 @@ class ScannerPage(QWidget):
             QMessageBox.warning(self, "بطاقة التعريف", f"تعذّر فتح الملف المختار:\n{ex}")
             return
 
-        # Verify the file really is a readable image now, rather than discovering it
-        # at generation time. The dialog's extension filter does not guarantee this.
         check = ocr_engine.inspect_card_image(img_bytes)
         if not check.get("ok"):
             QMessageBox.warning(
@@ -1140,6 +1302,13 @@ class ScannerPage(QWidget):
             p_list[idx]["back_bytes"] = None
             p_list[idx]["front_lbl"] = f"الوجهان معاً: {fname}"
             p_list[idx]["back_lbl"] = "(صورة واحدة تحتوي على الوجهين)"
+
+        # Save CIN photo to client attachments if client is selected
+        cid = p_list[idx].get("client_id")
+        if cid:
+            stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            reception.save_client_document(cid, img_bytes, f"بطاقة_تعريف_{fname}_{stamp}.jpg")
+
         self.rebuild_parties_ui()
 
         # Always reload AI settings first so ocr_api_key is guaranteed fresh on upload
@@ -1221,50 +1390,159 @@ class ScannerPage(QWidget):
     CLIENT_LIST_PAGE = 1000
 
     def load_clients_list(self):
-        """Loads the most recent clients, and says plainly how many are not shown."""
+        """Loads the most recent clients for party dropdowns, and initializes chosen archive list."""
         try:
             clients = reception.get_all_clients_summary(limit=self.CLIENT_LIST_PAGE)
         except reception.DataUnavailable:
-            QMessageBox.critical(
-                self, "Erreur", "La liste des clients n'a pas pu être lue.")
             clients = []
-        self._populate_client_list(clients, searching=False)
+        self.clients_list = [{
+            "id": c.get("client_id"),
+            "name": c.get("full_name"),
+            "cin": c.get("cin_number", "—")
+        } for c in clients]
         self.rebuild_parties_ui()
+        self.refresh_chosen_clients_archive_list()
+
+    def on_archive_item_changed(self, item):
+        if not item or self.archive_list.signalsBlocked():
+            return
+        if item.checkState() == Qt.CheckState.Unchecked:
+            row = self.archive_list.row(item)
+            if row >= 0:
+                self.archive_list.blockSignals(True)
+                self.archive_list.takeItem(row)
+                self.archive_list.blockSignals(False)
+
+            checked_count = sum(
+                1 for i in range(self.archive_list.count())
+                if self.archive_list.item(i).checkState() == Qt.CheckState.Checked
+            )
+            if hasattr(self, "client_count_lbl"):
+                if checked_count > 0:
+                    self.client_count_lbl.setText(f"أطراف العقد المحددة تلقائياً ({checked_count}) — يمكنك البحث في الأرشيف لإضافة حريف آخر")
+                    self.client_count_lbl.setStyleSheet("color: #059669; font-size: 11px; font-weight: bold;")
+                else:
+                    self.client_count_lbl.setText("لم يتم تحديد أطراف بعد — يرجى اختيار الحرفاء أو رفع بطاقات التعريف")
+                    self.client_count_lbl.setStyleSheet("color: #64748b; font-size: 11px;")
+
+    def open_add_extra_client_dialog(self, *args):
+        try:
+            from ui.dialogs.client_search_dialog import ClientSearchDialog
+            dlg = ClientSearchDialog(self, title="اختيار حريف إضافي لأرشفة العقد بملفه")
+            if dlg.exec() == QDialog.DialogCode.Accepted and dlg.selected_client:
+                c = dlg.selected_client
+                cid = str(c.get("client_id", "")).strip() if isinstance(c, dict) else ""
+                if not cid:
+                    return
+
+                self.archive_list.blockSignals(True)
+                already_in = False
+                for i in range(self.archive_list.count()):
+                    item = self.archive_list.item(i)
+                    if str(item.data(Qt.ItemDataRole.UserRole)).strip() == cid:
+                        item.setCheckState(Qt.CheckState.Checked)
+                        already_in = True
+                        break
+
+                if not already_in:
+                    fn = c.get("full_name") or f"{c.get('prenom','')} {c.get('nom','')}".strip()
+                    cin_num = c.get("cin_number", "—")
+                    item = QListWidgetItem(f"✓ {fn} (CIN: {cin_num}) [حريف إضافي]")
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                    item.setCheckState(Qt.CheckState.Checked)  # AUTO-TICKED!
+                    item.setData(Qt.ItemDataRole.UserRole, cid)
+                    self.archive_list.addItem(item)
+                self.archive_list.blockSignals(False)
+
+                checked_count = sum(
+                    1 for i in range(self.archive_list.count())
+                    if self.archive_list.item(i).checkState() == Qt.CheckState.Checked
+                )
+                if hasattr(self, "client_count_lbl"):
+                    self.client_count_lbl.setText(f"أطراف العقد والحرفاء المحددين تلقائياً ({checked_count})")
+                    self.client_count_lbl.setStyleSheet("color: #059669; font-size: 11px; font-weight: bold;")
+        except Exception as ex:
+            print("open_add_extra_client_dialog error:", ex)
+
+    def refresh_chosen_clients_archive_list(self):
+        """
+        Populates the archive_list ONLY with the specific clients chosen or extracted
+        for this contract, and automatically ticks (checks) them by default.
+        """
+        if not hasattr(self, "archive_list"):
+            return
+
+        self.archive_list.blockSignals(True)
+        self.archive_list.clear()
+
+        # Collect chosen client IDs from all active contract sources, strictly deduplicated by string ID
+        chosen_client_ids = []
+        seen = set()
+
+        def add_cid(raw_cid):
+            if raw_cid is None:
+                return
+            s_id = str(raw_cid).strip()
+            if s_id and s_id not in seen:
+                seen.add(s_id)
+                chosen_client_ids.append(s_id)
+
+        # 1. From dropdown / party card selections
+        for p in self.p1_parties + self.p2_parties:
+            add_cid(p.get("client_id"))
+
+        # 2. From extracted party records (p1_extracted, p2_extracted)
+        for p_list in (getattr(self, "p1_extracted", []), getattr(self, "p2_extracted", [])):
+            for ext in p_list:
+                cin = (ext.get("cin_number") or "").strip()
+                fn = (ext.get("full_name") or "").strip()
+                if cin or fn:
+                    c = reception.find_client_by_cin_or_name(cin_number=cin, full_name=fn)
+                    if c and c.get("client_id"):
+                        add_cid(c["client_id"])
+
+        # 3. From contract_vars CIN numbers or names
+        for prefix in ("party1", "party2"):
+            cin = (self.contract_vars.get(f"{prefix}_cin") or "").strip()
+            fn = (self.contract_vars.get(f"{prefix}_name") or "").strip()
+            if cin or fn:
+                c = reception.find_client_by_cin_or_name(cin_number=cin, full_name=fn)
+                if c and c.get("client_id"):
+                    add_cid(c["client_id"])
+
+        # Build list items for chosen clients ONLY, auto-ticked (Checked)
+        items_added = 0
+        for cid in chosen_client_ids:
+            c = reception.get_client_by_id(cid)
+            if c:
+                fn = c.get("full_name") or f"{c.get('prenom','')} {c.get('nom','')}".strip() or f"حريف {cid}"
+                cin_num = c.get("cin_number", "—")
+                item = QListWidgetItem(f"✓ {fn} (CIN: {cin_num})")
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item.setCheckState(Qt.CheckState.Checked)  # AUTO-TICKED!
+                item.setData(Qt.ItemDataRole.UserRole, cid)
+                self.archive_list.addItem(item)
+                items_added += 1
+
+        self.archive_list.blockSignals(False)
+
+        if hasattr(self, "client_count_lbl"):
+            if items_added > 0:
+                self.client_count_lbl.setText(f"أطراف العقد المحددة تلقائياً ({items_added}) — يمكنك البحث في الأرشيف لإضافة حريف آخر")
+                self.client_count_lbl.setStyleSheet("color: #059669; font-size: 11px; font-weight: bold;")
+            else:
+                self.client_count_lbl.setText("لم يتم تحديد أطراف بعد — يرجى اختيار الحرفاء أو رفع بطاقات التعريف")
+                self.client_count_lbl.setStyleSheet("color: #64748b; font-size: 11px;")
 
     def _populate_client_list(self, clients, searching: bool):
         self.clients_list = []
-        self.archive_list.clear()
-
         for c in clients:
             self.clients_list.append({
                 "id": c.get("client_id"),
                 "name": c.get("full_name"),
                 "cin": c.get("cin_number", "—")
             })
-            item = QListWidgetItem(f"{c.get('full_name')} (CIN: {c.get('cin_number', '—')})")
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Unchecked)
-            item.setData(Qt.ItemDataRole.UserRole, c.get("client_id"))
-            self.archive_list.addItem(item)
-
-        try:
-            total = reception.count_clients()
-        except reception.DataUnavailable:
-            total = 0
-        shown = len(clients)
-        if searching:
-            msg = f" نتائج البحث: {shown} من مجموع {total} حريف"
-        elif shown < total:
-            msg = (f"عرض {shown} من {total} حريف — استعمل خانة البحث للوصول إلى البقية "
-                   f"(Recherchez pour atteindre les {total - shown} autres)")
-        else:
-            msg = f"عرض كل الحرفاء ({total})"
-        if hasattr(self, "client_count_lbl"):
-            self.client_count_lbl.setText(msg)
-            self.client_count_lbl.setStyleSheet(
-                "color: #b45309; font-size: 11px; font-weight: bold;" if shown < total
-                else "color: #475569; font-size: 11px;"
-            )
+        self.refresh_chosen_clients_archive_list()
 
     def populate_contract_types(self):
         self.contract_menu = QMenu(self)
@@ -1314,6 +1592,7 @@ class ScannerPage(QWidget):
         self.contract_vars = contract_templates.get_default_variables(selected_type)
         self.contract_vars["contract_type"] = selected_type
 
+        self.update_contract_date_state()
         self.update_ui_fields_from_state()
         self.refresh_contract_preview_text()
         self.rebuild_parties_ui()
@@ -1326,61 +1605,100 @@ class ScannerPage(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         self.update_office_header()
+        self.update_contract_date_state()
         self.refresh_contract_preview_text()
+
+    def on_date_mode_changed(self):
+        is_custom = hasattr(self, "radio_date_custom") and self.radio_date_custom.isChecked()
+        if hasattr(self, "custom_date_edit"):
+            self.custom_date_edit.setEnabled(is_custom)
+        self.update_contract_date_state()
+
+    def on_custom_date_changed(self, qdate):
+        self.update_contract_date_state()
+
+    def update_contract_date_state(self):
+        import datetime, contract_templates
+        if hasattr(self, "radio_date_custom") and self.radio_date_custom.isChecked():
+            qd = self.custom_date_edit.date()
+            py_date = datetime.date(qd.year(), qd.month(), qd.day())
+        else:
+            py_date = datetime.date.today()
+
+        date_info = contract_templates.get_current_arabic_date_info(dt=py_date)
+        self.contract_vars["date_info"] = date_info
+        self.contract_vars["custom_date"] = py_date
+        
+        if hasattr(self, "lbl_date_preview"):
+            self.lbl_date_preview.setText(f"التاريخ الرسمي المصرح به في العقد: {date_info['full_date_text_no_time']}")
+
+        if hasattr(self, "editor"):
+            self.refresh_contract_preview_text()
 
     def on_contract_type_changed(self):
         pass
 
     def update_ui_fields_from_state(self):
-        self.var_p1_name.setText(self.contract_vars.get("party1_name", ""))
-        self.var_p1_cin.setText(self.contract_vars.get("party1_cin", ""))
-        self.var_p1_job.setText(self.contract_vars.get("party1_job", ""))
-        self.var_p1_addr.setText(self.contract_vars.get("party1_addr", ""))
-        self.var_p2_name.setText(self.contract_vars.get("party2_name", ""))
-        self.var_p2_cin.setText(self.contract_vars.get("party2_cin", ""))
-        self.var_p2_job.setText(self.contract_vars.get("party2_job", ""))
-        self.var_p2_addr.setText(self.contract_vars.get("party2_addr", ""))
-        
-        self.var_property_desc.setPlainText(self.contract_vars.get("property_desc", ""))
-        self.var_ownership_origin.setPlainText(self.contract_vars.get("ownership_origin", ""))
-        self.var_price_num.setText(self.contract_vars.get("price_num", ""))
-        self.var_price_words.setText(self.contract_vars.get("price_words", ""))
-        self.var_prop_title.setText(self.contract_vars.get("property_title", ""))
-        self.var_titre_foncier.setText(self.contract_vars.get("titre_foncier", ""))
-        self.var_titre_gov.setText(self.contract_vars.get("titre_gov", ""))
-        self.var_prop_location.setText(self.contract_vars.get("property_location", ""))
-        self.var_prop_area.setText(self.contract_vars.get("property_area", ""))
+        for attr in ["var_p1_name", "var_p1_cin", "var_p1_job", "var_p1_addr",
+                     "var_p2_name", "var_p2_cin", "var_p2_job", "var_p2_addr",
+                     "var_price_num", "var_price_words", "var_prop_title",
+                     "var_titre_foncier", "var_titre_gov", "var_prop_location", "var_prop_area"]:
+            w = getattr(self, attr, None)
+            if w is not None:
+                key = attr.replace("var_", "")
+                w.setText(self.contract_vars.get(key, ""))
+
+        for attr in ["var_property_desc", "var_ownership_origin"]:
+            w = getattr(self, attr, None)
+            if w is not None:
+                key = attr.replace("var_", "")
+                w.setPlainText(self.contract_vars.get(key, ""))
 
     def pull_state_from_ui_fields(self):
+        import re
         widget_map_text = [
-            ("party1_name", self.var_p1_name),
-            ("party1_cin", self.var_p1_cin),
-            ("party1_job", self.var_p1_job),
-            ("party1_addr", self.var_p1_addr),
-            ("party2_name", self.var_p2_name),
-            ("party2_cin", self.var_p2_cin),
-            ("party2_job", self.var_p2_job),
-            ("party2_addr", self.var_p2_addr),
-            ("price_num", self.var_price_num),
-            ("price_words", self.var_price_words),
-            ("property_title", self.var_prop_title),
-            ("titre_foncier", self.var_titre_foncier),
-            ("titre_gov", self.var_titre_gov),
-            ("property_location", self.var_prop_location),
-            ("property_area", self.var_prop_area),
+            ("party1_name", getattr(self, "var_p1_name", None)),
+            ("party1_cin", getattr(self, "var_p1_cin", None)),
+            ("party1_job", getattr(self, "var_p1_job", None)),
+            ("party1_addr", getattr(self, "var_p1_addr", None)),
+            ("party2_name", getattr(self, "var_p2_name", None)),
+            ("party2_cin", getattr(self, "var_p2_cin", None)),
+            ("party2_job", getattr(self, "var_p2_job", None)),
+            ("party2_addr", getattr(self, "var_p2_addr", None)),
+            ("price_num", getattr(self, "var_price_num", None)),
+            ("price_words", getattr(self, "var_price_words", None)),
+            ("property_title", getattr(self, "var_prop_title", None)),
+            ("titre_foncier", getattr(self, "var_titre_foncier", None)),
+            ("titre_gov", getattr(self, "var_titre_gov", None)),
+            ("property_location", getattr(self, "var_prop_location", None)),
+            ("property_area", getattr(self, "var_prop_area", None)),
         ]
         for key, widget in widget_map_text:
-            val = widget.text().strip()
-            if val:
-                self.contract_vars[key] = val
+            if widget is not None:
+                val = widget.text().strip()
+                if val:
+                    self.contract_vars[key] = val
 
         for key, widget in [
-            ("property_desc", self.var_property_desc),
-            ("ownership_origin", self.var_ownership_origin),
+            ("property_desc", getattr(self, "var_property_desc", None)),
+            ("ownership_origin", getattr(self, "var_ownership_origin", None)),
         ]:
-            val = widget.toPlainText().strip()
-            if val:
-                self.contract_vars[key] = val
+            if widget is not None:
+                val = widget.toPlainText().strip()
+                if val:
+                    self.contract_vars[key] = val
+
+        p_num = self.contract_vars.get("price_num", "").strip()
+        p_words = self.contract_vars.get("price_words", "").strip()
+        if p_num and (not p_words or re.match(r"^[\d.,\s]+$", p_words)):
+            gen_words = contract_templates.number_to_arabic_words(p_num)
+            if gen_words:
+                if "دينار" not in gen_words and "مليم" not in gen_words:
+                    gen_words += " دينار"
+                self.contract_vars["price_words"] = gen_words
+                w_pw = getattr(self, "var_price_words", None)
+                if w_pw is not None:
+                    w_pw.setText(gen_words)
 
     def _build_party_list(self, party_slots, extracted_list, prefix, label_ar):
         """
@@ -1425,16 +1743,25 @@ class ScannerPage(QWidget):
         party1_list = self._build_party_list(self.p1_parties, self.p1_extracted, "party1", "الطرف الأول")
         party2_list = self._build_party_list(self.p2_parties, self.p2_extracted, "party2", "الطرف الثاني")
 
-        w1_name = self.var_witness1_name.text().strip()
-        w1_data = {"name": w1_name, "cin": self.var_witness1_cin.text().strip()} if w1_name else None
-        w2_name = self.var_witness2_name.text().strip()
-        w2_data = {"name": w2_name, "cin": self.var_witness2_cin.text().strip()} if w2_name else None
+        w1_w = getattr(self, "var_witness1_name", None)
+        w1_name = w1_w.text().strip() if w1_w is not None else ""
+        w1_cin_w = getattr(self, "var_witness1_cin", None)
+        w1_cin = w1_cin_w.text().strip() if w1_cin_w is not None else ""
+        w1_data = {"name": w1_name, "cin": w1_cin} if w1_name else None
+
+        w2_w = getattr(self, "var_witness2_name", None)
+        w2_name = w2_w.text().strip() if w2_w is not None else ""
+        w2_cin_w = getattr(self, "var_witness2_cin", None)
+        w2_cin = w2_cin_w.text().strip() if w2_cin_w is not None else ""
+        w2_data = {"name": w2_data, "cin": w2_cin} if w2_name else None
+
+        procuration_txt = self.procuration_input.toPlainText().strip() if hasattr(self, "procuration_input") and self.procuration_input else ""
 
         base_text = contract_templates.build_multi_party_contract_text(
             contract_type=self.selected_contract_type,
             party1_list=party1_list,
             party2_list=party2_list,
-            procuration_text=self.procuration_input.toPlainText().strip(),
+            procuration_text=procuration_txt,
             property_desc=self.contract_vars.get("property_desc", ""),
             price_words=self.contract_vars.get("price_words", ""),
             price_num=self.contract_vars.get("price_num", ""),
@@ -1452,10 +1779,14 @@ class ScannerPage(QWidget):
         self.ocr_edited_text = self.editor.toPlainText()
 
     def quick_fill_witnesses(self):
-        self.var_witness1_name.setText("حسان بن حمودة")
-        self.var_witness1_cin.setText("08123456")
-        self.var_witness2_name.setText("محمد العربي الزواوي")
-        self.var_witness2_cin.setText("09876543")
+        if hasattr(self, "var_witness1_name") and self.var_witness1_name:
+            self.var_witness1_name.setText("حسان بن حمودة")
+        if hasattr(self, "var_witness1_cin") and self.var_witness1_cin:
+            self.var_witness1_cin.setText("08123456")
+        if hasattr(self, "var_witness2_name") and self.var_witness2_name:
+            self.var_witness2_name.setText("محمد العربي الزواوي")
+        if hasattr(self, "var_witness2_cin") and self.var_witness2_cin:
+            self.var_witness2_cin.setText("09876543")
         self.refresh_contract_preview_text()
 
     def copy_contract_text(self):
@@ -1651,12 +1982,14 @@ class ScannerPage(QWidget):
         # party records and still reports success, producing a deed with no parties.
         has_p1 = any(p.get("client_id") or p.get("front_bytes") or p.get("back_bytes") for p in self.p1_parties)
         has_p2 = any(p.get("client_id") or p.get("front_bytes") or p.get("back_bytes") for p in self.p2_parties)
-        has_voice = bool(self.audio_bytes) or bool(self.transcription_output.toPlainText().strip())
+        audio_b = getattr(self, "audio_bytes", None)
+        trans_out = getattr(self, "transcription_output", None)
+        has_voice = bool(audio_b) or bool(trans_out.toPlainText().strip() if trans_out else False)
 
         if not (has_p1 or has_p2 or has_voice):
             QMessageBox.warning(
                 self, "Génération",
-                "يرجى اختيار حريف مسجل أو إرفاق بطاقات التعريف الوطنية أو تسجيل القراءة الصوتية قبل التوليد."
+                "يرجى اختيار حريف مسجل أو إرفاق بطاقات التعريف الوطنية قبل التوليد."
             )
             return
 
@@ -1684,14 +2017,17 @@ class ScannerPage(QWidget):
         self.progress_bar.setVisible(True)
         self.generate_btn.setEnabled(False)
 
+        proc_txt = self.procuration_input.toPlainText().strip() if hasattr(self, "procuration_input") and self.procuration_input else ""
+        voice_txt = trans_out.toPlainText() if trans_out else ""
+
         self.pipeline_thread = UnifiedPipelineThread(
             contract_type=self.selected_contract_type,
             p1_data=p1_payload,
             p2_data=p2_payload,
-            procuration_text=self.procuration_input.toPlainText().strip(),
-            audio_bytes=self.audio_bytes,
-            audio_mime=self.audio_mime,
-            voice_text=self.transcription_output.toPlainText(),
+            procuration_text=proc_txt,
+            audio_bytes=getattr(self, "audio_bytes", None),
+            audio_mime=getattr(self, "audio_mime", "audio/wav"),
+            voice_text=voice_txt,
             api_key=self.ocr_api_key,
             provider=self.ocr_provider,
             model=self.ocr_model,
@@ -1753,10 +2089,13 @@ class ScannerPage(QWidget):
         self.extra_foussoul = res.get("extra_foussoul") or []
 
         self.update_ui_fields_from_state()
+        self.refresh_chosen_clients_archive_list()
 
         if res.get("spoken_content"):
-            self.transcription_output.setPlainText(res.get("spoken_content"))
-            self.audio_tabs.setCurrentIndex(2)
+            if hasattr(self, "transcription_output") and self.transcription_output:
+                self.transcription_output.setPlainText(res.get("spoken_content"))
+            if hasattr(self, "audio_tabs") and self.audio_tabs:
+                self.audio_tabs.setCurrentIndex(2)
 
         try:
             self.refresh_contract_preview_text()
@@ -1852,10 +2191,13 @@ class ScannerPage(QWidget):
         self.contract_vars = contract_templates.get_default_variables(self.selected_contract_type)
         self.update_ui_fields_from_state()
         self.editor.clear()
-        self.procuration_input.clear()
-        self.transcription_output.clear()
+        if hasattr(self, "procuration_input") and self.procuration_input:
+            self.procuration_input.clear()
+        if hasattr(self, "transcription_output") and self.transcription_output:
+            self.transcription_output.clear()
         self.audio_bytes = None
-        self.audio_path_lbl.setText("لا يوجد ملف")
+        if hasattr(self, "audio_path_lbl") and self.audio_path_lbl:
+            self.audio_path_lbl.setText("لا يوجد ملف")
         self.p1_parties = [{"client_id": "", "front_bytes": None, "back_bytes": None, "front_lbl": "لا يوجد", "back_lbl": "لا يوجد"}]
         self.p2_parties = [{"client_id": "", "front_bytes": None, "back_bytes": None, "front_lbl": "لا يوجد", "back_lbl": "لا يوجد"}]
 
@@ -1868,10 +2210,11 @@ class ScannerPage(QWidget):
             self.archive_list.item(i).setCheckState(Qt.CheckState.Unchecked)
             
         self.rebuild_parties_ui()
-        self.clear_layout(self.audit_lay)
-        self.audit_status_lbl = QLabel(("Aucune vérification effectuée" if self.lang == "fr" else "لم يتم فحص العقد بعد"), self.audit_container)
-        self.audit_status_lbl.setStyleSheet("color: #64748b; font-style: italic;")
-        self.audit_lay.addWidget(self.audit_status_lbl)
+        if hasattr(self, "audit_lay") and self.audit_lay:
+            self.clear_layout(self.audit_lay)
+            self.audit_status_lbl = QLabel(("Aucune vérification effectuée" if self.lang == "fr" else "لم يتم فحص العقد بعد"), getattr(self, "audit_container", None))
+            self.audit_status_lbl.setStyleSheet("color: #64748b; font-style: italic;")
+            self.audit_lay.addWidget(self.audit_status_lbl)
         
         self.refresh_contract_preview_text()
 
@@ -2016,9 +2359,13 @@ class ScannerPage(QWidget):
     def export_word(self):
         if not self._contract_ready_for_output("التصدير بصيغة Word"):
             return
+        selected_dossier_id = self.dossier_combo.currentData() if hasattr(self, "dossier_combo") else ""
+        custom_dossier_input = self.var_dossier_num.text().strip() if hasattr(self, "var_dossier_num") else ""
+        dossier_num = selected_dossier_id or custom_dossier_input
+        default_filename = f"ملف_رقم_{dossier_num}.docx" if dossier_num else f"{self.selected_contract_type}_{datetime.date.today()}.docx"
         save_path, _ = QFileDialog.getSaveFileName(
             self, "Exporter en Word / حفظ بصيغة Word",
-            f"{self.selected_contract_type}_{datetime.date.today()}.docx",
+            default_filename,
             "Word Documents (*.docx)"
         )
         if save_path:
@@ -2041,10 +2388,13 @@ class ScannerPage(QWidget):
     def export_pdf(self):
         if not self._contract_ready_for_output("التصدير بصيغة PDF"):
             return
-
+        selected_dossier_id = self.dossier_combo.currentData() if hasattr(self, "dossier_combo") else ""
+        custom_dossier_input = self.var_dossier_num.text().strip() if hasattr(self, "var_dossier_num") else ""
+        dossier_num = selected_dossier_id or custom_dossier_input
+        default_filename = f"ملف_رقم_{dossier_num}.pdf" if dossier_num else f"{self.selected_contract_type}_{datetime.date.today()}.pdf"
         save_path, _ = QFileDialog.getSaveFileName(
             self, "Exporter en PDF / حفظ بصيغة PDF",
-            f"{self.selected_contract_type}_{datetime.date.today()}.pdf",
+            default_filename,
             "PDF Documents (*.pdf)"
         )
         if save_path:
@@ -2060,8 +2410,144 @@ class ScannerPage(QWidget):
                 QMessageBox.warning(self, "Export", f"فشل التصدير: {str(e)}")
 
     # ── Multiple Archiving ──
+    def open_case_creation_popup(self, p1_names_list, p2_names_list, selected_client_ids):
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QComboBox, QTextEdit, QMessageBox, QDialogButtonBox, QFileDialog
+        from ui.pages.fiche_client_page import MoneySpinBox
+
+        is_fr = self.lang == "fr"
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Nouveau Dossier Notarié" if is_fr else "فتح ملف إشهاد جديد")
+        dialog.setMinimumWidth(560)
+        dialog.setModal(True)
+        lay = QVBoxLayout(dialog)
+        lay.setSpacing(10)
+
+        # N° dossier custom
+        row_num = QHBoxLayout()
+        row_num.addWidget(QLabel("رقم الملف (اختياري) :" if not is_fr else "N° Dossier (optionnel) :"))
+        num_input = QLineEdit()
+        custom_input = self.var_dossier_num.text().strip() if hasattr(self, "var_dossier_num") else ""
+        if custom_input:
+            num_input.setText(custom_input)
+        row_num.addWidget(num_input, stretch=1)
+        lay.addLayout(row_num)
+
+        # Contract type (Categorized Options from contract_templates)
+        type_lbl = QLabel("نوع العقد :" if not is_fr else "Type de contrat :")
+        type_combo = QComboBox()
+        import contract_templates
+        contract_templates.populate_categorized_contract_types(type_combo, default_selected=self.selected_contract_type)
+        lay.addWidget(type_lbl)
+        lay.addWidget(type_combo)
+
+        p1_str = "\n".join([n for n in p1_names_list if n])
+        p2_str = "\n".join([n for n in p2_names_list if n])
+        all_party_names = [n for n in (p1_names_list + p2_names_list) if n]
+        names_str = " & ".join(all_party_names)
+
+        # Notes / Description
+        desc_lbl = QLabel("ملاحظات العقد :" if not is_fr else "Notes du contrat :")
+        desc_input = QTextEdit()
+        desc_input.setMaximumHeight(70)
+        default_desc = f"الأطراف المربوطة بالعقد:\nالطرف الأول: {', '.join(p1_names_list)}\nالطرف الثاني: {', '.join(p2_names_list)}" if (p1_names_list or p2_names_list) else ""
+        desc_input.setPlainText(default_desc)
+        lay.addWidget(desc_lbl)
+        lay.addWidget(desc_input)
+
+        # Financial section
+        fin_sep = QLabel("معطيات الخلاص والمالية" if not is_fr else "Informations Financières")
+        fin_sep.setStyleSheet("font-weight:bold; color:#0284c7; margin-top:6px;")
+        lay.addWidget(fin_sep)
+
+        fin_row = QHBoxLayout()
+        fin_row.addWidget(QLabel("الإجمالي :" if not is_fr else "Total :"))
+        tot_spin = MoneySpinBox(dialog)
+        fin_row.addWidget(tot_spin)
+        fin_row.addWidget(QLabel("التسبقة :" if not is_fr else "Acompte :"))
+        av_spin = MoneySpinBox(dialog)
+        fin_row.addWidget(av_spin)
+        lay.addLayout(fin_row)
+
+        notes_row = QHBoxLayout()
+        notes_row.addWidget(QLabel("طريقة الخلاص :" if not is_fr else "Mode de règlement :"))
+        notes_input = QLineEdit()
+        notes_row.addWidget(notes_input, stretch=1)
+        lay.addLayout(notes_row)
+
+        # File attachments
+        files_sep = QLabel("وثائق الملف" if not is_fr else "Documents du dossier")
+        files_sep.setStyleSheet("font-weight:bold; margin-top:6px;")
+        lay.addWidget(files_sep)
+
+        new_case_files = []
+        files_count_lbl = QLabel("لا يوجد ملف محدد" if not is_fr else "Aucun fichier")
+        files_count_lbl.setStyleSheet("color:#64748b; font-style:italic; font-size:11px;")
+
+        def browse_attach():
+            paths, _ = QFileDialog.getOpenFileNames(
+                dialog, "اختيار ملفات / Fichiers", "",
+                "Fichiers (*.pdf *.docx *.doc *.jpg *.jpeg *.png)"
+            )
+            if paths:
+                new_case_files.clear()
+                new_case_files.extend(paths)
+                files_count_lbl.setText(f"{len(paths)} ملف / fichier(s) sélectionné(s)")
+
+        files_row = QHBoxLayout()
+        browse_f_btn = QPushButton("استعراض" if not is_fr else "Parcourir")
+        browse_f_btn.clicked.connect(browse_attach)
+        files_row.addWidget(browse_f_btn)
+        files_row.addWidget(files_count_lbl, stretch=1)
+        lay.addLayout(files_row)
+
+        btn_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btn_box.accepted.connect(dialog.accept)
+        btn_box.rejected.connect(dialog.reject)
+        lay.addWidget(btn_box)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            tot_v = tot_spin.value()
+            av_v = av_spin.value()
+            if av_v >= tot_v and tot_v > 0:
+                p_status = "خالص بالكامل"
+            elif av_v > 0:
+                p_status = "تسبقة"
+            else:
+                p_status = "غير خالص"
+
+            primary_cid = selected_client_ids[0] if selected_client_ids else ""
+            custom_id = num_input.text().strip() or None
+            case_title = f"{type_combo.currentText()} ({names_str})" if names_str else f"{type_combo.currentText()}"
+
+            new_id = reception.create_case(
+                client_id=primary_cid,
+                service_type=type_combo.currentText(),
+                title=case_title,
+                description=desc_input.toPlainText().strip(),
+                total_amount=tot_v,
+                avance_amount=av_v,
+                payment_status=p_status,
+                payment_notes=notes_input.text().strip(),
+                custom_case_id=custom_id,
+                party1_name=p1_str,
+                party2_name=p2_str,
+                client_ids=selected_client_ids
+            )
+
+            # Save attached files to ALL client folders
+            for fpath in new_case_files:
+                try:
+                    with open(fpath, 'rb') as f:
+                        fbytes = f.read()
+                    for cid in selected_client_ids:
+                        reception.save_client_document(cid, fbytes, f"Dossier_{new_id}_{Path(fpath).name}")
+                except Exception:
+                    pass
+
+            return new_id
+        return None
+
     def archive_to_clients(self):
-        # Checked first: archiving writes into every selected client's permanent folder.
         if not self._contract_ready_for_output("الأرشفة"):
             return
 
@@ -2072,14 +2558,39 @@ class ScannerPage(QWidget):
             item = self.archive_list.item(i)
             if item.checkState() == Qt.CheckState.Checked:
                 cid = item.data(Qt.ItemDataRole.UserRole)
-                selected_client_ids.append(cid)
-                selected_client_names.append(item.text())
-                
+                if cid and cid not in selected_client_ids:
+                    selected_client_ids.append(cid)
+                    selected_client_names.append(item.text())
+
+        if not selected_client_ids:
+            for p in self.p1_parties + self.p2_parties:
+                cid = p.get("client_id")
+                if cid and cid not in selected_client_ids:
+                    selected_client_ids.append(cid)
+
         if not selected_client_ids:
             QMessageBox.warning(self, "Archivage", "يرجى تحديد حريف واحد على الأقل من القائمة لتأمين حفظ العقد بملفهم.")
             return
 
         try:
+            selected_dossier_id = self.dossier_combo.currentData() if hasattr(self, "dossier_combo") else ""
+
+            p1_names_list = [p.get("full_name", "").strip() for p in getattr(self, "p1_extracted", []) if p.get("full_name")]
+            p2_names_list = [p.get("full_name", "").strip() for p in getattr(self, "p2_extracted", []) if p.get("full_name")]
+
+            if not p1_names_list and self.contract_vars.get("party1_name"):
+                p1_names_list = [self.contract_vars.get("party1_name").strip()]
+            if not p2_names_list and self.contract_vars.get("party2_name"):
+                p2_names_list = [self.contract_vars.get("party2_name").strip()]
+
+            target_case_id = selected_dossier_id
+
+            if not target_case_id:
+                # Trigger the official "Nouveau Dossier Notarié" popup dialog
+                target_case_id = self.open_case_creation_popup(p1_names_list, p2_names_list, selected_client_ids)
+                if not target_case_id:
+                    return
+
             docx_bytes = pdf_generator.generate_docx_from_transcription(
                 title=f"{self.selected_contract_type} — {office_profile.office_title()}",
                 text=self.ocr_edited_text,
@@ -2089,16 +2600,30 @@ class ScannerPage(QWidget):
                     "نوع المحرر": self.selected_contract_type
                 }
             )
+            pdf_bytes = pdf_generator.generate_pdf_from_transcription(
+                title=f"{self.selected_contract_type} — {office_profile.office_title()}",
+                text=self.ocr_edited_text
+            )
             
+            reception.link_clients_to_case(target_case_id, selected_client_ids)
+
             saved_count = 0
+            fn_docx = f"ملف_رقم_{target_case_id}.docx"
+            fn_pdf = f"ملف_رقم_{target_case_id}.pdf"
+
             for cid in selected_client_ids:
-                fn = f"{self.selected_contract_type}_{cid}_{reception.unique_file_stamp()}.docx"
-                reception.save_client_document(cid, docx_bytes, fn)
+                reception.save_client_document(cid, docx_bytes, fn_docx)
+                reception.save_client_document(cid, pdf_bytes, fn_pdf)
                 saved_count += 1
-                
+
+            self.update_dossiers_combo()
+            idx = self.dossier_combo.findData(target_case_id)
+            if idx >= 0:
+                self.dossier_combo.setCurrentIndex(idx)
+
             QMessageBox.information(
                 self, "Archivage", 
-                f" تم أرشفة وحفظ العقد بنجاح في مجلدات الحرفاء المحددين (عدد الحرفاء المربوطين: {saved_count})!"
+                f"تم أرشفة وحفظ العقد بنجاح والمربوط بالملف رقم {target_case_id} في مجلدات الحرفاء المحددين (عدد الحرفاء المربوطين: {saved_count})!"
             )
             
             for i in range(self.archive_list.count()):
@@ -2139,7 +2664,8 @@ class ScannerPage(QWidget):
             selected_cid = self.selected_p1.get("client_id")
 
         dlg = TunisianFaridaDialog(self, lang=self.lang, client_id=selected_cid)
-        dlg.farida_inserted.connect(self._on_farida_inserted)
+        if hasattr(dlg, "farida_inserted"):
+            dlg.farida_inserted.connect(self._on_farida_inserted)
         dlg.generate_partition_requested.connect(self._on_generate_partition_from_farida)
         dlg.exec()
 

@@ -79,30 +79,57 @@ def police_arabe():
     return _police_retenue
 
 
+def set_section_rtl(section):
+    """Enforces 100% Native Arabic Right-To-Left view mode on document section."""
+    sectPr = section._sectPr
+    bidi = OxmlElement('w:bidi')
+    bidi.set(qn('w:val'), '1')
+    sectPr.append(bidi)
+
+
 def set_rtl(paragraph):
-    """Sets Right-to-Left paragraph formatting for Arabic text in docx."""
+    """Sets Right-to-Left paragraph and BiDi formatting for Arabic text in docx."""
     pPr = paragraph._p.get_or_add_pPr()
     bidi = OxmlElement('w:bidi')
     bidi.set(qn('w:val'), '1')
     pPr.append(bidi)
+    paragraph.paragraph_format.bidi = True
+
+
+def set_table_rtl(table):
+    """Sets Word table column order from Right to Left (Arabic view)."""
+    tblPr = table._element.xpath('w:tblPr')
+    if tblPr:
+        bidiVisual = OxmlElement('w:bidiVisual')
+        bidiVisual.set(qn('w:val'), '1')
+        tblPr[0].append(bidiVisual)
 
 
 def set_run_font(run, font_name=None, size_pt=14, bold=False, color_rgb=(0, 0, 0)):
     font_name = font_name or police_arabe()
-    """Sets exact font, size, weight, and bidi properties for a run of Arabic text."""
+    """Sets exact font, size, weight, and complex script BiDi/RTL properties for a run of Arabic text."""
     run.font.name = font_name
     run.font.size = Pt(size_pt)
     run.bold = bold
     if color_rgb:
         run.font.color.rgb = RGBColor(*color_rgb)
     
-    # Force Arabic CS font name in XML
+    # Force Arabic CS font name and Complex Script RTL direction in XML
     rPr = run._r.get_or_add_rPr()
     rFonts = OxmlElement('w:rFonts')
     rFonts.set(qn('w:ascii'), font_name)
     rFonts.set(qn('w:hAnsi'), font_name)
     rFonts.set(qn('w:cs'), font_name)
     rPr.append(rFonts)
+
+    rtl = OxmlElement('w:rtl')
+    rtl.set(qn('w:val'), '1')
+    rPr.append(rtl)
+
+    if bold:
+        bCs = OxmlElement('w:bCs')
+        bCs.set(qn('w:val'), '1')
+        rPr.append(bCs)
 
 
 def format_legal_paragraph(paragraph, text, font_name=None, base_size=14):
@@ -117,8 +144,8 @@ def format_legal_paragraph(paragraph, text, font_name=None, base_size=14):
     paragraph.paragraph_format.space_after = Pt(4)
     paragraph.paragraph_format.space_before = Pt(0)
 
-    # Keywords to auto-bold in legal text
-    bold_patterns = r"(الطرف الأول[^\:\n]*\:|الطرف الثاني[^\:\n]*\:|الفصل الأول[^\:\n]*\:|الفصل الثاني[^\:\n]*\:|الفصل الثالث[^\:\n]*\:|الفصل الرابع[^\:\n]*\:|الفصل الخامس[^\:\n]*\:|الفصل السادس[^\:\n]*\:|الفصل السابع[^\:\n]*\:|الفصل الثامن[^\:\n]*\:|الحمد لله|موضوع العقار|ثمن البيع|التزام|إشهاد)"
+    # Keywords to auto-bold in legal text: ONLY legal chapter headings (Intitulés des chapitres)
+    bold_patterns = r"((?:فصل\s+تمهيدي|الفصل\s+(?:الأول|الاول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر))[^\:\n]*\:)"
     
     parts = re.split(bold_patterns, text)
     for part in parts:
@@ -132,7 +159,7 @@ def format_legal_paragraph(paragraph, text, font_name=None, base_size=14):
 def create_notary_deed_docx(contract_title: str, contract_text: str, output_path: str) -> bool:
     """
     Generates a beautifully formatted Microsoft Word (.docx) document 
-    matching official Tunisian notary deed typography.
+    matching official Tunisian notary deed typography with 100% Native Arabic RTL layout.
     """
     if not DOCX_AVAILABLE:
         print("[DOCX Generator] python-docx not installed.")
@@ -140,13 +167,14 @@ def create_notary_deed_docx(contract_title: str, contract_text: str, output_path
 
     doc = docx.Document()
     
-    # Page Margins (Normal 1 inch / 2.54 cm)
+    # Page Margins & 100% Arabic Section RTL
     sections = doc.sections
     for section in sections:
         section.top_margin = Inches(1)
         section.bottom_margin = Inches(1)
         section.left_margin = Inches(1)
         section.right_margin = Inches(1)
+        set_section_rtl(section)
 
     # Title / Header
     if contract_title:

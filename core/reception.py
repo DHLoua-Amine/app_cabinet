@@ -415,6 +415,7 @@ def init_db():
                     ("grandfather_name", "TEXT DEFAULT ''"),
                     ("cin_issue_date", "TEXT DEFAULT ''"),
                     ("cin_issue_place", "TEXT DEFAULT ''"),
+                    ("notes", "TEXT DEFAULT ''"),
                 ]
                 for col_name, col_def in new_cols:
                     if col_name not in existing_cols:
@@ -492,9 +493,21 @@ def init_db():
                         ("avance_amount", "REAL DEFAULT 0.0"),
                         ("payment_status", "TEXT DEFAULT 'غير خالص'"),
                         ("payment_notes", "TEXT DEFAULT ''"),
+                        ("party1_name", "TEXT DEFAULT ''"),
+                        ("party2_name", "TEXT DEFAULT ''"),
                     ]:
                         if col_name not in cols:
                             cursor.execute(f"ALTER TABLE {tbl} ADD COLUMN {col_name} {col_def}")
+
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS case_clients (
+                        case_id TEXT,
+                        client_id TEXT,
+                        PRIMARY KEY (case_id, client_id),
+                        FOREIGN KEY (case_id) REFERENCES cases (case_id),
+                        FOREIGN KEY (client_id) REFERENCES clients (client_id)
+                    )
+                """)
 
                 # case_payments and client_services are both cascaded into by
                 # delete_client, but neither was ever created here.  The existing
@@ -726,7 +739,8 @@ def update_client_civil_status(
     legal_role: str, company_name: str, company_rc: str,
     titre_foncier: str = "", wilaya: str = "", is_new: bool = False,
     father_name: str = "", grandfather_name: str = "",
-    cin_issue_date: str = "", cin_issue_place: str = ""
+    cin_issue_date: str = "", cin_issue_place: str = "",
+    notes: str = ""
 ) -> bool:
     init_db()
     check_name_field(nom, "اللقب")
@@ -754,13 +768,13 @@ def update_client_civil_status(
                     (client_id, nom, prenom, full_name, phone, maiden_name, birth_date, birth_place,
                      cin_number, cin_date_place, marital_status, matrimonial_regime, profession, address,
                      legal_role, company_name, company_rc, titre_foncier, wilaya, created_at, documents_dir, face_embedding,
-                     father_name, grandfather_name, cin_issue_date, cin_issue_place)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     father_name, grandfather_name, cin_issue_date, cin_issue_place, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     client_id, nom, prenom, full_name, phone, maiden_name, birth_date, birth_place,
                     cin_number, cin_date_place, marital_status, matrimonial_regime, profession, address,
                     legal_role, company_name, company_rc, titre_foncier, wilaya, now_str, doc_dir, b"",
-                    father_name, grandfather_name, cin_issue_date, cin_issue_place
+                    father_name, grandfather_name, cin_issue_date, cin_issue_place, notes
                 ))
             else:
                 cursor.execute("""
@@ -771,7 +785,7 @@ def update_client_civil_status(
                         matrimonial_regime=?, profession=?, address=?,
                         legal_role=?, company_name=?, company_rc=?,
                         titre_foncier=?, wilaya=?,
-                        father_name=?, grandfather_name=?, cin_issue_date=?, cin_issue_place=?
+                        father_name=?, grandfather_name=?, cin_issue_date=?, cin_issue_place=?, notes=?
                     WHERE client_id=?
                 """, (
                     nom, prenom, full_name, phone,
@@ -780,7 +794,7 @@ def update_client_civil_status(
                     matrimonial_regime, profession, address,
                     legal_role, company_name, company_rc,
                     titre_foncier, wilaya,
-                    father_name, grandfather_name, cin_issue_date, cin_issue_place,
+                    father_name, grandfather_name, cin_issue_date, cin_issue_place, notes,
                     client_id
                 ))
         clear_db_caches()
@@ -996,8 +1010,12 @@ def search_cases(search_text: str = "", status: str = "", service_type: str = ""
     if search_text:
         q = f"%{search_text.strip()}%"
         where.append("(c.case_id LIKE ? OR c.title LIKE ? OR c.service_type LIKE ? "
-                     "OR c.status LIKE ? OR COALESCE(cl.full_name,'') LIKE ?)")
-        params += [q, q, q, q, q]
+                     "OR c.status LIKE ? OR c.description LIKE ? OR COALESCE(c.party1_name,'') LIKE ? "
+                     "OR COALESCE(c.party2_name,'') LIKE ? OR COALESCE(cl.full_name,'') LIKE ? "
+                     "OR COALESCE(cl.cin_number,'') LIKE ? OR COALESCE(cl.phone,'') LIKE ? "
+                     "OR COALESCE(cl.nom,'') LIKE ? OR COALESCE(cl.prenom,'') LIKE ? "
+                     "OR COALESCE(cl.titre_foncier,'') LIKE ?)")
+        params += [q, q, q, q, q, q, q, q, q, q, q, q, q]
     if status:
         where.append("c.status LIKE ?")
         params.append(f"%{status}%")
@@ -1774,7 +1792,9 @@ def create_case(
     status: str = "جديد",
     total_amount: float = 0.0, avance_amount: float = 0.0,
     payment_status: str = "غير خالص", payment_notes: str = "",
-    custom_case_id: str = ""
+    custom_case_id: str = "",
+    party1_name: str = "", party2_name: str = "",
+    client_ids: Optional[List[str]] = None
 ) -> str:
     init_db()
     now = datetime.datetime.now()
@@ -1783,17 +1803,6 @@ def create_case(
             if custom_case_id and custom_case_id.strip():
                 case_id = custom_case_id.strip()
             else:
-                # One aggregate per table instead of pulling every case_id into a Python
-                # set and probing it.
-                #
-                # The previous allocator did `while next_num in existing_ids` with a
-                # wraparound at 9999, so once ids 1..9999 were all taken the loop never
-                # terminated — 13.4 million spins in 3 seconds, on the UI thread, with no
-                # error shown. That put a hard 9,999-dossier ceiling on the office. It
-                # also read the whole case table on every single creation.
-                #
-                # CAST maps non-numeric ids ('imp_123', 'D7') to 0, so MAX+1 is always
-                # free and always above every numeric id in use.
                 cursor.execute(
                     "SELECT COALESCE(MAX(CAST(case_id AS INTEGER)), 0) FROM cases")
                 row = cursor.fetchone()
@@ -1801,14 +1810,36 @@ def create_case(
                 case_id = str(highest + 1)
             created_at = now.strftime("%Y-%m-%d %H:%M:%S")
 
-            # A failed insert used to be diverted into 'client_cases', where the
-            # Registre could not see the dossier while the finance totals still counted
-            # it. A real failure must surface instead.
+            # Validate client_id against foreign key requirement in clients table
+            valid_client_id = None
+            if client_id and isinstance(client_id, str) and client_id.strip():
+                cid_str = client_id.strip()
+                row = cursor.execute("SELECT client_id FROM clients WHERE client_id = ? OR cin_number = ?", (cid_str, cid_str)).fetchone()
+                if row:
+                    valid_client_id = row[0]
+
             cursor.execute("""
                 INSERT OR REPLACE INTO cases
-                (case_id, client_id, service_type, title, description, status, created_at, total_amount, avance_amount, payment_status, payment_notes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (case_id, client_id, service_type, title, description, status, created_at, total_amount, avance_amount, payment_status, payment_notes))
+                (case_id, client_id, service_type, title, description, status, created_at, total_amount, avance_amount, payment_status, payment_notes, party1_name, party2_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (case_id, valid_client_id, service_type, title, description, status, created_at, total_amount, avance_amount, payment_status, payment_notes, party1_name, party2_name))
+
+            all_cids = set()
+            if valid_client_id:
+                all_cids.add(valid_client_id)
+            if client_ids:
+                for c in client_ids:
+                    if c and isinstance(c, str) and c.strip():
+                        c_str = c.strip()
+                        row_c = cursor.execute("SELECT client_id FROM clients WHERE client_id = ? OR cin_number = ?", (c_str, c_str)).fetchone()
+                        if row_c:
+                            all_cids.add(row_c[0])
+
+            for cid in all_cids:
+                try:
+                    cursor.execute("INSERT OR IGNORE INTO case_clients (case_id, client_id) VALUES (?, ?)", (case_id, cid))
+                except Exception:
+                    pass
 
             clear_db_caches()
             return case_id
@@ -1818,35 +1849,92 @@ def create_case(
 
 @permissions.require(Cap.RECORD_PAYMENT)
 def update_case_payment(case_id: str, total_amount: float, avance_amount: float, payment_status: str, payment_notes: str) -> bool:
-    """
-    Records a payment. Returns True only when a row was actually updated.
-
-    This used to wrap each UPDATE in `except Exception: pass` and then `return True`
-    unconditionally, so it reported success even with both case tables dropped. Money
-    could fail to save while the client was shown a confirmation. Now the row count
-    decides the answer and a genuine database error is raised instead of hidden.
-    """
     init_db()
-    changed = 0
     with get_db_cursor(commit=True) as cursor:
         cursor.execute("""
             UPDATE cases
-            SET total_amount=?, avance_amount=?, payment_status=?, payment_notes=?
-            WHERE case_id=?
+            SET total_amount = ?, avance_amount = ?, payment_status = ?, payment_notes = ?
+            WHERE case_id = ?
         """, (total_amount, avance_amount, payment_status, payment_notes, case_id))
-        changed = cursor.rowcount if cursor.rowcount and cursor.rowcount > 0 else 0
+        changed = cursor.rowcount
     clear_db_caches()
     if changed == 0:
         log_system_error("update_case_payment matched no rows",
                          Exception(f"case_id={case_id!r} not found"))
     return changed > 0
 
+def link_clients_to_case(case_id: str, client_ids: List[str]) -> bool:
+    init_db()
+    if not case_id or not client_ids:
+        return False
+    try:
+        with get_db_cursor(commit=True) as cursor:
+            chk_case = cursor.execute("SELECT 1 FROM cases WHERE case_id = ?", (str(case_id),)).fetchone()
+            if not chk_case:
+                return False
+            for cid in client_ids:
+                if cid and isinstance(cid, str) and cid.strip():
+                    c_str = cid.strip()
+                    row_c = cursor.execute("SELECT client_id FROM clients WHERE client_id = ? OR cin_number = ?", (c_str, c_str)).fetchone()
+                    if row_c:
+                        cursor.execute("INSERT OR IGNORE INTO case_clients (case_id, client_id) VALUES (?, ?)", (str(case_id), row_c[0]))
+        clear_db_caches()
+        return True
+    except Exception as e:
+        log_system_error("link_clients_to_case failed", e)
+        return False
+
+def sync_case_clients_from_documents() -> bool:
+    """Auto-links case_id and client_id if a document file for case_id is stored in client_id's folder."""
+    try:
+        init_db()
+        if not DOCUMENTS_DIR.exists():
+            return True
+        links = []
+        import re
+        for cdir in DOCUMENTS_DIR.iterdir():
+            if cdir.is_dir():
+                cid = cdir.name
+                for f in cdir.iterdir():
+                    if f.is_file():
+                        fname = f.name
+                        m1 = re.match(r"^ملف_رقم_([^\.]+)", fname)
+                        m2 = re.match(r"^Dossier_([^_]+)_", fname)
+                        case_id = None
+                        if m1:
+                            case_id = m1.group(1)
+                        elif m2:
+                            case_id = m2.group(1)
+                        if case_id:
+                            links.append((case_id, cid))
+        if links:
+            with get_db_cursor(commit=True) as cursor:
+                for case_id, cid in links:
+                    chk_case = cursor.execute("SELECT 1 FROM cases WHERE case_id = ?", (str(case_id),)).fetchone()
+                    row_c = cursor.execute("SELECT client_id FROM clients WHERE client_id = ? OR cin_number = ?", (str(cid), str(cid))).fetchone()
+                    if chk_case and row_c:
+                        cursor.execute("INSERT OR IGNORE INTO case_clients (case_id, client_id) VALUES (?, ?)", (str(case_id), row_c[0]))
+            clear_db_caches()
+        return True
+    except Exception as e:
+        log_system_error("sync_case_clients_from_documents failed", e)
+        return False
+
 def get_client_cases(client_id: str) -> List[Dict]:
     init_db()
+    try:
+        sync_case_clients_from_documents()
+    except Exception:
+        pass
     rows = []
     try:
         with get_db_cursor() as cursor:
-            cursor.execute("SELECT * FROM cases WHERE client_id=? ORDER BY created_at DESC", (client_id,))
+            cursor.execute("""
+                SELECT DISTINCT c.* FROM cases c
+                LEFT JOIN case_clients cc ON c.case_id = cc.case_id
+                WHERE c.client_id=? OR cc.client_id=?
+                ORDER BY c.created_at DESC
+            """, (client_id, client_id))
             rows = cursor.fetchall()
     except Exception as e:
         log_system_error("get_client_cases failed", e)

@@ -1628,8 +1628,14 @@ class AccountingPage(QWidget):
             if "مصاريف أخرى" in val: return "Autre"
         return val
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        if hasattr(self, "tabs") and self.tabs is not None:
+            self.tabs.setCurrentIndex(0)
+
     # Slot for language update from parent
     def update_language(self, lang_code):
         self.lang = lang_code
         self.update_translations()
         self.load_data()
+

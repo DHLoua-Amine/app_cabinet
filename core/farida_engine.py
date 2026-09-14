@@ -909,24 +909,35 @@ def parse_hujjat_wafat_text(text: str) -> dict:
     heirs['applicant_name'] = ""
     heirs['applicant_cin'] = ""
 
-    clean_text_for_dec = re.sub(r'اسم\s+الأم\s+ولقبها\s*[:：]?\s*[^\n،.]+', '', t)
-    clean_text_for_dec = re.sub(r'زوج(?:ها|ته)\s+(?:المتوفى|المتوفاة|الهالك|الهالكة)\s+(?:قبلها|قبله)\s+[^\n،.]+', '', clean_text_for_dec)
-    
-    m_dec = re.search(r"(?:إقامة\s+حجة\s+وفاة\s+|نقرر\s+إقامة\s+حجة\s+وفاة\s+)?المرحوم(?:ة|\(ة\))?\s*[:：]?\s*([^\n،.:]+?)(?:\s+ولقبه|\s+اسم\s+الأم|\s+المتوفي|\s+حسب|\s+جنسيته|$)", clean_text_for_dec)
-    if m_dec: heirs['deceased_name'] = _clean_extracted_text(m_dec.group(1))
+    if not heirs['deceased_name']:
+        clean_text_for_dec = re.sub(r'اسم\s+الأم\s+ولقبها\s*[:：]?\s*[^\n،.]+', '', t)
+        clean_text_for_dec = re.sub(r'زوج(?:ها|ته)\s+(?:المتوفى|المتوفاة|الهالك|الهالكة)\s+(?:قبلها|قبله)\s+[^\n،.]+', '', clean_text_for_dec)
+        
+        m_dec = re.search(r"(?:إقامة\s+حجة\s+وفاة\s+|نقرر\s+إقامة\s+حجة\s+وفاة\s+|اسم\s+)?(?:الهالك|الهالكة|المرحوم|المرحومة|المتوفى|المتوفاة|الموروث|الموروثة)(?:ة|\(ة\))?\s*[:：]?\s*([^\n،.:]+)", clean_text_for_dec)
+        if m_dec:
+            raw_dec = m_dec.group(1).strip()
+            raw_dec = re.split(r"(?:\s+ولقبه|\s+اسم\s+الأم|\s+المتوفي|\s+المتوفى|\s+حسب|\s+جنسيته)", raw_dec)[0]
+            heirs['deceased_name'] = _clean_extracted_text(raw_dec)
 
     # Top right header: Court of Jurisdiction (محكمة ناحية... / المحكمة الابتدائية...)
-    m_crt = re.search(r"(?:الجمهورية\s+التونسية\s+)?(?:وزارة\s+العدل\s+)?(محكمة\s+(?:الناحية|ناحية|الابتدائية)\s+[^\n،.]+)", t[:500])
-    if not m_crt:
-        m_crt = re.search(r"(محكمة\s+(?:الناحية|ناحية|الابتدائية)\s+[^\n،.]+)", t)
-    if m_crt: heirs['hujja_court'] = _clean_extracted_text(m_crt.group(1))
+    if not heirs['hujja_court']:
+        m_crt = re.search(r"(?:الجمهورية\s+التونسية\s+)?(?:وزارة\s+العدل\s+)?(محكمة\s+(?:الناحية|ناحية|الابتدائية)\s+[^\n،.]+)", t[:500])
+        if not m_crt:
+            m_crt = re.search(r"(محكمة\s+(?:الناحية|ناحية|الابتدائية)\s+[^\n،.]+)", t)
+        if m_crt: heirs['hujja_court'] = _clean_extracted_text(m_crt.group(1))
 
     # Top left: Case File Number (عدد الملف / عدد المادة / عدد...)
-    m_num = re.search(r"(?:عدد\s+الملف|عدد\s+المادة|المادة\s+عدد|ملف\s+عدد|عدد)\s*[:：]?\s*([\d\/]+)", t)
-    if m_num: heirs['hujja_num'] = _clean_extracted_text(m_num.group(1))
+    if not heirs['hujja_num']:
+        m_num = re.search(r"(?:عدد\s+الملف|عدد\s+المادة|ملف\s+عدد|عدد)\s*[:：]?\s*([\d\/]+)", t)
+        if not m_num:
+            m_num = re.search(r"\b(\d+\/\d{4})\b", t)
+        if m_num: heirs['hujja_num'] = _clean_extracted_text(m_num.group(1))
 
-    m_dt = re.search(r"بتاريخ\s*[:：]?\s*(\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2})", t)
-    if not m_dt:
+    if not heirs['hujja_date']:
+        m_dt = re.search(r"بتاريخ\s*[:：]?\s*(\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2})", t)
+        if not m_dt:
+            m_dt = re.search(r"حرر\s+(?:بتونس|في)\s+([^\n،.]+)", t)
+        if m_dt: heirs['hujja_date'] = _clean_extracted_text(m_dt.group(1))
         m_dt = re.search(r"حرر\s+(?:بتونس|في)\s+([^\n،.]+)", t)
     if m_dt: heirs['hujja_date'] = _clean_extracted_text(m_dt.group(1))
 

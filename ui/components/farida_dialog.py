@@ -152,6 +152,8 @@ class TunisianFaridaDialog(QDialog):
         self.engine = TunisianFaridaEngine()
         self.last_result = None
         self.heir_inputs = {}
+        self.main_parsed = None          # result of scanning main hujja wafat
+        self.linked_hujaj = []           # list of parsed additional hujjat wafat (predeceased children)
         self.init_ui()
 
         if client_id:
@@ -340,7 +342,10 @@ class TunisianFaridaDialog(QDialog):
         tab1_lay.setContentsMargins(12, 12, 12, 12)
         tab1_lay.setSpacing(12)
 
-        self.btn_import_wafat = QPushButton("استيراد وتفريغ حجة وفاة تلقائياً (صورة / PDF / نص)", tab1)
+        # ── SCAN BUTTONS ROW ──────────────────────────────────────────────────
+        scan_btns_row = QHBoxLayout()
+
+        self.btn_import_wafat = QPushButton("📄 استيراد حجة وفاة الهالك الرئيسي (صورة / PDF / نص)", tab1)
         self.btn_import_wafat.setStyleSheet("""
             QPushButton {
                 background-color: #0284c7;
@@ -356,7 +361,71 @@ class TunisianFaridaDialog(QDialog):
             }
         """)
         self.btn_import_wafat.clicked.connect(self.import_hujjat_wafat_file)
-        tab1_lay.addWidget(self.btn_import_wafat)
+
+        self.btn_add_linked_hujja = QPushButton("➕ إضافة حجة وفاة ابن/بنت توفي في حياة الهالك", tab1)
+        self.btn_add_linked_hujja.setToolTip("امسح حجة وفاة أحد أبناء الهالك الذين توفوا قبله — سيتم الربط التلقائي وإضافة أبنائهم (الأحفاد) لقائمة الورثة")
+        self.btn_add_linked_hujja.setStyleSheet("""
+            QPushButton {
+                background-color: #065f46;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 16px;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #047857;
+            }
+        """)
+        self.btn_add_linked_hujja.clicked.connect(self.add_linked_hujja)
+
+        self.btn_link_hujaj = QPushButton("🔗 ربط الحجج وتعبئة الفريضة تلقائياً", tab1)
+        self.btn_link_hujaj.setToolTip("يقوم بمطابقة أسماء المتوفين في الحجج الإضافية مع قائمة الورثة، ويعبئ أعداد الأحفاد تلقائياً")
+        self.btn_link_hujaj.setEnabled(False)
+        self.btn_link_hujaj.setStyleSheet("""
+            QPushButton {
+                background-color: #5b21b6;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 16px;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #4c1d95;
+            }
+            QPushButton:disabled {
+                background-color: #a5b4fc;
+                color: #e0e7ff;
+            }
+        """)
+        self.btn_link_hujaj.clicked.connect(self.link_and_merge_hujaj)
+
+        scan_btns_row.addWidget(self.btn_import_wafat, 3)
+        scan_btns_row.addWidget(self.btn_add_linked_hujja, 3)
+        scan_btns_row.addWidget(self.btn_link_hujaj, 2)
+        tab1_lay.addLayout(scan_btns_row)
+
+        # ── LINKED HUJAJ PANEL ──────────────────────────────────────────────
+        self.linked_panel_frame = QFrame(tab1)
+        self.linked_panel_frame.setVisible(False)
+        self.linked_panel_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f0fdf4;
+                border: 1px solid #86efac;
+                border-radius: 6px;
+                padding: 4px;
+            }
+        """)
+        self.linked_panel_layout = QVBoxLayout(self.linked_panel_frame)
+        self.linked_panel_layout.setContentsMargins(8, 6, 8, 6)
+        self.linked_panel_layout.setSpacing(4)
+        lnk_title = QLabel("📋 حجج الوفاة المرتبطة (أبناء/بنات الهالك المتوفون قبله):", self.linked_panel_frame)
+        lnk_title.setStyleSheet("font-weight: bold; font-size: 12px; color: #065f46;")
+        self.linked_panel_layout.addWidget(lnk_title)
+        tab1_lay.addWidget(self.linked_panel_frame)
 
         scroll1 = QScrollArea(tab1)
         scroll1.setWidgetResizable(True)
@@ -1518,6 +1587,7 @@ class TunisianFaridaDialog(QDialog):
             from core.farida_engine import parse_hujjat_wafat_text
 
         parsed = parse_hujjat_wafat_text(extracted_text)
+        self.main_parsed = parsed  # store for linking
 
         if parsed:
             self.cb_husband.setChecked(bool(parsed.get('husband', False)))
@@ -1552,6 +1622,9 @@ class TunisianFaridaDialog(QDialog):
             if parsed.get('hujja_court'): self.txt_hujja_court.setText(parsed['hujja_court'])
 
             self.on_calculate_clicked()
+            # Enable link button if there are already linked hujjas
+            if self.linked_hujaj:
+                self.btn_link_hujaj.setEnabled(True)
 
             heir_names_str = "، ".join(parsed.get('names', [])) or "تم الاستخراج بناءً على الشروط الشرعية"
             msg = (
@@ -1561,7 +1634,8 @@ class TunisianFaridaDialog(QDialog):
                 f"حجة الوفاة: عدد {parsed.get('hujja_num') or 'غير محدد'} بتاريخ {parsed.get('hujja_date') or 'غير محدد'} ({parsed.get('hujja_court') or 'غير محدد'})\n"
                 f"عدد الذكور (الأبناء): {parsed.get('sons_count', 0)}\n"
                 f"عدد الإناث (البنات): {parsed.get('daughters_count', 0)}\n"
-                f"أسماء الورثة المستخرجين: {heir_names_str}"
+                f"أسماء الورثة المستخرجين: {heir_names_str}\n\n"
+                f"💡 لمسح حجج الأبناء المتوفين قبله، استخدم زر 'إضافة حجة وفاة ابن/بنت'."
             )
             QMessageBox.information(self, "نجاح الاستيراد التلقائي", msg)
 
@@ -1751,4 +1825,259 @@ class TunisianFaridaDialog(QDialog):
         else:
             QMessageBox.warning(self, "تنبيه", "لم يتم استخراج نصوص إضافية من الوثائق المرفقة.")
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # MULTI-HUJJA LINKING  (أبناء متوفون في حياة الهالك)
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def add_linked_hujja(self):
+        """Scans an additional Hujjat Wafat for a child who predeceased the main deceased."""
+        from pathlib import Path
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "اختر حجة وفاة الابن/البنت المتوفى في حياة الهالك", "",
+            "الملفات ووثائق وصور (*.png *.jpg *.jpeg *.pdf *.txt)"
+        )
+        if not file_path:
+            return
+
+        progress = QProgressDialog(
+            "🤖 جاري قراءة وتحليل حجة وفاة الابن/البنت...\nالمرجو الانتظار لحظات.",
+            None, 0, 0, self
+        )
+        progress.setWindowTitle("معالجة حجة وفاة إضافية (AI Reading...)")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.show()
+        QApplication.processEvents()
+
+        p = Path(file_path)
+        extracted_text = ""
+        try:
+            if p.suffix.lower() == ".txt":
+                extracted_text = p.read_text(encoding="utf-8", errors="ignore")
+            elif p.suffix.lower() in [".png", ".jpg", ".jpeg"]:
+                try:
+                    import ocr_engine
+                except ImportError:
+                    import core.ocr_engine as ocr_engine
+                res = ocr_engine.extract_handwritten_notary_script(p.read_bytes())
+                if not res.get("success"):
+                    progress.close()
+                    QMessageBox.warning(self, "خطأ في المعالجة", res.get("error") or "تعذّر استخراج النص.")
+                    return
+                extracted_text = res.get("full_text") or ""
+            elif p.suffix.lower() == ".pdf":
+                try:
+                    import pypdf
+                    reader = pypdf.PdfReader(file_path)
+                    extracted_text = "\n".join([pg.extract_text() or "" for pg in reader.pages])
+                except Exception:
+                    extracted_text = ""
+        except Exception as e:
+            progress.close()
+            QMessageBox.warning(self, "خطأ", f"تعذر قراءة الملف: {e}")
+            return
+        finally:
+            progress.close()
+
+        if not extracted_text:
+            QMessageBox.warning(self, "تنبيه", "لم يتم استخراج نص واضح من الملف.")
+            return
+
+        try:
+            from farida_engine import parse_hujjat_wafat_text
+        except ImportError:
+            from core.farida_engine import parse_hujjat_wafat_text
+
+        parsed = parse_hujjat_wafat_text(extracted_text)
+        if not parsed:
+            QMessageBox.warning(self, "تنبيه", "تعذّر تحليل محتوى حجة الوفاة الإضافية.")
+            return
+
+        self.linked_hujaj.append(parsed)
+        self._refresh_linked_panel()
+        self.btn_link_hujaj.setEnabled(True)
+
+        dec_name = parsed.get("deceased_name") or "غير محدد"
+        sons = parsed.get("sons_count", 0)
+        daughters = parsed.get("daughters_count", 0)
+        QMessageBox.information(
+            self, "تمت إضافة الحجة",
+            f"✅ تمت إضافة حجة وفاة:\n"
+            f"• اسم المتوفى: {dec_name}\n"
+            f"• عدد أبنائه (ذكور): {sons}\n"
+            f"• عدد بناته (إناث): {daughters}\n\n"
+            f"اضغط '🔗 ربط الحجج' لتطبيق الربط التلقائي على الفريضة."
+        )
+
+    def _refresh_linked_panel(self):
+        """Refreshes the linked hujaj panel with current entries."""
+        # Remove all rows except the title (index 0)
+        while self.linked_panel_layout.count() > 1:
+            item = self.linked_panel_layout.takeAt(1)
+            if item.widget():
+                item.widget().deleteLater()
+
+        for idx, hujja in enumerate(self.linked_hujaj):
+            row_frame = QFrame(self.linked_panel_frame)
+            row_frame.setStyleSheet("QFrame { background-color: #dcfce7; border-radius: 4px; border: none; }")
+            row_lay = QHBoxLayout(row_frame)
+            row_lay.setContentsMargins(6, 3, 6, 3)
+
+            dec_name = hujja.get("deceased_name") or "غير محدد"
+            sons = hujja.get("sons_count", 0)
+            daughters = hujja.get("daughters_count", 0)
+            names_str = "، ".join(hujja.get("names", [])) or "—"
+
+            info_lbl = QLabel(
+                f"⚰️ <b>{dec_name}</b>  —  ذكور: {sons} | إناث: {daughters}  |  أبناؤه: {names_str}",
+                row_frame
+            )
+            info_lbl.setStyleSheet("font-size: 11px; color: #14532d; border: none;")
+            info_lbl.setWordWrap(True)
+
+            del_btn = QPushButton("✖", row_frame)
+            del_btn.setFixedWidth(28)
+            del_btn.setStyleSheet("QPushButton { background: #ef4444; color: white; border: none; border-radius: 3px; font-weight: bold; }")
+            del_btn.setToolTip("حذف هذه الحجة من القائمة")
+            del_btn.clicked.connect(lambda _, i=idx: self._remove_linked_hujja(i))
+
+            row_lay.addWidget(info_lbl, 1)
+            row_lay.addWidget(del_btn)
+            self.linked_panel_layout.addWidget(row_frame)
+
+        self.linked_panel_frame.setVisible(bool(self.linked_hujaj))
+
+    def _remove_linked_hujja(self, idx: int):
+        """Removes a linked hujja by index."""
+        if 0 <= idx < len(self.linked_hujaj):
+            self.linked_hujaj.pop(idx)
+        self._refresh_linked_panel()
+        if not self.linked_hujaj:
+            self.btn_link_hujaj.setEnabled(False)
+
+    @staticmethod
+    def _normalize_arabic(text: str) -> str:
+        """Normalize Arabic text: strip tashkeel, unify alef, remove tatweel."""
+        import re
+        text = re.sub(r'[\u064b-\u065f\u0670]', '', text)   # remove tashkeel
+        text = re.sub(r'[أإآٱ]', 'ا', text)                  # unify alef
+        text = re.sub(r'ة', 'ه', text)                        # unify ta marbuta
+        text = re.sub(r'ى', 'ي', text)                        # unify alef maqsura
+        text = re.sub(r'ـ', '', text)                          # remove tatweel
+        return text.strip()
+
+    @staticmethod
+    def _names_overlap(name_a: str, name_b: str, min_tokens: int = 2) -> bool:
+        """
+        Returns True if at least `min_tokens` first-name tokens match between
+        name_a and name_b (Arabic-normalized, case-insensitive).
+        """
+        norm = TunisianFaridaDialog._normalize_arabic
+        tokens_a = [t for t in norm(name_a).split() if len(t) > 1 and t not in {'بن', 'بنت', 'ابن', 'ولد', 'بنا'}]
+        tokens_b = [t for t in norm(name_b).split() if len(t) > 1 and t not in {'بن', 'بنت', 'ابن', 'ولد', 'بنا'}]
+        if not tokens_a or not tokens_b:
+            return False
+        common = set(tokens_a[:3]) & set(tokens_b[:3])
+        return len(common) >= min_tokens
+
+    def link_and_merge_hujaj(self):
+        """
+        Links additional hujjat wafat (predeceased children) to the main hujja,
+        automatically updates grandson/granddaughter counts and names.
+        """
+        if not self.main_parsed:
+            QMessageBox.warning(
+                self, "تنبيه",
+                "يرجى أولاً استيراد حجة وفاة الهالك الرئيسي قبل تطبيق الربط."
+            )
+            return
+        if not self.linked_hujaj:
+            QMessageBox.warning(self, "تنبيه", "لا توجد حجج إضافية لربطها.")
+            return
+
+        main_names = list(self.main_parsed.get('names', []))
+        main_sons_orig = self.spin_sons.value()
+        main_daughters_orig = self.spin_daug.value()
+
+        total_grandsons = self.spin_grandsons.value()
+        total_granddaughters = self.spin_granddaughters.value()
+        grandchildren_names = []
+
+        matched_reports = []
+        unmatched_names = []
+
+        female_endings = {'ه', 'ة', 'اء', 'ى'}
+
+        for hujja in self.linked_hujaj:
+            dec_name = hujja.get('deceased_name', '').strip()
+            if not dec_name:
+                continue
+
+            # Try to find this name in main heirs list
+            matched_heir = None
+            for heir_name in main_names:
+                if self._names_overlap(dec_name, heir_name, min_tokens=2):
+                    matched_heir = heir_name
+                    break
+
+            if not matched_heir:
+                unmatched_names.append(dec_name)
+                continue
+
+            # Determine gender of predeceased child
+            norm_dec = self._normalize_arabic(dec_name)
+            last_token = norm_dec.split()[-1] if norm_dec.split() else ''
+            is_female_child = any(last_token.endswith(e) for e in female_endings)
+
+            # Remove from main counts
+            if is_female_child:
+                # daughter predeceased → her children don't normally inherit (عصبة rule)
+                # still decrement daughters count if > 0
+                curr_d = self.spin_daug.value()
+                if curr_d > 0:
+                    self.spin_daug.setValue(curr_d - 1)
+                matched_reports.append(
+                    f"• {dec_name} → بنت متوفية في حياة أبيها (أبناؤها لا يرثون عصبةً)"
+                )
+            else:
+                # son predeceased → his sons inherit as أبناء الابن
+                curr_s = self.spin_sons.value()
+                if curr_s > 0:
+                    self.spin_sons.setValue(curr_s - 1)
+                child_sons = hujja.get('sons_count', 0)
+                child_daughters = hujja.get('daughters_count', 0)
+                total_grandsons += child_sons
+                total_granddaughters += child_daughters
+                grandchildren_names.extend(hujja.get('names', []))
+                matched_reports.append(
+                    f"• {dec_name} → ابن متوفى في حياة أبيه ← أبناؤه: {child_sons} ذكر، {child_daughters} أنثى"
+                )
+
+        # Apply grandsons/granddaughters
+        self.spin_grandsons.setValue(total_grandsons)
+        self.spin_granddaughters.setValue(total_granddaughters)
+
+        # Refresh heir details and fill grandchildren names
+        self.refresh_heir_details_widgets()
+        if grandchildren_names:
+            gc_idx = 0
+            for k, data in self.heir_inputs.items():
+                if k.startswith(('grandson_', 'granddaughter_')):
+                    if gc_idx < len(grandchildren_names):
+                        data['name'].setText(grandchildren_names[gc_idx])
+                        gc_idx += 1
+
+        self.on_calculate_clicked()
+
+        # Build report
+        report_lines = ["✅ نتائج الربط التلقائي للحجج:\n"]
+        if matched_reports:
+            report_lines.append("الحجج المرتبطة بنجاح:")
+            report_lines.extend(matched_reports)
+        if unmatched_names:
+            report_lines.append("\n⚠️ حجج لم يتم التعرف عليها (الاسم غير موجود في قائمة الورثة):")
+            report_lines.extend([f"  • {n}" for n in unmatched_names])
+        report_lines.append(f"\nإجمالي أبناء الابن (الأحفاد الذكور): {total_grandsons}")
+        report_lines.append(f"إجمالي بنات الابن (الأحفاد الإناث): {total_granddaughters}")
+
+        QMessageBox.information(self, "نجاح الربط التلقائي", "\n".join(report_lines))
 

@@ -774,6 +774,9 @@ def parse_hujjat_wafat_text(text: str) -> dict:
         'predeceased_children_count': 0,
         'names': [],
         'deceased_name': '',
+        'deceased_lakab': '',
+        'husband_name': '',
+        'wife_name': '',
         'applicant_name': '',
         'applicant_cin': '',
         'hujja_num': '',
@@ -797,6 +800,8 @@ def parse_hujjat_wafat_text(text: str) -> dict:
                     if 'father_alive' in data: heirs['father'] = bool(data['father_alive'])
                     if 'mother_alive' in data: heirs['mother'] = bool(data['mother_alive'])
                     if 'deceased_name' in data: heirs['deceased_name'] = _clean_extracted_text(data['deceased_name'])
+                    if 'wife_name' in data: heirs['wife_name'] = _clean_extracted_text(data['wife_name'])
+                    if 'husband_name' in data: heirs['husband_name'] = _clean_extracted_text(data['husband_name'])
                     if 'applicant_name' in data: heirs['applicant_name'] = _clean_extracted_text(data['applicant_name'])
                     if 'hujja_date' in data: heirs['hujja_date'] = _clean_extracted_text(data['hujja_date'])
                     if heirs['sons_count'] > 0 or heirs['daughters_count'] > 0 or heirs['husband'] or heirs['wife']:
@@ -825,6 +830,8 @@ def parse_hujjat_wafat_text(text: str) -> dict:
             heirs['husband'] = False
         elif re.search(r"\bزوجها\b", clause_text):
             heirs['husband'] = True
+            m_husb = re.search(r"زوجها\s*[:：]?\s*([^\n،.]+?)(?=\s+و?ابناؤها|\s+و?ابنائها|\s+و?اولادها|\s+و?المحيطين|\s+وهم|\n|$)", clause_text)
+            if m_husb: heirs['husband_name'] = _clean_extracted_text(m_husb.group(1))
         else:
             heirs['husband'] = False
     elif is_male_deceased:
@@ -833,6 +840,8 @@ def parse_hujjat_wafat_text(text: str) -> dict:
             heirs['wife'] = False
         elif re.search(r"\b(زوجته|زوجاته|أرملة|حرمته)\b", clause_text):
             heirs['wife'] = True
+            m_wife = re.search(r"زوجته\s*[:：]?\s*([^\n،.]+?)(?=\s+و?ابناؤه|\s+و?ابنائه|\s+و?اولاده|\s+و?المحيطين|\s+وهم|\n|$)", clause_text)
+            if m_wife: heirs['wife_name'] = _clean_extracted_text(m_wife.group(1))
         else:
             heirs['wife'] = False
     else:
@@ -848,12 +857,31 @@ def parse_hujjat_wafat_text(text: str) -> dict:
         heirs['mother'] = True
 
     # Common female names in Tunisia & feminine gender endings
-    female_names = {'سعاد', 'فاطمة', 'مريم', 'عائشة', 'أميرة', 'نادرة', 'سارة', 'ليلى', 'منيرة', 'وسيلة', 'نعيمة', 'خديجة', 'زينب', 'لطيفة', 'سامية', 'سلمى', 'هناء', 'رباب', 'نجلاء', 'سميرة', 'جنات', 'آسية', 'سمية', 'إلهام', 'حياة', 'نبيلة', 'جميلة', 'سليمة', 'مبروكة', 'صالحة', 'وجدان', 'فوزية', 'عزيزة', 'رفيقه', 'رفيقة', 'عزة', 'مامييه', 'مبروكه'}
+    female_names = {'سعاد', 'فاطمة', 'مريم', 'عائشة', 'أميرة', 'اميرة', 'نادرة', 'سارة', 'ليلى', 'منيرة', 'وسيلة', 'نعيمة', 'خديجة', 'زينب', 'لطيفة', 'سامية', 'سلمى', 'هناء', 'رباب', 'نجلاء', 'سميرة', 'جنات', 'آسية', 'اسية', 'سمية', 'إلهام', 'الهام', 'حياة', 'نبيلة', 'جميلة', 'سليمة', 'مبروكة', 'صالحة', 'وجدان', 'فوزية', 'عزيزة', 'رفيقه', 'رفيقة', 'عزة', 'مامييه', 'مبروكه'}
 
     # Extract non-heir names (predeceased husband/wife names & explicitly excluded non-inheritors)
-    non_heir_names = {'الرشداء', 'البالغين', 'المذكورين', 'وهم', 'منها', 'منه', 'غير', 'لاغير', 'لا', 'التركة', 'المحيطين', 'بإرثه', 'الذين', 'تصادقا'}
+    non_heir_names = {'الرشداء', 'البالغين', 'المذكورين', 'وهم', 'منها', 'منه', 'غير', 'لاغير', 'لا', 'التركة', 'المحيطين', 'بإرثه', 'بارثه', 'الذين', 'تصادقا'}
     for m in re.finditer(r"(?:زوجها\s+(?:المتوفى|الهالك)\s+قبلها|زوجته\s+(?:المتوفاة|الهالكة)\s+قبله|من\s+غير\s+الوارث)\s+([^\s،.]+)", clause_text):
         non_heir_names.add(m.group(1).strip())
+
+    # Extract deceased name & family surname / lakab (ولقبه/ولقبها)
+    if not heirs['deceased_name']:
+        clean_text_for_dec = re.sub(r'اسم\s+الأم\s+ولقبها\s*[:：]?\s*[^\n،.]+', '', t)
+        clean_text_for_dec = re.sub(r'زوج(?:ها|ته)\s+(?:المتوفى|المتوفاة|الهالك|الهالكة)\s+(?:قبلها|قبله)\s+[^\n،.]+', '', clean_text_for_dec)
+        
+        m_dec = re.search(r"(?:إقامة\s+حجة\s+وفاة\s+|نقرر\s+إقامة\s+حجة\s+وفاة\s+|اسم\s+)?(?:الهالك|الهالكة|المرحوم|المرحومة|المتوفى|المتوفاة|الموروث|الموروثة)(?:ة|\(ة\))?\s*[:：]?\s*([^\n،.:]+)", clean_text_for_dec)
+        if m_dec:
+            raw_dec = m_dec.group(1).strip()
+            raw_dec = re.split(r"(?:\s+ولقبه|\s+اسم\s+الأم|\s+المتوفي|\s+المتوفى|\s+حسب|\s+جنسيته)", raw_dec)[0]
+            heirs['deceased_name'] = _clean_extracted_text(raw_dec)
+
+    m_lakab = re.search(r"ولقبه(?:ا)?\s*[:：]?\s*([^\s،.\n]+)", t)
+    deceased_lakab = _clean_extracted_text(m_lakab.group(1)) if m_lakab else ""
+    if not deceased_lakab and heirs['deceased_name']:
+        dec_parts = heirs['deceased_name'].split()
+        if len(dec_parts) > 1 and "بن" not in dec_parts[-1] and "بنت" not in dec_parts[-1]:
+            deceased_lakab = dec_parts[-1]
+    heirs['deceased_lakab'] = deceased_lakab
 
     # 3. Children list parsing (e.g. وأبناؤه منها الرشداء وهم : رفيقه / جمال / أحمد / أميرة / منصور / عزة لا غير)
     t_norm = re.sub(r'[أإآ]', 'ا', t)
@@ -877,7 +905,13 @@ def parse_hujjat_wafat_text(text: str) -> dict:
                     heirs['daughters_count'] += 1
                 else:
                     heirs['sons_count'] += 1
-                heirs['names'].append(name)
+                
+                # Append father's family surname (lakab) if available
+                if deceased_lakab and not name.endswith(deceased_lakab):
+                    full_child_name = f"{name} {deceased_lakab}"
+                else:
+                    full_child_name = name
+                heirs['names'].append(full_child_name)
 
     # 4. Standard Sons & Daughters regex if not extracted via names list
     if heirs['sons_count'] == 0 and heirs['daughters_count'] == 0:

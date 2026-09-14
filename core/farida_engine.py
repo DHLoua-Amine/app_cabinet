@@ -804,17 +804,24 @@ def parse_hujjat_wafat_text(text: str) -> dict:
         except Exception:
             pass
 
-    clause_match = re.search(r"(وقد تركت?|أحاط بتركه|انحصر ورثته?|الورثة الشرعيين?)\s*[:：]?(.*?)(ولم ترك|ولم يترك|هذا ما تم|وذلك تمامها|$)", t, re.DOTALL)
-    clause_text = clause_match.group(2) if clause_match else t
+    clause_match = re.search(r"(?:وقد تركت?|أحاط بتركه|انحصر ورثته?|الورثة الشرعيين?|المحيطين\s+بارثه|المحيطين\s+بتركته)\s*[:：]?(.*?)(?:ولم ترك|ولم يترك|هذا ما تم|وذلك تمامها|لا غير|$)", t, re.DOTALL)
+    clause_text = clause_match.group(1) if clause_match else t
 
     # Determine gender of deceased strictly
-    is_female_deceased = bool(re.search(r"(المتوفاة|المتوفية|المتوفات|الهالكة|الموروثة|المرحومة|زوجها|أرملة)", t))
-    is_male_deceased = bool(re.search(r"(المتوفى|الهالك|الموروث|المرحوم|زوجته)", t)) and not is_female_deceased
+    if re.search(r"\b(زوجته|إرثه|تركته|أبناؤه|أولاده)\b", t):
+        is_female_deceased = False
+        is_male_deceased = True
+    elif re.search(r"\b(زوجها|إرثها|تركتها|أبناؤها|أولادها)\b", t):
+        is_female_deceased = True
+        is_male_deceased = False
+    else:
+        is_female_deceased = bool(re.search(r"(المتوفاة|المتوفية|المتوفات|الهالكة|الموروثة|المرحومة)", t))
+        is_male_deceased = bool(re.search(r"(المتوفى|الهالك|الموروث|المرحوم)", t)) and not is_female_deceased
 
     # 1. Spouse check
     if is_female_deceased:
         heirs['wife'] = False  # Deceased is female -> She has NO wife!
-        if re.search(r"زوجها\s+(المتوفى|الهالك)\s+قبلها", clause_text) or "المتوفى قبلها" in clause_text or "الهالك قبلها" in clause_text or "توفي قبلها" in clause_text:
+        if re.search(r"زوجها\s+(?:المتوفى|الهالك)\s+قبلها", clause_text) or "المتوفى قبلها" in clause_text or "الهالك قبلها" in clause_text or "توفي قبلها" in clause_text:
             heirs['husband'] = False
         elif re.search(r"\bزوجها\b", clause_text):
             heirs['husband'] = True
@@ -822,16 +829,16 @@ def parse_hujjat_wafat_text(text: str) -> dict:
             heirs['husband'] = False
     elif is_male_deceased:
         heirs['husband'] = False  # Deceased is male -> He has NO husband!
-        if re.search(r"زوجته\s+(المتوفاة|الهالكة)\s+قبله", clause_text) or "المتوفاة قبله" in clause_text or "الهالكة قبله" in clause_text or "توفيت قبله" in clause_text:
+        if re.search(r"زوجته\s+(?:المتوفاة|الهالكة)\s+قبله", clause_text) or "المتوفاة قبله" in clause_text or "الهالكة قبله" in clause_text or "توفيت قبله" in clause_text:
             heirs['wife'] = False
         elif re.search(r"\b(زوجته|زوجاته|أرملة|حرمته)\b", clause_text):
             heirs['wife'] = True
         else:
             heirs['wife'] = False
     else:
-        if re.search(r"زوجها\s+(المتوفى|الهالك)\s+قبلها", clause_text) or "المتوفى قبلها" in clause_text:
+        if re.search(r"زوجها\s+(?:المتوفى|الهالك)\s+قبلها", clause_text) or "المتوفى قبلها" in clause_text:
             heirs['husband'] = False
-        elif re.search(r"زوجته\s+(المتوفاة|الهالكة)\s+قبله", clause_text) or "المتوفاة قبله" in clause_text:
+        elif re.search(r"زوجته\s+(?:المتوفاة|الهالكة)\s+قبله", clause_text) or "المتوفاة قبله" in clause_text:
             heirs['wife'] = False
 
     # 2. Parents check
@@ -840,25 +847,33 @@ def parse_hujjat_wafat_text(text: str) -> dict:
     if re.search(r"\b(والدته|أمه|أمي)\b", clause_text) and "المتوفاة قبل" not in clause_text:
         heirs['mother'] = True
 
+    # Common female names in Tunisia & feminine gender endings
+    female_names = {'سعاد', 'فاطمة', 'مريم', 'عائشة', 'أميرة', 'نادرة', 'سارة', 'ليلى', 'منيرة', 'وسيلة', 'نعيمة', 'خديجة', 'زينب', 'لطيفة', 'سامية', 'سلمى', 'هناء', 'رباب', 'نجلاء', 'سميرة', 'جنات', 'آسية', 'سمية', 'إلهام', 'حياة', 'نبيلة', 'جميلة', 'سليمة', 'مبروكة', 'صالحة', 'وجدان', 'فوزية', 'عزيزة', 'رفيقه', 'رفيقة', 'عزة', 'مامييه', 'مبروكه'}
+
     # Extract non-heir names (predeceased husband/wife names & explicitly excluded non-inheritors)
-    non_heir_names = set()
+    non_heir_names = {'الرشداء', 'البالغين', 'المذكورين', 'وهم', 'منها', 'منه', 'غير', 'لاغير', 'لا', 'التركة', 'المحيطين', 'بإرثه', 'الذين', 'تصادقا'}
     for m in re.finditer(r"(?:زوجها\s+(?:المتوفى|الهالك)\s+قبلها|زوجته\s+(?:المتوفاة|الهالكة)\s+قبله|من\s+غير\s+الوارث)\s+([^\s،.]+)", clause_text):
         non_heir_names.add(m.group(1).strip())
 
-    # Common female names in Tunisia & feminine gender endings
-    female_names = {'سعاد', 'فاطمة', 'مريم', 'عائشة', 'أميرة', 'نادرة', 'سارة', 'ليلى', 'منيرة', 'وسيلة', 'نعيمة', 'خديجة', 'زينب', 'لطيفة', 'سامية', 'سلمى', 'هناء', 'رباب', 'نجلاء', 'سميرة', 'جنات', 'آسية', 'سمية', 'إلهام', 'حياة', 'نبيلة', 'جميلة', 'سليمة', 'مبروكة', 'صالحة', 'وجدان', 'فوزية', 'عزيزة'}
+    # 3. Children list parsing (e.g. وأبناؤه منها الرشداء وهم : رفيقه / جمال / أحمد / أميرة / منصور / عزة لا غير)
+    t_norm = re.sub(r'[أإآ]', 'ا', t)
+    clause_norm = re.sub(r'[أإآ]', 'ا', clause_text)
+    kids_match = re.search(r"(?:و?ابنا[ؤئءه]ه|و?ابنائه|و?ابنائها|و?ابناؤها|و?اولاده|و?اولادها|و?ورثته|و?خلفاؤه|و?خلفائه).*?وهم\s*[:：]?\s*(.+?)\s*(?:لا\s+غير|\s+غير|\s+المحل|\.\/\.|\n|$)", clause_norm)
+    if not kids_match:
+        kids_match = re.search(r"وهما\s+(?:الرشيدين|البالغين|المذكورين)?\s*([^\n،.]+?)(?:ومن\s+غير|\s+والوارث|ولم|$)", clause_norm)
 
-    # 3. Dual & Multi-children names list (e.g. ابنيها... وهما الرشيدين سعاد وجلول)
-    names_match = re.search(r"وهما\s+(?:الرشيدين|البالغين|المذكورين)?\s*([^\n،.]+?)(?:ومن\s+غير|\s+والوارث|ولم|$)", clause_text)
-    if names_match:
-        raw_phrase = names_match.group(1)
-        stop_words = {'الرشيدين', 'البالغين', 'المذكورين', 'من', 'ابنيها', 'ابنيه', 'ولدها', 'ولديه', 'ولديها', 'منهم', 'منها', 'زوجها', 'المتوفى', 'قبلها', 'الهالك', 'الرشيدان'}
-        raw_list = [_clean_extracted_text(n.strip().lstrip('و').strip()) for n in re.split(r"[،,\s]+", raw_phrase) if n.strip()]
-        raw_list = [n for n in raw_list if n and n not in stop_words]
-        valid_names = [n for n in raw_list if n not in non_heir_names]
+    if kids_match:
+        raw_phrase = kids_match.group(1)
+        raw_list = [_clean_extracted_text(n.strip()) for n in re.split(r"[/،,]+|\s+و\s+", raw_phrase) if n.strip()]
+        valid_names = [n for n in raw_list if n and len(n) > 1 and n not in non_heir_names]
         if valid_names:
+            heirs['sons_count'] = 0
+            heirs['daughters_count'] = 0
+            heirs['names'] = []
+            male_exceptions = {'حمزة', 'عطية', 'طه', 'وجيه', 'قتادة', 'أسامة', 'اسامة', 'عبيدة', 'عمران'}
             for name in valid_names:
-                if name in female_names or name.endswith('ة') or name.endswith('اء'):
+                clean_n = re.sub(r'[أإآ]', 'ا', name)
+                if name not in male_exceptions and clean_n not in male_exceptions and (name in female_names or clean_n in female_names or name.endswith('ة') or name.endswith('ه') or name.endswith('اء')):
                     heirs['daughters_count'] += 1
                 else:
                     heirs['sons_count'] += 1
@@ -879,7 +894,7 @@ def parse_hujjat_wafat_text(text: str) -> dict:
             stop_words = {"الذكر", "مثل", "حظ", "الأنثيين", "وهم", "وهن", "منها", "منه", "غير", "التركة", "ابن", "إبن", "ابنه"}
             s_names = [n.strip() for n in re.split(r"[،,و\s]+", sons_part) if len(n.strip()) > 2 and n.strip() not in stop_words and n.strip() not in non_heir_names]
             if len(s_names) > 0:
-                heirs['sons_count'] = max(1, len(s_names))
+                heirs['sons_count'] = len(s_names)
                 heirs['names'].extend(s_names)
 
         daug_match = re.search(r"(بناته?|بناتها|بناتهن|ابنته|إبنته|بنته)\s*(?:منه|منها)?\s*[:：]?\s*([^،.\n]+)", clause_text)
@@ -888,35 +903,34 @@ def parse_hujjat_wafat_text(text: str) -> dict:
             daug_part = re.split(r"(أبناؤه?|أبنائه?|إبنه|ابنه|أولاده)", daug_match.group(2))[0]
             d_names = [n.strip() for n in re.split(r"[،,و\s]+", daug_part) if len(n.strip()) > 2 and n.strip() not in stop_words and n.strip() not in non_heir_names]
             if len(d_names) > 0:
-                heirs['daughters_count'] = max(1, len(d_names))
+                heirs['daughters_count'] = len(d_names)
 
-        # Explicit digits match
-        s_num = re.search(r"(\d+)\s*(أبناء|أولاد|ابن)", clause_text)
-        if s_num: heirs['sons_count'] = int(s_num.group(1))
-        d_num = re.search(r"(\d+)\s*(بنات|إناث|بنت)", clause_text)
-        if d_num: heirs['daughters_count'] = int(d_num.group(1))
+    # 5. Extract metadata (Deceased name, Court from top right, Case File Num from top left, Date)
+    heirs['applicant_name'] = ""
+    heirs['applicant_cin'] = ""
 
-    # 5. Extract metadata (Deceased, Applicant, CIN, Hujja Num, Court, Date)
-    clean_text_for_dec = re.sub(r'زوج(?:ها|ته)\s+(?:المتوفى|المتوفاة|الهالك|الهالكة)\s+(?:قبلها|قبله)\s+[^\n،.]+', '', t)
-    m_dec = re.search(r"(?:يعرفان|يعرفون|وفاة|اسم)?\s*(?:المتوفاة|المتوفية|المتوفات|المتوفى|الهالكة|الهالك|المرحومة|المرحوم|الموروثة|الموروث)\s*[:：]?\s*([^\n،.:]+?)(?:\s+وإبنة|\s+إبنة|\s+شهد|\s+توفيت|\s+في|\s+بتونس|\s+معرفة|\s+حسبما|\s+المعروفة|\s+المعروف|\s+وتركت|\s+ورثتها|\s+قاطن|\s+صناعة|\n|$)", clean_text_for_dec)
+    clean_text_for_dec = re.sub(r'اسم\s+الأم\s+ولقبها\s*[:：]?\s*[^\n،.]+', '', t)
+    clean_text_for_dec = re.sub(r'زوج(?:ها|ته)\s+(?:المتوفى|المتوفاة|الهالك|الهالكة)\s+(?:قبلها|قبله)\s+[^\n،.]+', '', clean_text_for_dec)
+    
+    m_dec = re.search(r"(?:إقامة\s+حجة\s+وفاة\s+|نقرر\s+إقامة\s+حجة\s+وفاة\s+)?المرحوم(?:ة|\(ة\))?\s*[:：]?\s*([^\n،.:]+?)(?:\s+ولقبه|\s+اسم\s+الأم|\s+المتوفي|\s+حسب|\s+جنسيته|$)", clean_text_for_dec)
     if m_dec: heirs['deceased_name'] = _clean_extracted_text(m_dec.group(1))
 
-    m_app = re.search(r"السيد(?:ة)?\s*[:：]?\s*([^\n،.]+?)(?:\s+المولود|\s+صناعتها|\s+القاطن|\s+بطاقة|\s+بوصفها|$)", t)
-    if m_app: heirs['applicant_name'] = _clean_extracted_text(m_app.group(1))
-
-    m_cin = re.search(r"بطاقة\s+تعريف[^\d]*(\d{8})", t)
-    if m_cin: heirs['applicant_cin'] = _clean_extracted_text(m_cin.group(1))
-
-    m_crt = re.search(r"(محكمة\s+ناحية\s+[^\n،.]+)", t)
+    # Top right header: Court of Jurisdiction (محكمة ناحية... / المحكمة الابتدائية...)
+    m_crt = re.search(r"(?:الجمهورية\s+التونسية\s+)?(?:وزارة\s+العدل\s+)?(محكمة\s+(?:الناحية|ناحية|الابتدائية)\s+[^\n،.]+)", t[:500])
+    if not m_crt:
+        m_crt = re.search(r"(محكمة\s+(?:الناحية|ناحية|الابتدائية)\s+[^\n،.]+)", t)
     if m_crt: heirs['hujja_court'] = _clean_extracted_text(m_crt.group(1))
 
-    m_num = re.search(r"(?:عدد\s+المادة|عدد)\s*[:：]?\s*([\d\/]+)", t)
+    # Top left: Case File Number (عدد الملف / عدد المادة / عدد...)
+    m_num = re.search(r"(?:عدد\s+الملف|عدد\s+المادة|المادة\s+عدد|ملف\s+عدد|عدد)\s*[:：]?\s*([\d\/]+)", t)
     if m_num: heirs['hujja_num'] = _clean_extracted_text(m_num.group(1))
 
-    m_dt = re.search(r"حرر\s+(?:بتونس|في)\s+([^\n،.]+)", t)
+    m_dt = re.search(r"بتاريخ\s*[:：]?\s*(\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2})", t)
+    if not m_dt:
+        m_dt = re.search(r"حرر\s+(?:بتونس|في)\s+([^\n،.]+)", t)
     if m_dt: heirs['hujja_date'] = _clean_extracted_text(m_dt.group(1))
 
-    heirs['names'] = [_clean_extracted_text(n) for n in heirs['names'] if _clean_extracted_text(n)]
+    heirs['names'] = list(dict.fromkeys([_clean_extracted_text(n) for n in heirs['names'] if _clean_extracted_text(n)]))
 
     return heirs
 

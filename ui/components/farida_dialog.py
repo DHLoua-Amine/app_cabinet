@@ -1124,26 +1124,21 @@ class TunisianFaridaDialog(QDialog):
                 txt_name.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 11px;")
                 txt_name.textChanged.connect(self.on_calculate_clicked)
 
+                # Hidden CIN field (kept for data integrity, not shown in UI)
                 txt_cin = QLineEdit(row_card)
-                txt_cin.setPlaceholderText("رقم ب.ت.ط")
-                txt_cin.setFixedWidth(100)
-                txt_cin.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 11px;")
-                txt_cin.textChanged.connect(self.on_calculate_clicked)
+                txt_cin.setVisible(False)
 
+                # Hidden civil status field (kept for data integrity, not shown in UI)
                 txt_civil_status = QLineEdit(row_card)
-                txt_civil_status.setPlaceholderText("مرجع رسم الولادة (مثال: رسم عدد 1042 ببلدية فوشانة)")
-                txt_civil_status.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 11px;")
-                txt_civil_status.textChanged.connect(self.on_calculate_clicked)
+                txt_civil_status.setVisible(False)
 
                 btn_search = QPushButton("🔍 أرشيف", row_card)
-                btn_search.setToolTip("البحث في أرشيف المكتب لاستيراد الاسم ورقم ب.ت.ط")
+                btn_search.setToolTip("البحث في أرشيف المكتب لاستيراد الاسم واللقب")
                 btn_search.setStyleSheet("QPushButton { background-color: #0284c7; color: white; border: none; border-radius: 4px; padding: 4px 8px; font-size: 10px; font-weight: bold; } QPushButton:hover { background-color: #0369a1; }")
                 btn_search.clicked.connect(lambda _, n=txt_name, c=txt_cin, l=label_text: self._search_heir_from_archive(n, c, l))
 
                 row_lay.addWidget(lbl)
-                row_lay.addWidget(txt_name, 2)
-                row_lay.addWidget(txt_cin, 1)
-                row_lay.addWidget(txt_civil_status, 2)
+                row_lay.addWidget(txt_name, 4)
                 row_lay.addWidget(btn_search)
 
                 self.heir_details_layout.addWidget(row_card)
@@ -1333,8 +1328,6 @@ class TunisianFaridaDialog(QDialog):
 
                     label_prefix = "الابن" if prefix == "son_" else ("البنت" if prefix == "daughter_" else ("الزوجة" if prefix == "wife_" else "الوارث"))
                     disp_name = f"{label_prefix} {h_name}" if h_name else f"{label_prefix} {sub_i}"
-                    if h_cin:
-                        disp_name += f" (ب.ت.و: {h_cin})"
 
                     expanded_table_rows.append({
                         "name": disp_name,

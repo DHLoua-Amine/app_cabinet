@@ -69,6 +69,9 @@ def build_executable():
         print("Erreur : l'exécutable DATLY.exe n'a pas été produit.")
         return False
 
+    # Backward compatibility for old v1.0.6 updater scripts looking for CabinetNotarialZarai.exe
+    shutil.copy2(dist_dir / "DATLY.exe", dist_dir / "CabinetNotarialZarai.exe")
+
     ok = verify_bundle(dist_dir)
     total = sum(f.stat().st_size for f in dist_dir.rglob("*") if f.is_file())
     print(f"\nTaille totale du build : {total / 1e6:.0f} Mo")

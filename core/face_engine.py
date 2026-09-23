@@ -36,8 +36,22 @@ def get_global_face_engine():
             _global_face_engine_instance = FaceEngine()
         return _global_face_engine_instance
 
+def apply_clahe_contrast(image_bgr: np.ndarray) -> np.ndarray:
+    """Enhances backlit and shadowed face crops using Adaptive Histogram Equalization (CLAHE)."""
+    if image_bgr is None or image_bgr.size == 0:
+        return image_bgr
+    try:
+        lab = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2LAB)
+        l, a, b = cv2.split(lab)
+        clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
+        cl = clahe.apply(l)
+        limg = cv2.merge((cl, a, b))
+        return cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+    except Exception:
+        return image_bgr
+
 class FaceEngine:
-    def __init__(self, score_threshold: float = 0.8, nms_threshold: float = 0.3, top_k: int = 5000):
+    def __init__(self, score_threshold: float = 0.55, nms_threshold: float = 0.3, top_k: int = 5000):
         self.score_threshold = score_threshold
         self.nms_threshold = nms_threshold
         self.top_k = top_k
@@ -58,7 +72,7 @@ class FaceEngine:
                 from system_guardian import log_system_error
                 log_system_error("FaceEngine Model Load Failed", e)
 
-    def detect_and_extract(self, frame_bgr: np.ndarray, non_blocking: bool = False) -> List[Dict]:
+    def detect_and_extract(self, frame_bgr: np.ndarray, non_blocking: bool = False, roi_box: Optional[Tuple[float, float, float, float]] = None) -> List[Dict]:
         if frame_bgr is None:
             return []
         
@@ -73,16 +87,30 @@ class FaceEngine:
             try:
                 orig_h, orig_w = frame_bgr.shape[:2]
 
+                # Apply ROI (Region of Interest) cropping if configured
+                roi_offset_x, roi_offset_y = 0, 0
+                working_frame = frame_bgr
+                if roi_box and len(roi_box) == 4:
+                    rx1_p, ry1_p, rx2_p, ry2_p = roi_box
+                    rx1 = max(0, int(rx1_p * orig_w))
+                    ry1 = max(0, int(ry1_p * orig_h))
+                    rx2 = min(orig_w, int(rx2_p * orig_w))
+                    ry2 = min(orig_h, int(ry2_p * orig_h))
+                    if rx2 - rx1 > 50 and ry2 - ry1 > 50:
+                        working_frame = frame_bgr[ry1:ry2, rx1:rx2].copy()
+                        roi_offset_x, roi_offset_y = rx1, ry1
+                        orig_h, orig_w = working_frame.shape[:2]
+
                 # Fast Downscale to 640px max width for 5X faster YuNet inference
                 max_dim = 640
                 if max(orig_h, orig_w) > max_dim:
                     scale = max_dim / float(max(orig_h, orig_w))
                     target_w = int(orig_w * scale)
                     target_h = int(orig_h * scale)
-                    resized_frame = cv2.resize(frame_bgr, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                    resized_frame = cv2.resize(working_frame, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
                 else:
                     scale = 1.0
-                    resized_frame = frame_bgr
+                    resized_frame = working_frame
                     target_w, target_h = orig_w, orig_h
 
                 self.detector.setInputSize((target_w, target_h))
@@ -91,7 +119,7 @@ class FaceEngine:
                 results = []
                 if faces is not None:
                     for face in faces:
-                        # Scale face detection output back to original full resolution
+                        # Scale face detection output back to working resolution
                         scaled_face = face.copy()
                         if scale != 1.0:
                             scaled_face[0:14] = scaled_face[0:14] / scale
@@ -100,19 +128,55 @@ class FaceEngine:
                         x, y, bw, bh = bbox
                         x1, y1 = max(0, x), max(0, y)
                         x2, y2 = min(orig_w, x + bw), min(orig_h, y + bh)
-                        if x2 - x1 < 25 or y2 - y1 < 25:
+                        
+                        # Accept faces down to 30x30 pixels (for hallway/wall camera distances)
+                        if x2 - x1 < 30 or y2 - y1 < 30:
                             continue
 
-                        # Align & crop using full-resolution original frame for maximum SFace feature accuracy
-                        aligned = self.recognizer.alignCrop(frame_bgr, scaled_face)
+                        # Frontal/Angled Pose Filter: Permissive angle check (0.75) for walking clients
+                        try:
+                            re_x, le_x = scaled_face[4], scaled_face[6]
+                            nose_x = scaled_face[8]
+                            eye_dist = abs(le_x - re_x)
+                            if eye_dist > 3:
+                                dist_re_nose = abs(nose_x - re_x)
+                                dist_le_nose = abs(le_x - nose_x)
+                                asym_ratio = abs(dist_re_nose - dist_le_nose) / eye_dist
+                                if asym_ratio > 0.75:
+                                    continue  # Reject extreme 90-degree profile faces only
+                        except Exception:
+                            pass
+
+                        crop = working_frame[y1:y2, x1:x2].copy()
+                        if crop is None or crop.size == 0:
+                            continue
+
+                        # Anti-Blur Laplacian Filter: Relaxed threshold (10.0) for RTSP security video streams
+                        gray_crop = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY) if len(crop.shape) == 3 else crop
+                        blur_var = float(cv2.Laplacian(gray_crop, cv2.CV_64F).var())
+                        if blur_var < 10.0:
+                            continue
+
+                        # Apply CLAHE contrast enhancement to handle backlit/shadowed faces
+                        enhanced_frame = apply_clahe_contrast(working_frame)
+                        enhanced_crop = apply_clahe_contrast(crop)
+
+                        # Align & crop using full-resolution frame for maximum SFace feature accuracy
+                        aligned = self.recognizer.alignCrop(enhanced_frame, scaled_face)
                         embedding = self.recognizer.feature(aligned).flatten()
-                        crop = frame_bgr[y1:y2, x1:x2].copy()
+
+                        actual_x1 = x1 + roi_offset_x
+                        actual_y1 = y1 + roi_offset_y
+                        actual_x2 = x2 + roi_offset_x
+                        actual_y2 = y2 + roi_offset_y
 
                         results.append({
-                            "bbox": (x1, y1, x2, y2),
-                            "crop": crop,
+                            "bbox": (actual_x1, actual_y1, actual_x2, actual_y2),
+                            "crop": enhanced_crop,
+                            "raw_crop": crop,
                             "embedding": embedding,
-                            "face_row": scaled_face
+                            "face_row": scaled_face,
+                            "blur_var": blur_var
                         })
                 return results
             except (cv2.error, Exception) as e:
@@ -134,9 +198,9 @@ class FaceEngine:
         if threshold is None:
             try:
                 from core import config
-                threshold = float(config.get_setting("face_match_threshold", 0.46))
+                threshold = float(config.get_setting("face_match_threshold", 0.363))
             except Exception:
-                threshold = 0.46
+                threshold = 0.363
 
         if query_emb is None or len(query_emb) == 0:
             return None, 0.0

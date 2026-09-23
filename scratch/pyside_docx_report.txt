@@ -1,0 +1,15 @@
+=== CHECKING PYSIDE HEADER TABLE ===
+Header Cell (0, 0) text: 'MAITRE Abelhmdi zarai | NOTAIRE | Rue Fouchene | Tel: 96206392'
+Header Cell (0, 1) text: ''
+Header Cell (0, 2) text: 'مكــتب الأستاذ عبد الحميد الزارعي | عدل إشهــــاد | شارع فوشانة | الهاتف 96206392'
+
+=== CHECKING PYSIDE FOOTER TABLE ===
+Footer Cell (0, 0) text: 'الأستاذ سامي الجوادي ب ت و ع 14785236دد' | font: Simplified Arabic | size: 14.0pt | w:cs: Simplified Arabic | w:ascii: Simplified Arabic
+Footer Cell (0, 1) text: 'الأستاذ عبد الحميد الزارعي ب ت و ع 12345679' | font: Simplified Arabic | size: 14.0pt | w:cs: Simplified Arabic | w:ascii: Simplified Arabic
+
+=== CHECKING PYSIDE BODY PARAGRAPHS ===
+P1 R0 text: 'عقد بيع' | font: Simplified Arabic | size: 20.0pt | w:cs: Simplified Arabic | w:ascii: Simplified Arabic
+P2 R0 text: 'الحمد لله في' | font: Simplified Arabic | size: 13.5pt | w:cs: Simplified Arabic | w:ascii: Simplified Arabic
+P2 R1 text: ' يوم السبت... نحن عبد الح' | font: Simplified Arabic | size: 13.0pt | w:cs: Simplified Arabic | w:ascii: Simplified Arabic
+P3 R0 text: 'الفصل الأول:' | font: Simplified Arabic | size: 13.5pt | w:cs: Simplified Arabic | w:ascii: Simplified Arabic
+P3 R1 text: ' باع واحال...' | font: Simplified Arabic | size: 13.0pt | w:cs: Simplified Arabic | w:ascii: Simplified Arabic

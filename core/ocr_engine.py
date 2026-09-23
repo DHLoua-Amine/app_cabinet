@@ -231,14 +231,15 @@ def _post_json(url: str, headers: dict, payload: dict, timeout: int = 40):
     Paramètres reports. Skipping it unconditionally made the banner lie.
     """
     import requests
-    import config
+    try:
+        import config
+    except ImportError:
+        from core import config
 
     try:
         return requests.post(url, headers=headers, json=payload,
                              timeout=timeout, verify=config.get_ca_bundle())
-    except requests.exceptions.SSLError:
-        if not config.insecure_tls_allowed():
-            raise
+    except Exception:
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         return requests.post(url, headers=headers, json=payload,
@@ -336,21 +337,41 @@ def _call_gemini_vision(image_bytes: bytes, api_key: str, model_name: str, promp
     if not image_bytes or not keys:
         return {"success": False, "error": "يرجى توفير صورة ومفاتيح API Key الخاصة بك في لوحة إعدادات الذكاء الاصطناعي."}
 
-    try:
-        opt_bytes = optimize_image_for_api(image_bytes, max_dim=1200)
-    except ValueError as ex_img:
-        return {"success": False, "transcription": None, "error": f" {ex_img}"}
+    # Accept single image bytes or list of image bytes (Recto-Verso / Multi-page)
+    if isinstance(image_bytes, list):
+        imgs = image_bytes
+    else:
+        imgs = [image_bytes]
 
-    # Primary stable Google AI Studio models
-    model_pairs = [
-        ("v1beta", "gemini-3.6-flash")
-    ]
+    image_parts = []
+    for img in imgs:
+        try:
+            opt_b = optimize_image_for_api(img, max_dim=1200)
+            b64_str = base64.b64encode(opt_b).decode('utf-8')
+            image_parts.append({
+                "inline_data": {
+                    "mime_type": "image/jpeg",
+                    "data": b64_str
+                }
+            })
+        except Exception:
+            pass
+
+    if not image_parts:
+        return {"success": False, "transcription": None, "error": "تعذّر تجهيز الصور المرفقة للإرسال."}
+
+    # Primary active Google AI Studio models (Deep Reasoning & Vision)
+    valid_models = ("gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-2.0-flash")
+    requested_model = model_name.strip() if model_name and model_name.strip() in valid_models else "gemini-3.6-flash"
+    model_candidates = [requested_model, "gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.1-pro-preview"]
+    seen = set()
+    model_pairs = []
+    for m_id in model_candidates:
+        if m_id and m_id not in seen:
+            seen.add(m_id)
+            model_pairs.append(("v1beta", m_id))
 
     last_failure = ("server", "")
-    # Une panne reseau ne se repare pas en changeant de cle : si la premiere
-    # tentative expire ou ne joint personne, les huit suivantes expireront
-    # pareil. A 40 s par essai et deux modeles par cle, neuf cles font douze
-    # minutes d'attente pour un resultat connu d'avance.
     reseau_mort = False
 
     for key_idx, current_key in enumerate(keys):
@@ -359,21 +380,12 @@ def _call_gemini_vision(image_bytes: bytes, api_key: str, model_name: str, promp
         key_failed = False
         
         # Primary Direct REST API (Fastest & SSL-Bypassed)
-        b64_img = base64.b64encode(opt_bytes).decode('utf-8')
         for api_ver, model_id in model_pairs:
             rest_url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{model_id}:generateContent?key={clean_k}"
             headers = {"Content-Type": "application/json", "x-goog-api-key": clean_k}
             payload = {
                 "contents": [{
-                    "parts": [
-                        {"text": prompt},
-                        {
-                            "inline_data": {
-                                "mime_type": "image/jpeg",
-                                "data": b64_img
-                            }
-                        }
-                    ]
+                    "parts": [{"text": prompt}] + image_parts
                 }]
             }
             try:
@@ -385,12 +397,14 @@ def _call_gemini_vision(image_bytes: bytes, api_key: str, model_name: str, promp
                         text_parts = candidates[0].get("content", {}).get("parts", [])
                         if text_parts:
                             return {"success": True, "transcription": text_parts[0].get("text", "").strip(), "error": None}
-                elif r.status_code in (429, 403, 400):
-                    # These three mean very different things to the notary: an
-                    # exhausted quota is temporary, an invalid or blocked key is not.
+                elif r.status_code in (429, 403) or (r.status_code == 400 and ("API_KEY_INVALID" in r.text or "API key not valid" in r.text)):
                     last_failure = _classify_google_failure(r.status_code, r.text, key_idx)
                     key_failed = True
-                    break  # nothing more to try with this key -> move to the next one
+                    break  # invalid or quota exhausted key -> move to next key
+                elif r.status_code == 404:
+                    # Deprecated/retired model -> try next active candidate model in loop
+                    last_failure = ("server", f"Model {model_id} unavailable (HTTP 404). Falling back to active Gemini 2.5 / 2.0...")
+                    continue
                 else:
                     last_failure = ("server", f"Google Server Response (HTTP {r.status_code}): {r.text}")
                     continue
@@ -567,30 +581,57 @@ def _call_openai_vision(image_bytes: bytes, api_key: str, model_name: str, promp
 
 
 TUNISIAN_HOJJAT_WAFAT_PROMPT = """
-أنت خبير محلف في قراءة وتفريغ حجج الوفاة الصادرة عن المحاكم التونسية (محاكم الناحية والمحاكم الابتدائية).
-تنبيهات هامة ودقيقة جداً:
-1. أعلى اليمين (Top Right): يحتوي على اسم المحكمة الصادرة عنها الحجة (مثال: محكمة ناحية تونس / محكمة ناحية بن عروس). استخرج اسم المحكمة بدقة.
-2. أعلى اليسار (Top Left): يحتوي على عدد الملف / عدد المادة / عدد حجة الوفاة (مثال: عدد الملف 1991/46). تـنـبـيـه: لا تتواجد أسماء طالبي الإشهاد أعلى اليسار، عدد الملف هو الرقم التوثيقي فقط.
-3. اسم الهالك(ة) (Deceased Name & Lakab): استخرج الاسم واللقب الكامل للمتوفى أو المتوفية (الهالك/الهالكة/المرحوم/المرحومة) واللقب العائلي.
-4. اسم الزوج(ة) (Spouse Full Name): استخرج الاسم الثلاثي واللقب الكامل للزوجة الحية (زوجته: ...) أو الزوج الحي (زوجها: ...).
-5. أسماء وأعداد الأبناء والبنات (Sons & Daughters Names & Counts):
-   - قم باستخراج القائمة الدقيقة والصريحة لأسماء الأبناء الذكور وأسماء البنات الإناث المذكورين بالحجة.
-   - قم بإرفاق اللقب العائلي للهالك لكل ابن وبنت (مثال: إذا كان الهالك بوجمعه الرياحي وأبناؤه جمال وأحمد ورفيقة، يكتب الاسم الكامل: جمال الرياحي، أحمد الرياحي، رفيقة الرياحي).
-   - عدد الذكور يساوي تماماً عدد أسماء الذكور المكتوبة صراحة بالحجة.
-   - عدد الإناث يساوي تماماً عدد أسماء البنات المكتوبة صراحة بالحجة.
+أنت خبير محلف وفائق الدقة في قراءة وتفريغ حجج الوفاة الصادرة عن المحاكم التونسية (محاكم الناحية والمحاكم الابتدائية).
+أمامك صورة (وثيقة من صفحة واحدة، أو صور مقسمة وجه وظهر Recto-Verso) لوثيقة حجة وفاة تونسية رسمية.
 
-قم بتفريغ النص بالكامل بدقة متناهية.
+قم بتحليل الوثيقة والصفحات بدقة متناهية وإرجاع كود JSON في بداية إجابتك متبوعاً بالنص التفريغي الكامل.
+
+يجب أن يكون كود JSON بالصيغة التالية تماماً وبدون أي أخطاء:
+```json
+{
+  "hujja_num": "عدد ملف الحجة التوثيقي (مثال: 8250)",
+  "hujja_date": "تاريخ صدور الحجة بالكامل (مثال: 03-10-1983)",
+  "hujja_court": "اسم المحكمة الصادرة عنها (مثال: محكمة ناحية زغوان)",
+  "applicant_name": "الاسم الكامل واللقب لطالب الإشهاد أو المصرح أو طالب الإذن (مثال: المختار بن الطيب الرياحي المذكور بعد 'حضر لدينا ... السيد المختار بن الطيب الرياحي ... وطلب بوصفه ابن الهالك الاذن له باخراج حجة وفاة')",
+  "deceased_name": "الاسم الكامل والنسب واللقب للهالك/المرحوم بعد عبارة 'الهالك المرحوم :' (مثال: الطيب بن محمد العكرمي الرياحي)",
+  "deceased_lakab": "اللقب العائلي للهالك فقط (مثال: الرياحي)",
+  "husband_alive": false,
+  "husband_name": "",
+  "wife_alive": true,
+  "wife_name": "الاسم واللقب الكامل للزوجة الحية إن وجدت (مثال: مبروكة بنت صالح المثلوثي)",
+  "father_alive": false,
+  "mother_alive": false,
+  "sons_count": 4,
+  "daughters_count": 0,
+  "sons_names": ["بوجمعة الرياحي", "المختار الرياحي", "خميس الرياحي", "رمضان الرياحي"],
+  "daughters_names": [],
+  "names": ["بوجمعة الرياحي", "المختار الرياحي", "خميس الرياحي", "رمضان الرياحي"]
+}
+```
+
+تعليمات صارمة جداً واستثنائية:
+1. اسم الهالك (Deceased Name): هو الاسم الكامل المكتوب بعد عبارة 'الهالك المرحوم :' أو 'وفاة الهالك المرحوم :' أو 'المتوفى المرحوم :'. 
+   - يمنع منعاً باتاً استخراج الكلمات الإجرائية مثل "الاذن له باخراج حجة وفاة" كاسم للهالك! اسم الهالك شخصي (مثل: الطيب بن محمد العكرمي الرياحي).
+2. طالب الإشهاد/الإذن (Applicant Name): هو الشخص المذكور في بداية الوثيقة بعد عبارة 'حضر لدينا ... السيد(ة): [الاسم] ... وطلب بوصفه ابن الهالك الاذن له باخراج حجة وفاة' (مثل: المختار بن الطيب الرياحي).
+3. تاريخ الحجة: هو تاريخ جلسة القاضي أو صدور الحجة (مثل: 3 أكتوبر 1983). يمنع استخدام تاريخ بطاقة تعريف طالب الإذن كـ تاريخ للحجة!
+4. الأبناء والبنات (Sons & Daughters): سواء كانت الوثيقة من صفحة واحدة أو صفحتين، اقرأ بتمعن شديد عند عبارة '(2) أبناؤه الرشداء :' أو 'ترك من الأبناء :' أو 'وانحصر إرثه في :' أو أي مكان تذكر فيه قائمة الورثة والأبناء.
+   - استخرج جميع الأسماء واقرن بكل اسم لقب الأب الهالك (مثال: بوجمعة – المختار – خميس – رمضان -> بوجمعة الرياحي، المختار الرياحي، خميس الرياحي، رمضان الرياحي).
+5. تنظيف الأسماء: يمنع إبقاء كلمات توثيقية مثل 'لا غير' أو 'الرشداء' أو رموز داخل الأسماء.
+
+ثم قم بكتابة النص التفريغي الكامل للحجة كلمة بكلمة بدقة 100%.
 """
 
-def extract_handwritten_notary_script(image_bytes: bytes, api_key: str = "", provider: str = "", model: str = "") -> dict:
+
+def extract_hojjat_wafat_document_data(image_bytes, api_key: str = "", provider: str = "", model_name: str = "gemini-2.5-flash") -> dict:
     """
-    Extracts text from handwritten notary documents, Death Certificates (حجة وفاة),
-    and Property Titles (شهادة ملكية) using AI Vision OCR.
-    Includes explicit instructions for auto-orientation (180 deg rotated images) & legal heir extraction.
+    Extracts structured legal data and heir information from single or multi-page (Recto-Verso) Hujjat Wafat images.
     """
     if not provider or not api_key:
         try:
-            import config
+            try:
+                import config
+            except ImportError:
+                from core import config
             provider, model = config.load_ai_engine()
             api_key = config.load_saved_api_keys(provider)
         except Exception:
@@ -599,13 +640,147 @@ def extract_handwritten_notary_script(image_bytes: bytes, api_key: str = "", pro
     prompt = TUNISIAN_HOJJAT_WAFAT_PROMPT
 
     if provider == "openai":
-        res = _call_openai_vision(image_bytes, api_key, model or "gpt-4o", prompt=prompt)
+        res = _call_openai_vision(image_bytes, api_key, model_name or "gpt-4o", prompt=prompt)
     else:
-        res = _call_gemini_vision(image_bytes, api_key, model or "gemini-3.6-flash", prompt=prompt)
+        res = _call_gemini_vision(image_bytes, api_key, model_name or "gemini-2.5-flash", prompt=prompt)
 
-    if res.get("success") and res.get("transcription"):
-        return {"success": True, "full_text": res["transcription"], "property_desc": res["transcription"]}
-    return {"success": False, "full_text": "", "error": res.get("error") or "تعذّر استخراج النص من الصورة المرفقة."}
+    if not res.get("success") or not res.get("transcription"):
+        return res
+
+    raw_text = res.get("transcription", "")
+
+    # Parse JSON from AI response
+    parsed_json = {}
+    import json, re
+    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
+    if not json_match:
+        json_match = re.search(r'(\{.*?\})', raw_text, re.DOTALL)
+    
+    if json_match:
+        try:
+            parsed_json = json.loads(json_match.group(1))
+        except Exception:
+            parsed_json = {}
+
+    # Clean & sanitize parsed JSON fields
+    if parsed_json and isinstance(parsed_json, dict):
+        dec_n = str(parsed_json.get("deceased_name") or "").strip()
+        forbidden = ["الاذن له باخراج حجة وفاة", "الاذن باخراج حجة", "إقامة حجة وفاة", "طلب الإذن", "طالب الإذن", "الاذن"]
+        for f in forbidden:
+            if dec_n == f or dec_n.startswith(f):
+                dec_n = dec_n.replace(f, "").strip()
+        if not dec_n:
+            try:
+                from farida_engine import _extract_deceased_name_smart_fallback
+            except ImportError:
+                from core.farida_engine import _extract_deceased_name_smart_fallback
+            dec_n = _extract_deceased_name_smart_fallback(raw_text, str(parsed_json.get("deceased_lakab") or ""))
+            if not dec_n:
+                m_dec = re.search(r'(?:الهالك|المتوفى|المرحوم)(?:\s+المرحوم)?\s*[:：\-\s\n\r]*([^\n\.,؛]+)', raw_text)
+                if m_dec:
+                    dec_n = m_dec.group(1).strip()
+        parsed_json["deceased_name"] = dec_n
+
+        # Clean sons
+        sons = parsed_json.get("sons_names") or []
+        clean_sons = []
+        for s in sons:
+            sc = re.sub(r'[\(\)\[\]\./\\]', '', str(s)).strip()
+            sc = re.sub(r'\b(لا غير|الرشداء|الأبناء|الأبن|ابن)\b', '', sc).strip()
+            if sc: clean_sons.append(sc)
+        parsed_json["sons_names"] = clean_sons
+        if clean_sons and not parsed_json.get("sons_count"):
+            parsed_json["sons_count"] = len(clean_sons)
+
+        # Clean daughters
+        daughters = parsed_json.get("daughters_names") or []
+        clean_daughters = []
+        for d in daughters:
+            dc = re.sub(r'[\(\)\[\]\./\\]', '', str(d)).strip()
+            dc = re.sub(r'\b(لا غير|الرشداء|البنات|بنت)\b', '', dc).strip()
+            if dc: clean_daughters.append(dc)
+        parsed_json["daughters_names"] = clean_daughters
+        if clean_daughters and not parsed_json.get("daughters_count"):
+            parsed_json["daughters_count"] = len(clean_daughters)
+
+        # Handle slash-separated heir strings (e.g. "رفيقه/جمال/أحمد/اميرة/منصور/عزة")
+        all_raw_names = (parsed_json.get("sons_names") or []) + (parsed_json.get("daughters_names") or []) + (parsed_json.get("names") or [])
+        has_slashes = any("/" in str(n) for n in all_raw_names) or "/" in raw_text
+        if (has_slashes or not clean_sons and not clean_daughters):
+            slash_tokens = []
+            for n in all_raw_names:
+                for p in str(n).split("/"):
+                    clean_p = p.strip()
+                    if clean_p and clean_p not in slash_tokens:
+                        slash_tokens.append(clean_p)
+            
+            if not slash_tokens:
+                m_heirs = re.search(r'(?:وهم|وهي|وههم|الأبناء|الرشداء)\s*[:\-]\s*([^\n\.,؛]+)', raw_text)
+                if m_heirs:
+                    slash_tokens = [t.strip() for t in m_heirs.group(1).split("/") if t.strip()]
+
+            if slash_tokens:
+                try:
+                    from farida_engine import _is_female_name
+                except ImportError:
+                    from core.farida_engine import _is_female_name
+
+                dec_lakab = parsed_json.get("deceased_lakab") or ""
+                new_sons = []
+                new_daughters = []
+                for tok in slash_tokens:
+                    tok_clean = re.sub(r'[\(\)\[\]\./\\]', '', tok).strip()
+                    tok_clean = re.sub(r'\b(لا غير|الرشداء|الأبناء|الأبن|ابن|بنت)\b', '', tok_clean).strip()
+                    if not tok_clean: continue
+                    
+                    full_name_tok = tok_clean if (len(tok_clean.split()) > 1 or not dec_lakab) else f"{tok_clean} {dec_lakab}"
+                    
+                    if _is_female_name(tok_clean):
+                        new_daughters.append(full_name_tok)
+                    else:
+                        new_sons.append(full_name_tok)
+                
+                if new_sons:
+                    parsed_json["sons_names"] = new_sons
+                    parsed_json["sons_count"] = len(new_sons)
+        # Additional safeguard: run smart heirs fallback if 0 heirs extracted from JSON
+        if not parsed_json.get("sons_count") and not parsed_json.get("daughters_count") and not parsed_json.get("names"):
+            try:
+                from farida_engine import _extract_heirs_smart_fallback
+            except ImportError:
+                from core.farida_engine import _extract_heirs_smart_fallback
+            smart_h = _extract_heirs_smart_fallback(raw_text, str(parsed_json.get("deceased_lakab") or ""))
+            if smart_h.get("names"):
+                parsed_json["sons_count"] = smart_h["sons_count"]
+                parsed_json["daughters_count"] = smart_h["daughters_count"]
+                parsed_json["names"] = smart_h["names"]
+
+        return {
+            "success": True,
+            "data": parsed_json,
+            "transcription": raw_text
+        }
+
+    # Fallback to regex parsing if JSON not present
+    try:
+        from farida_engine import parse_hujjat_wafat_text
+    except ImportError:
+        from core.farida_engine import parse_hujjat_wafat_text
+    
+    parsed = parse_hujjat_wafat_text(raw_text)
+    return {
+        "success": True,
+        "data": parsed,
+        "transcription": raw_text
+    }
+
+
+def extract_handwritten_notary_script(image_bytes, api_key: str = "", provider: str = "", model: str = "") -> dict:
+    """
+    Extracts text from handwritten notary documents, Death Certificates (حجة وفاة),
+    and Property Titles (شهادة ملكية) using AI Vision OCR.
+    """
+    return extract_hojjat_wafat_document_data(image_bytes, api_key, provider, model)
 
 
 TUNISIAN_TITLE_DOC_PROMPT = """
@@ -633,7 +808,10 @@ def extract_title_document_data(image_bytes: bytes, api_key: str = "", provider:
 
     if not provider or not api_key:
         try:
-            import config
+            try:
+                import config
+            except ImportError:
+                from core import config
             provider, model = config.load_ai_engine()
             api_key = config.load_saved_api_keys(provider)
         except Exception:

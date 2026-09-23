@@ -45,7 +45,7 @@ def run_full_suite():
 
     print("[3/5] Testing Farida Engine & DOCX Exporter...")
     engine = TunisianFaridaEngine()
-    result = engine.calculate_farida(heirs_dict, gross_estate=100000.0, property_parts=2400)
+    result = engine._compute_shares(heirs_dict, property_parts=2400)
     output_docx = os.path.abspath(os.path.join(os.path.dirname(__file__), "test_farida_output.docx"))
     engine.export_farida_docx(result, output_path=output_docx)
     print(f"      Exported DOCX File Exists: {os.path.exists(output_docx)}")

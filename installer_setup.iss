@@ -13,7 +13,7 @@
 ; ============================================================================
 
 #define MonNom        "DATLY"
-#define MaVersion     "1.0.5"
+#define MaVersion     "1.0.8"
 #define MonExe        "DATLY.exe"
 #define ReglePareFeu  "DATLY (partage reseau)"
 #define PortReseau    "8765"
@@ -28,9 +28,9 @@ VersionInfoVersion={#MaVersion}
 DefaultDirName={localappdata}\DATLY
 DefaultGroupName={#MonNom}
 OutputDir=dist_installer
-OutputBaseFilename=DATLY_Setup_v{#MaVersion}_NewBuild
+OutputBaseFilename=DATLY_Setup_v{#MaVersion}
 SetupIconFile=C:\Users\amin\Desktop\zarai1_pyside\assets\datly_app.ico
-Compression=lzma
+Compression=lzma2/fast
 SolidCompression=no
 WizardStyle=modern
 CloseApplications=force

@@ -386,14 +386,15 @@ def apply_update_and_restart(zip_path: str, install_dir: str = None, current_pid
     file_p = Path(zip_path).resolve()
     is_exe = str(file_p).lower().endswith(".exe")
 
-    target_exe_name = Path(sys.executable).name if getattr(sys, 'frozen', False) else "CabinetNotarialZarai.exe"
+    target_exe_name = Path(sys.executable).name if getattr(sys, 'frozen', False) else "DATLY.exe"
     
+    stage_dir = temp_dir / "stage"
     if is_exe:
         integrity_cmd = f'if exist "{file_p}" ( exit 0 ) else ( exit 1 )'
         install_cmd = f'copy /Y "{file_p}" "{install_dir}\\{target_exe_name}"'
     else:
         integrity_cmd = f'powershell -Command "try {{ $null = [System.IO.Compression.ZipFile]::OpenRead(\'{file_p}\'); exit 0 }} catch {{ exit 1 }}"'
-        install_cmd = f'powershell -Command "Expand-Archive -Path \'{file_p}\' -DestinationPath \'{install_dir}\' -Force"'
+        install_cmd = f'if exist "{stage_dir}" rmdir /S /Q "{stage_dir}" & powershell -Command "Expand-Archive -Path \'{file_p}\' -DestinationPath \'{stage_dir}\' -Force" & if exist "{stage_dir}\\DATLY" ( xcopy /E /I /Y /Q "{stage_dir}\\DATLY\\*" "{install_dir}" ) else ( xcopy /E /I /Y /Q "{stage_dir}\\*" "{install_dir}" )'
 
     log_startup_event(f"Préparation du script d'installation helper (Cible : '{install_dir}', Mode : {'EXE' if is_exe else 'ZIP'})...")
 
@@ -421,7 +422,7 @@ if "%ERRORLEVEL%"=="0" (
 )
 
 :: ÉTAPE 4.1 : VÉRIFICATION DE L'ESPACE DISQUE LIBRE AVANT SAUVEGARDE
-powershell -Command "$installSize = (Get-ChildItem -Path '{install_dir}' -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum; $freeSpace = (Get-Volume -FilePath '{install_dir}').SizeRemaining; if ($freeSpace -lt ($installSize * 2.5)) {{ exit 1 }} else {{ exit 0 }}"
+powershell -Command "try {{ $s = (Get-ChildItem -Path '{install_dir}' -Recurse -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum; $f = (Get-Volume -FilePath '{install_dir}').SizeRemaining; if ($f -and $s -and $f -lt ($s * 2)) {{ exit 1 }} else {{ exit 0 }} }} catch {{ exit 0 }}"
 if %errorlevel% neq 0 (
     echo [ERREUR DISQUE] Espace disque insuffisant pour créer la sauvegarde et extraire la mise à jour !
     msg %username% "Erreur de mise à jour: Espace disque insuffisant sur votre PC. Libérez de l'espace et réessayez."
@@ -448,8 +449,15 @@ mkdir "{backup_dir}" >nul 2>&1
 xcopy /E /I /Y /Q "{install_dir}" "{backup_dir}" >nul 2>&1
 
 :: ÉCRASEMENT / DEPLOIEMENT DE LA NOUVELLE VERSION
+set /a INSTALL_RETRIES=0
+:DO_INSTALL
 {install_cmd}
 if %errorlevel% neq 0 (
+    set /a INSTALL_RETRIES+=1
+    if %INSTALL_RETRIES% LSS 4 (
+        timeout /t 2 /nobreak >nul
+        goto DO_INSTALL
+    )
     echo [ERREUR DEPLOIEMENT] Échec de l'installation. Restauration de la sauvegarde précédente...
     xcopy /E /I /Y /Q "{backup_dir}" "{install_dir}" >nul 2>&1
     msg %username% "Échec de l'installation: Votre ancienne version a été restaurée automatiquement."
@@ -457,7 +465,9 @@ if %errorlevel% neq 0 (
 
 :: RELANCEMENT SÉCURISÉ DE L'APPLICATION
 cd /d "{install_dir}"
-if exist "{target_exe_name}" (
+if exist "DATLY.exe" (
+    start "" "DATLY.exe"
+) else if exist "{target_exe_name}" (
     start "" "{target_exe_name}"
 ) else if exist "Lancer_Application.bat" (
     start "" "Lancer_Application.bat"

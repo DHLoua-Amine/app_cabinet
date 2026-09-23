@@ -1,0 +1,10 @@
+VERIFICATION_SUCCESS!
+Case_ID: 1
+Docs:
+Dossier_1_عقد بيع_20260913_151810_719_88298d.docx
+Dossier_1_عقد بيع_20260913_151810_719_88298d.pdf
+Dossier_tfvd_1.png
+ملف_رقم_1.docx
+ملف_رقم_1.pdf
+ملف_رقم_tfvd.docx
+ملف_رقم_tfvd.pdf

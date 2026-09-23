@@ -1571,10 +1571,12 @@ def build_farida_contract_text(
     successive_deaths_text: str = "",
     ownership_origin: str = ""
 ) -> str:
-    """
-    Assembles an authentic Tunisian Notary Farida Act (فريضة شرعية / فريضة جزئية)
-    without chapters (الفصول) as a continuous legal narrative text, matching official notary deeds.
-    """
+    """Assembles an authentic Tunisian Notary Farida Act."""
+    if ownership_origin and isinstance(ownership_origin, str):
+        clean_orig = ownership_origin.strip()
+        if clean_orig.startswith("الحمد لله وحده") or "المخرجة من أصل" in clean_orig:
+            return clean_orig
+
     date_info = get_current_arabic_date_info()
     import office_profile
     full_date_str = (date_info.get("full_date_text_no_time")

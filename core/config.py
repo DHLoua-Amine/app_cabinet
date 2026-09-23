@@ -551,10 +551,6 @@ _DEFAULT_MODEL = {"gemini": "gemini-3.6-flash", "openai": "gpt-4o"}
 def load_ai_engine():
     """
     Returns the saved (provider, model) tuple for the AI engine.
-
-    Persisted because the engine is configured on the Settings page while the Scanner
-    page is the one that uses it; without this the Scanner would fall back to Gemini
-    on every restart no matter what was chosen.
     """
     try:
         if AI_PREFS_FILE_PATH.exists():
@@ -564,7 +560,7 @@ def load_ai_engine():
             if provider not in _VALID_PROVIDERS:
                 provider = "gemini"
             model = parts[1] if len(parts) > 1 and parts[1] else _DEFAULT_MODEL[provider]
-            if provider == "gemini" and model not in ("gemini-3.6-flash", "gemini-2.5-flash"):
+            if provider == "gemini" and model not in ("gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-pro", "gemini-3.1-pro-preview", "gemini-2.0-flash"):
                 model = "gemini-3.6-flash"
                 save_ai_engine("gemini", "gemini-3.6-flash")
             return provider, model

@@ -97,6 +97,8 @@ class UnifiedPipelineThread(QThread):
                         sys.stdout.write(f"[TIMING {t_curr:.2f}s] Party 1 Card {idx+1}: Background pre-scan active - joining active thread...\n")
                         sys.stdout.flush()
                         p1["ocr_thread"].join(timeout=OCR_JOIN_TIMEOUT_S)
+                        if p1.get("party_dict") and p1["party_dict"].get("extracted"):
+                            p1["extracted"] = p1["party_dict"]["extracted"]
                         if p1["ocr_thread"].is_alive():
                             # Le fil tourne encore : on l'abandonne plutot que
                             # de bloquer la generation entiere sur une carte.
@@ -140,6 +142,8 @@ class UnifiedPipelineThread(QThread):
                         sys.stdout.write(f"[TIMING {t_curr:.2f}s] Party 2 Card {idx+1}: Background pre-scan active - joining active thread...\n")
                         sys.stdout.flush()
                         p2["ocr_thread"].join(timeout=OCR_JOIN_TIMEOUT_S)
+                        if p2.get("party_dict") and p2["party_dict"].get("extracted"):
+                            p2["extracted"] = p2["party_dict"]["extracted"]
                         if p2["ocr_thread"].is_alive():
                             # Le fil tourne encore : on l'abandonne plutot que
                             # de bloquer la generation entiere sur une carte.
@@ -2000,7 +2004,8 @@ class ScannerPage(QWidget):
                 "front_bytes": p["front_bytes"],
                 "back_bytes": p["back_bytes"],
                 "extracted": p.get("extracted"),
-                "ocr_thread": p.get("ocr_thread")
+                "ocr_thread": p.get("ocr_thread"),
+                "party_dict": p
             })
             
         p2_payload = []
@@ -2010,7 +2015,8 @@ class ScannerPage(QWidget):
                 "front_bytes": p["front_bytes"],
                 "back_bytes": p["back_bytes"],
                 "extracted": p.get("extracted"),
-                "ocr_thread": p.get("ocr_thread")
+                "ocr_thread": p.get("ocr_thread"),
+                "party_dict": p
             })
 
         self.progress_bar.setRange(0, 0)
@@ -2295,12 +2301,7 @@ class ScannerPage(QWidget):
     )
 
     def _champs_obligatoires_manquants(self):
-        """Les informations obligatoires absentes, nommees en arabe.
-
-        Chaque champ est designe par le role qu'il occupe dans CE type d'acte :
-        « اسم البائع » pour une vente, « اسم الزوج » pour un mariage. Les roles
-        viennent de contract_templates.get_party_role_names(), qui les connait
-        deja pour chaque type."""
+        """Les informations obligatoires absentes, nommées en arabe."""
         try:
             import contract_templates
             roles = contract_templates.get_party_role_names(self.selected_contract_type)
@@ -2308,8 +2309,13 @@ class ScannerPage(QWidget):
         except Exception:
             role1, role2 = "الطرف الأول", "الطرف الثاني"
 
+        c_type = self.selected_contract_type or ""
+        is_single_party = any(w in c_type for w in ["فريضة", "وفاة", "حوز", "توكيل", "إسقاط", "وصل", "توصية", "إشهار", "تكليف"])
+
         manquants = []
         for cle, libelle in self.CHAMPS_OBLIGATOIRES:
+            if is_single_party and cle.startswith("party2"):
+                continue
             if (self.contract_vars.get(cle) or "").strip():
                 continue
             role = role1 if cle.startswith("party1") else role2
@@ -2562,6 +2568,15 @@ class ScannerPage(QWidget):
                     selected_client_ids.append(cid)
                     selected_client_names.append(item.text())
 
+        if not selected_client_ids and self.archive_list.count() > 0:
+            for i in range(self.archive_list.count()):
+                item = self.archive_list.item(i)
+                item.setCheckState(Qt.CheckState.Checked)
+                cid = item.data(Qt.ItemDataRole.UserRole)
+                if cid and cid not in selected_client_ids:
+                    selected_client_ids.append(cid)
+                    selected_client_names.append(item.text())
+
         if not selected_client_ids:
             for p in self.p1_parties + self.p2_parties:
                 cid = p.get("client_id")
@@ -2675,30 +2690,19 @@ class ScannerPage(QWidget):
         if not legal_text:
             return
 
-        # 1. Update contract variables state
+        c_type = farida_result.get("contract_type", "فريضة شرعية")
+        # 1. Switch contract type to matching farida type
+        self.select_contract_type(c_type)
+
+        # 2. Update contract variables state
         self.contract_vars["ownership_origin"] = legal_text
-        self.contract_vars["property_desc"] = (self.contract_vars.get("property_desc", "") + f"\n{legal_text}").strip()
         if hasattr(self, "var_ownership_origin"):
             self.var_ownership_origin.setPlainText(legal_text)
 
-        # 2. Append to procuration box if present
-        if hasattr(self, "procuration_input"):
-            curr_proc = self.procuration_input.toPlainText().strip()
-            self.procuration_input.setText(f"{curr_proc}\n{legal_text}".strip())
-
         # 3. Direct insertion into the Main Contract Editor widget
         if hasattr(self, "editor") and self.editor:
-            curr_editor_text = self.editor.toPlainText().strip()
-            if curr_editor_text:
-                self.editor.setPlainText(f"{curr_editor_text}\n\n{legal_text}")
-            else:
-                self.editor.setPlainText(legal_text)
-
-        # 4. Refresh full multi-party contract preview
-        try:
-            self.refresh_contract_preview_text()
-        except Exception:
-            pass
+            self.editor.setPlainText(legal_text)
+            self.ocr_edited_text = legal_text
 
     def _on_generate_partition_from_farida(self, farida_result: dict):
         """Auto-generates Amicable Partition Contract (عقد مقاسمة)."""

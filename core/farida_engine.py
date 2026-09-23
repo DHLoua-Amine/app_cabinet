@@ -1073,6 +1073,24 @@ class TunisianFaridaEngine:
             p_key = f"son_predeceased_{p_idx}" if not is_female else f"daughter_predeceased_{p_idx}"
 
             disp_p_name = re.sub(r'^(الابن|البنت)\s+', '', p_name.strip())
+            parts_n = disp_p_name.split()
+            if len(parts_n) > 2 and ('بن' in parts_n or 'بنت' in parts_n):
+                f_n = parts_n[0]
+                l_n = parts_n[-1]
+                if l_n not in {'بن', 'بنت', 'ابن'} and l_n != f_n:
+                    disp_p_name = f"{f_n} {l_n}"
+                else:
+                    disp_p_name = f_n
+
+            # Match share with living same-gender siblings if available for uniform display in primary estate
+            matching_sibs = [item for item in heir_items if (str(item.get("key", "")).startswith("son_") if not is_female else str(item.get("key", "")).startswith("daughter_")) and not item.get("is_predeceased_parent")]
+            if matching_sibs:
+                ref_sib = matching_sibs[0]
+                if parts and parts > 0:
+                    p_parts_val = ref_sib.get("parts", p_parts_val)
+                else:
+                    p_shares_val = ref_sib.get("shares", p_shares_val)
+                    p_parts_val = ref_sib.get("parts", p_parts_val)
 
             p_n_chk = _norm_chk(p_name)
             already_in = any(_norm_chk(item["disp_name"]) in p_n_chk or p_n_chk in _norm_chk(item["disp_name"]) for item in heir_items if not item.get("key", "").startswith("grandchild_"))
@@ -1222,7 +1240,7 @@ class TunisianFaridaEngine:
                 else:
                     p_hujja_str = f"حسب حجة {p_hujja_pronoun} الرسمية"
 
-                p_header = f"وحيث {verb_d} {marhoum_t} {p_name} {manab_phrase} {p_sh_text} {p_irath_verb} {p_hujja_str}:"
+                p_header = f"وحيث {verb_d} {p_name} عن منابات قدرها {p_sh_text} {p_irath_verb} {p_hujja_str}:"
 
                 p_lines = [p_header]
 

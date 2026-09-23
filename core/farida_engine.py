@@ -1066,8 +1066,13 @@ class TunisianFaridaEngine:
                 p_parts_val = sum(r.get("parts", 0.0) for r in gc_items)
                 p_shares_val = sum(r.get("shares", 0.0) for r in gc_items)
             else:
-                p_parts_val = 0.0
-                p_shares_val = 0.0
+                s_res = [r for r in results if ("أبناء" in r.get("heir", "") or "ابن" in r.get("heir", "")) and not r.get("is_waseya_summary") and not r.get("is_individual_grandchild")]
+                if s_res:
+                    p_shares_val = float(s_res[0].get("single_shares", s_res[0].get("shares", 14.0)))
+                    p_parts_val = float(s_res[0].get("single_parts", s_res[0].get("parts", p_shares_val)))
+                else:
+                    p_shares_val = 14.0
+                    p_parts_val = 14.0
 
             is_female = (p_gender == "female")
             p_key = f"son_predeceased_{p_idx}" if not is_female else f"daughter_predeceased_{p_idx}"
@@ -1096,6 +1101,7 @@ class TunisianFaridaEngine:
             already_in = any(_norm_chk(item["disp_name"]) in p_n_chk or p_n_chk in _norm_chk(item["disp_name"]) for item in heir_items if not item.get("key", "").startswith("grandchild_"))
 
             if not already_in:
+                eff_p_val = p_parts_val if p_parts_val > 0 else p_shares_val
                 heir_items.append({
                     "key": p_key,
                     "disp_name": disp_p_name,
@@ -1105,8 +1111,8 @@ class TunisianFaridaEngine:
                     "shares": p_shares_val,
                     "raw_area": 0.0,
                     "area": 0.0,
-                    "raw_parts": p_parts_val,
-                    "parts": p_parts_val,
+                    "raw_parts": eff_p_val,
+                    "parts": eff_p_val,
                     "is_predeceased_parent": True
                 })
 
@@ -1215,11 +1221,9 @@ class TunisianFaridaEngine:
 
                 gc_items = [r for r in results if r.get("is_individual_grandchild") and (r.get("parent_name") == p_name or p_name in r.get("heir", ""))]
                 p_total_share = sum(r.get("parts", 0.0) if (parts and parts > 0) else r.get("shares", 0.0) for r in gc_items)
-                
-                if p_total_share == 0 and children:
-                    raw_val = sum(c["parts"] for c in children) if (parts and parts > 0) else sum(c["shares"] for c in children)
-                    s_count = max(1, int((heirs_dict or {}).get("sons_count", len(children))))
-                    p_total_share = raw_val / float(s_count)
+
+                if p_total_share == 0:
+                    p_total_share = p_shares_val if (p_shares_val > 0 and (not p_parts_val or p_parts_val == 0)) else (p_parts_val if p_parts_val > 0 else 14.0)
 
                 p_sh_text = _fmt_shares(p_total_share, is_equal_unit=is_equal_unit)
 
@@ -1240,7 +1244,19 @@ class TunisianFaridaEngine:
                 else:
                     p_hujja_str = f"حسب حجة {p_hujja_pronoun} الرسمية"
 
-                p_header = f"وحيث {verb_d} {p_name} عن منابات قدرها {p_sh_text} {p_irath_verb} {p_hujja_str}:"
+                branch_gc = [gc for gc in grandchildren if p_name in gc.get("disp_name", "") or p_name in gc.get("key", "")]
+                if not branch_gc and p.get("grandchildren_names"):
+                    for gcn in p.get("grandchildren_names"):
+                        g_fem = _is_female_name(gcn) or "بنت" in gcn
+                        branch_gc.append({
+                            "disp_name": gcn,
+                            "is_female": g_fem
+                        })
+
+                is_unmarried = (not has_p_wife and not has_p_husband and not branch_gc)
+                azab_clause = (" وهو أعزب دون زوجة ولا عقب،" if p_gender == "male" else " وهي عزباء دون زوج ولا عقب،") if is_unmarried else ""
+
+                p_header = f"وحيث {verb_d} {p_name} عن منابات قدرها {p_sh_text}{azab_clause} {p_irath_verb} {p_hujja_str}:"
 
                 p_lines = [p_header]
 
@@ -1253,15 +1269,6 @@ class TunisianFaridaEngine:
                 elif has_p_husband:
                     p_spouse_share = p_total_share * 0.25
                     p_children_share = p_total_share * 0.75
-
-                branch_gc = [gc for gc in grandchildren if p_name in gc.get("disp_name", "") or p_name in gc.get("key", "")]
-                if not branch_gc and p.get("grandchildren_names"):
-                    for gcn in p.get("grandchildren_names"):
-                        g_fem = _is_female_name(gcn) or "بنت" in gcn
-                        branch_gc.append({
-                            "disp_name": gcn,
-                            "is_female": g_fem
-                        })
 
                 if has_p_wife:
                     w_disp = p_wife_name if p_wife_name and "زوج" in p_wife_name else (f"زوجته {p_wife_name}" if p_wife_name else "زوجته")
@@ -1278,6 +1285,17 @@ class TunisianFaridaEngine:
                 elif branch_gc:
                     ch_head = "وأبناؤه وهم:" if p_gender == "male" else "وأبناؤها وهم:"
                     p_lines.append(f"\n{ch_head}")
+                elif is_unmarried and children:
+                    # Distribute share to surviving brothers/sisters
+                    surv_sibs = [c for c in children if c.get("disp_name") != disp_p_name and p_name not in c.get("disp_name", "")]
+                    if surv_sibs:
+                        p_lines.append("\nوإخوته المذكورون أعلاه وهم:")
+                        sib_share = p_total_share / float(len(surv_sibs))
+                        for sb in surv_sibs:
+                            sb_fem = sb.get("is_female", False)
+                            sb_sh_text = _fmt_shares(sib_share, is_equal_unit=is_equal_unit)
+                            sb_verb = "وينوبها " if sb_fem else "وينوبه "
+                            p_lines.append(f"• {sb['disp_name']} {sb_verb}{sb_sh_text}")
 
                 num_gc_sons = len([gc for gc in branch_gc if not gc["is_female"]])
                 num_gc_daug = len([gc for gc in branch_gc if gc["is_female"]])

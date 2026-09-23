@@ -6,7 +6,7 @@ __version__ = "1.0.8"
 APP_NAME    = "Cabinet Notarial"
 
 # ── GitHub ────────────────────────────────────────────────────────────────────
-GITHUB_REPO_RELEASES = "DHLoua-Amine/app_cabinet"  # Dépôt officiel des mises à jour
+GITHUB_REPO_RELEASES = "dhlou3/app_zerai"  # Dépôt officiel des mises à jour
 UPDATE_MODE          = "confirm"   # "confirm" | "silent" | "forced"
 ENCODED_GITHUB_TOKEN = ""   # ← VIDE, ET DOIT LE RESTER.
 # Le jeton vit dans core/secrets_local.py, ignore par git. Un jeton ecrit

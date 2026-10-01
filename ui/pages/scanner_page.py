@@ -4,7 +4,7 @@ import html
 import datetime
 import time
 from pathlib import Path
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QComboBox, QPushButton, QTabWidget, QFrame, QFileDialog, QMessageBox, QProgressBar, QListWidget, QListWidgetItem, QGridLayout, QScrollArea, QMenu, QRadioButton, QButtonGroup, QDateEdit
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QTextEdit, QComboBox, QPushButton, QTabWidget, QFrame, QFileDialog, QMessageBox, QProgressBar, QListWidget, QListWidgetItem, QGridLayout, QScrollArea, QMenu, QRadioButton, QButtonGroup, QDateEdit, QDialog, QCheckBox
 from PySide6.QtCore import Qt, Signal, QThread, QTimer
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QCursor
 
@@ -37,7 +37,7 @@ OCR_JOIN_TIMEOUT_S = 95
 class UnifiedPipelineThread(QThread):
     finished = Signal(dict)
     
-    def __init__(self, contract_type, p1_data, p2_data, procuration_text, audio_bytes, audio_mime, voice_text, api_key, provider, model, contract_vars):
+    def __init__(self, contract_type, p1_data, p2_data, procuration_text, audio_bytes, audio_mime, voice_text, api_key, provider, model, contract_vars, include_audio_party_info=False):
         super().__init__()
         self.contract_type = contract_type
         self.p1_data = p1_data
@@ -50,6 +50,7 @@ class UnifiedPipelineThread(QThread):
         self.provider = provider
         self.model = model
         self.contract_vars = contract_vars.copy()
+        self.include_audio_party_info = include_audio_party_info
         
     def run(self):
         import time, sys
@@ -278,8 +279,8 @@ class UnifiedPipelineThread(QThread):
                                     results["logs"].append(f" تنبيه بطاقة البائع {idx+1}: {err}")
                                     results["warnings"].append(f"بطاقة الطرف الأول {idx+1}: {err}")
                                     results["success"] = False
-                    # Always merge any missing fields (e.g. dictated Job or Address) from audio dictation
-                    if results.get("extracted_vars"):
+                    # Merge missing fields (e.g. dictated Job or Address) from audio dictation only if toggle is ON
+                    if results.get("extracted_vars") and self.include_audio_party_info:
                         sv = results["extracted_vars"]
                         if not extracted.get("full_name"):
                             extracted["full_name"] = sv.get("party1_name") or sv.get("party_1_name") or ""
@@ -344,8 +345,8 @@ class UnifiedPipelineThread(QThread):
                                     results["warnings"].append(f"بطاقة الطرف الثاني {idx+1}: {err}")
                                     results["success"] = False
 
-                    # Always merge any missing fields (e.g. dictated Job or Address) from audio dictation
-                    if results.get("extracted_vars"):
+                    # Merge missing fields (e.g. dictated Job or Address) from audio dictation only if toggle is ON
+                    if results.get("extracted_vars") and self.include_audio_party_info:
                         sv = results["extracted_vars"]
                         if not extracted.get("full_name"):
                             extracted["full_name"] = sv.get("party2_name") or sv.get("party_2_name") or ""
@@ -374,6 +375,188 @@ class UnifiedPipelineThread(QThread):
         sys.stdout.flush()
 
         self.finished.emit(results)
+
+
+class ScannerSettingsDialog(QDialog):
+    """
+    Sleek, modern, ultra-minimalist modal dialog for Scanner Page contract settings.
+    Contains:
+    1. Contract Date selection (Automatic vs Custom Date)
+    2. Audio Dictation Identity Extraction toggle
+    """
+    def __init__(self, parent_scanner_page):
+        super().__init__(parent_scanner_page)
+        self.scanner = parent_scanner_page
+        self.lang = self.scanner.lang
+        self.setWindowTitle("⚙️ إعدادات العقد" if self.lang == "ar" else "⚙️ Paramètres")
+        self.setFixedWidth(410)
+        self.setModal(True)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #ffffff;
+            }
+        """)
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 18, 18, 18)
+        layout.setSpacing(14)
+
+        # Header Title
+        lbl_title = QLabel("⚙️ إعدادات العقد والرقمنة" if self.lang == "ar" else "⚙️ Configuration du contrat")
+        lbl_title.setStyleSheet("font-size: 15px; font-weight: 800; color: #0f172a;")
+        layout.addWidget(lbl_title)
+
+        # ── 1. Contract Date Card ──
+        date_card = QFrame(self)
+        date_card.setStyleSheet("""
+            QFrame {
+                background-color: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        date_lay = QVBoxLayout(date_card)
+        date_lay.setSpacing(8)
+
+        lbl_date = QLabel("📅 تاريخ تحرير العقد" if self.lang == "ar" else "📅 Date du contrat")
+        lbl_date.setStyleSheet("font-size: 12px; font-weight: bold; color: #334155; border: none;")
+        date_lay.addWidget(lbl_date)
+
+        radio_lay = QHBoxLayout()
+        self.radio_auto = QRadioButton("تلقائي (اليوم)" if self.lang == "ar" else "Aujourd'hui", date_card)
+        self.radio_custom = QRadioButton("تاريخ مخصص" if self.lang == "ar" else "Date spécifique", date_card)
+        self.radio_auto.setStyleSheet("font-size: 12px; font-weight: 600; color: #1e293b;")
+        self.radio_custom.setStyleSheet("font-size: 12px; font-weight: 600; color: #1e293b;")
+
+        is_auto = self.scanner.radio_date_auto.isChecked()
+        self.radio_auto.setChecked(is_auto)
+        self.radio_custom.setChecked(not is_auto)
+
+        radio_lay.addWidget(self.radio_auto)
+        radio_lay.addWidget(self.radio_custom)
+        date_lay.addLayout(radio_lay)
+
+        from PySide6.QtCore import QDate
+        from ui.components.calendar_utils import configure_calendar
+
+        self.date_edit = QDateEdit(self.scanner.custom_date_edit.date(), date_card)
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDisplayFormat("yyyy/MM/dd")
+        self.date_edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.date_edit.setFixedHeight(32)
+        self.date_edit.setEnabled(not is_auto)
+        self.date_edit.setStyleSheet("""
+            QDateEdit {
+                background-color: #ffffff;
+                color: #0f172a;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 0 8px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QDateEdit:disabled {
+                background-color: #f1f5f9;
+                color: #94a3b8;
+            }
+        """)
+        configure_calendar(self.date_edit)
+
+        self.radio_auto.toggled.connect(lambda checked: self.date_edit.setEnabled(not checked))
+        date_lay.addWidget(self.date_edit)
+
+        layout.addWidget(date_card)
+
+        # ── 2. Audio Identity Extraction Card ──
+        audio_card = QFrame(self)
+        audio_card.setStyleSheet("""
+            QFrame {
+                background-color: #f8fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 10px;
+            }
+        """)
+        audio_lay = QVBoxLayout(audio_card)
+        audio_lay.setSpacing(8)
+
+        lbl_audio = QLabel("🎙️ استخراج معطيات الأطراف من الصوت" if self.lang == "ar" else "🎙️ Identité des parties via vocal")
+        lbl_audio.setStyleSheet("font-size: 12px; font-weight: bold; color: #334155; border: none;")
+        audio_lay.addWidget(lbl_audio)
+
+        self.btn_audio_party_toggle = QPushButton(audio_card)
+        self.btn_audio_party_toggle.setFixedHeight(36)
+        self.btn_audio_party_toggle.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_audio_party_toggle.setCheckable(True)
+        self.btn_audio_party_toggle.setChecked(self.scanner.btn_audio_party_toggle.isChecked())
+        self.btn_audio_party_toggle.clicked.connect(self._update_audio_toggle_ui)
+        self._update_audio_toggle_ui()
+        audio_lay.addWidget(self.btn_audio_party_toggle)
+
+        layout.addWidget(audio_card)
+
+        # Actions (Single clean Apply Button)
+        btn_apply = QPushButton("تطبيق الإعدادات" if self.lang == "ar" else "Appliquer", self)
+        btn_apply.setFixedHeight(38)
+        btn_apply.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        btn_apply.setStyleSheet("""
+            QPushButton {
+                background-color: #1e40af;
+                color: #ffffff;
+                border-radius: 6px;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #1e3a8a;
+            }
+        """)
+        btn_apply.clicked.connect(self.save_and_accept)
+        layout.addWidget(btn_apply)
+
+    def _update_audio_toggle_ui(self):
+        is_on = self.btn_audio_party_toggle.isChecked()
+        if is_on:
+            text = "🎙️ مفعّل (تضمين هويات الأطراف)" if self.lang == "ar" else "🎙️ Activé (Inclure identités)"
+            style = """
+                QPushButton {
+                    background-color: #ecfdf5;
+                    color: #047857;
+                    border: 1px solid #10b981;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }
+            """
+        else:
+            text = "🔇 معطّل (فقط الفصول والملكية)" if self.lang == "ar" else "🔇 Désactivé (Clauses & bien uniquement)"
+            style = """
+                QPushButton {
+                    background-color: #ffffff;
+                    color: #475569;
+                    border: 1px solid #cbd5e1;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }
+            """
+        self.btn_audio_party_toggle.setText(text)
+        self.btn_audio_party_toggle.setStyleSheet(style)
+
+    def save_and_accept(self):
+        if self.radio_auto.isChecked():
+            self.scanner.radio_date_auto.setChecked(True)
+        else:
+            self.scanner.radio_date_custom.setChecked(True)
+            self.scanner.custom_date_edit.setDate(self.date_edit.date())
+
+        self.scanner.btn_audio_party_toggle.setChecked(self.btn_audio_party_toggle.isChecked())
+        self.scanner.update_audio_party_toggle_ui()
+
+        self.accept()
 
 
 class ScannerPage(QWidget):
@@ -434,6 +617,12 @@ class ScannerPage(QWidget):
         self.rec_timer = QTimer(self)
         self.rec_timer.timeout.connect(self._update_rec_timer_display)
 
+        # Audio party toggle state managed via ScannerSettingsDialog
+        self.btn_audio_party_toggle = QPushButton()
+        self.btn_audio_party_toggle.setCheckable(True)
+        self.btn_audio_party_toggle.setChecked(False)
+        self.btn_audio_party_toggle.hide()
+
         self.init_ui()
         self.load_clients_list()
         self.populate_contract_types()
@@ -468,9 +657,13 @@ class ScannerPage(QWidget):
 
         # Single Unified Selectors Box
         selectors_box = QHBoxLayout()
+        selectors_box.setSpacing(10)
+
+        self.lbl_type = QLabel("Type de contrat :" if self.lang == "fr" else "نوع العقد :", left_panel)
+        self.lbl_type.setStyleSheet("font-size:13px; font-weight:700; color:#1e293b; border:none;")
+
         self.type_btn = QPushButton(left_panel)
         self.type_btn.setFixedHeight(36)
-        self.type_btn.setMinimumWidth(320)
         self.type_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.type_btn.setStyleSheet("""
             QPushButton {
@@ -478,7 +671,7 @@ class ScannerPage(QWidget):
                 color: #0f172a;
                 border: 1px solid #cbd5e1;
                 border-radius: 6px;
-                padding: 0 14px;
+                padding: 0 16px;
                 font-size: 13px;
                 font-weight: bold;
                 text-align: right;
@@ -489,11 +682,9 @@ class ScannerPage(QWidget):
             }
         """)
 
-        self.lbl_type = QLabel("Type de contrat :" if self.lang == "fr" else "نوع العقد :", left_panel)
-        self.lbl_type.setStyleSheet("font-size:13px; font-weight:700; color:#1e293b; border:none;")
-
-        self.btn_farida = QPushButton("حاسبة الفريضة" if self.lang == "ar" else "Calculateur d'Héritage", left_panel)
+        self.btn_farida = QPushButton("🧮 حاسبة الفريضة" if self.lang == "ar" else "🧮 Calculateur d'Héritage", left_panel)
         self.btn_farida.setFixedHeight(36)
+        self.btn_farida.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.btn_farida.setStyleSheet("""
             QPushButton {
                 background-color: #1e40af;
@@ -509,9 +700,30 @@ class ScannerPage(QWidget):
         """)
         self.btn_farida.clicked.connect(self.open_farida_calculator)
 
+        self.btn_scanner_settings = QPushButton("⚙️ خيارات العقد" if self.lang == "ar" else "⚙️ Options du contrat", left_panel)
+        self.btn_scanner_settings.setFixedHeight(36)
+        self.btn_scanner_settings.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_scanner_settings.setStyleSheet("""
+            QPushButton {
+                background-color: #f8fafc;
+                color: #1e3a8a;
+                border: 1px solid #cbd5e1;
+                border-radius: 6px;
+                padding: 0 14px;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #eff6ff;
+                border-color: #3b82f6;
+            }
+        """)
+        self.btn_scanner_settings.clicked.connect(self.open_scanner_settings_dialog)
+
         selectors_box.addWidget(self.lbl_type)
-        selectors_box.addWidget(self.type_btn, 1)
+        selectors_box.addWidget(self.type_btn, 2)
         selectors_box.addWidget(self.btn_farida)
+        selectors_box.addWidget(self.btn_scanner_settings)
         left_lay.addLayout(selectors_box)
 
         # Single Unified Dossier Selector Box & Custom Dossier Number Input
@@ -568,86 +780,30 @@ class ScannerPage(QWidget):
         dossier_box.addWidget(self.var_dossier_num, 1)
         left_lay.addLayout(dossier_box)
 
-        # ── Dedicated Contract Date Selection Box (إعدادات تاريخ تحرير العقد) ──
-        date_box_frame = QFrame(left_panel)
-        date_box_frame.setObjectName("date_box_frame")
-        date_box_frame.setStyleSheet("""
-            QFrame#date_box_frame {
-                background-color: #f8fafc;
-                border: 1px solid #cbd5e1;
-                border-radius: 8px;
-                padding: 4px;
-            }
-        """)
-        date_box_lay = QVBoxLayout(date_box_frame)
-        date_box_lay.setContentsMargins(10, 6, 10, 6)
-        date_box_lay.setSpacing(6)
-
-        header_date_lay = QHBoxLayout()
-        lbl_date_title = QLabel("تاريخ تحرير العقد :" if self.lang == "ar" else "Date de rédaction :", date_box_frame)
-        lbl_date_title.setStyleSheet("font-size:13px; font-weight:700; color:#1e3a8a; border:none;")
-        header_date_lay.addWidget(lbl_date_title)
-        
-        self.radio_date_auto = QRadioButton("تلقائي (تاريخ اليوم)" if self.lang == "ar" else "Automatique (Aujourd'hui)", date_box_frame)
-        self.radio_date_custom = QRadioButton("تحديد تاريخ مخصص" if self.lang == "ar" else "Date personnalisée", date_box_frame)
-        self.radio_date_auto.setChecked(True)
-        self.radio_date_auto.setStyleSheet("font-size:12px; font-weight:bold; color:#0f172a;")
-        self.radio_date_custom.setStyleSheet("font-size:12px; font-weight:bold; color:#0f172a;")
-        
-        header_date_lay.addWidget(self.radio_date_auto)
-        header_date_lay.addWidget(self.radio_date_custom)
-        
+        # ── Internal Contract Date State ──
         from PySide6.QtCore import QDate
         from ui.components.calendar_utils import configure_calendar
         
-        self.custom_date_edit = QDateEdit(QDate.currentDate(), date_box_frame)
+        self.radio_date_auto = QRadioButton()
+        self.radio_date_auto.setChecked(True)
+        self.radio_date_auto.hide()
+
+        self.radio_date_custom = QRadioButton()
+        self.radio_date_custom.hide()
+
+        self.custom_date_edit = QDateEdit(QDate.currentDate())
         self.custom_date_edit.setCalendarPopup(True)
         self.custom_date_edit.setDisplayFormat("yyyy/MM/dd")
         self.custom_date_edit.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
-        self.custom_date_edit.setFixedHeight(32)
-        self.custom_date_edit.setEnabled(False)
-        self.custom_date_edit.setStyleSheet("""
-            QDateEdit {
-                background-color: #ffffff;
-                color: #0f172a;
-                border: 1px solid #cbd5e1;
-                border-radius: 6px;
-                padding: 0 8px;
-                font-size: 13px;
-                font-weight: bold;
-            }
-            QDateEdit:disabled {
-                background-color: #f1f5f9;
-                color: #94a3b8;
-            }
-        """)
         configure_calendar(self.custom_date_edit)
-        header_date_lay.addWidget(self.custom_date_edit)
+        self.custom_date_edit.hide()
         
-        date_box_lay.addLayout(header_date_lay)
-        
-        # Live formatted date badge/preview
-        self.lbl_date_preview = QLabel(date_box_frame)
-        self.lbl_date_preview.setWordWrap(True)
-        self.lbl_date_preview.setStyleSheet("""
-            QLabel {
-                background-color: #eff6ff;
-                color: #1e40af;
-                border: 1px solid #bfdbfe;
-                border-radius: 6px;
-                padding: 6px 10px;
-                font-size: 12px;
-                font-weight: bold;
-            }
-        """)
-        date_box_lay.addWidget(self.lbl_date_preview)
-        
-        # Connect signals
+        self.lbl_date_preview = QLabel()
+        self.lbl_date_preview.hide()
+
         self.radio_date_auto.toggled.connect(self.on_date_mode_changed)
         self.radio_date_custom.toggled.connect(self.on_date_mode_changed)
         self.custom_date_edit.dateChanged.connect(self.on_custom_date_changed)
-        
-        left_lay.addWidget(date_box_frame)
 
         # ── Collapsible Section 1: CIN Cards & Registered Clients ──
         self.sec_cin = CollapsibleSection(("1. Cartes d'identité et clients enregistrés" if self.lang == "fr" else "1. بطاقات التعريف الوطنية والحرفاء المسجلين"), expanded=False, parent=left_panel)
@@ -766,15 +922,14 @@ class ScannerPage(QWidget):
         self.progress_bar.setVisible(False)
         self.progress_bar.setStyleSheet("QProgressBar { max-height: 14px; }")
         left_lay.addWidget(self.progress_bar)
-        left_lay.addWidget(self.progress_bar)
 
         btn_box = QHBoxLayout()
-        self.generate_btn = QPushButton(("Générer le contrat officiel" if self.lang == "fr" else "توليد وصياغة العقد الرسمي النهائي"), left_panel)
+        self.generate_btn = QPushButton(("Numériser" if self.lang == "fr" else "رقمنة"), left_panel)
         self.generate_btn.setProperty("class", "PrimaryButton")
         self.generate_btn.setMinimumHeight(45)
         self.generate_btn.clicked.connect(self.run_unified_generation)
         
-        self.reset_btn = QPushButton(("Réinitialiser les documents" if self.lang == "fr" else "تصفير المستندات"), left_panel)
+        self.reset_btn = QPushButton(("Retour" if self.lang == "fr" else "رجوع"), left_panel)
         self.reset_btn.setProperty("class", "SecondaryButton")
         self.reset_btn.setMinimumHeight(45)
         self.reset_btn.clicked.connect(self.reset_pipeline)
@@ -865,18 +1020,18 @@ class ScannerPage(QWidget):
         self.footer_label.setWordWrap(True)
         right_lay.addWidget(self.footer_label)
 
-        self.copy_btn = QPushButton(("Copier le contrat" if self.lang == "fr" else "نسخ نص العقد الكامل"), right_panel)
+        self.copy_btn = QPushButton(("Copier le texte" if self.lang == "fr" else "📋 نسخ النص"), right_panel)
         self.copy_btn.setProperty("class", "SecondaryButton")
         self.copy_btn.clicked.connect(self.copy_contract_text)
         right_lay.addWidget(self.copy_btn)
 
         # Exports
         exports_box = QHBoxLayout()
-        self.export_word_btn = QPushButton("Word (.docx)", right_panel)
+        self.export_word_btn = QPushButton("📄 تحميل Word", right_panel)
         self.export_word_btn.setProperty("class", "PrimaryButton")
         self.export_word_btn.clicked.connect(self.export_word)
 
-        self.export_pdf_btn = QPushButton("PDF (.pdf)", right_panel)
+        self.export_pdf_btn = QPushButton("📕 تحميل PDF", right_panel)
         self.export_pdf_btn.setProperty("class", "SecondaryButton")
         self.export_pdf_btn.clicked.connect(self.export_pdf)
         
@@ -885,7 +1040,7 @@ class ScannerPage(QWidget):
         right_lay.addLayout(exports_box)
 
         # Multiple Archiving
-        right_lay.addWidget(QLabel(("<b>Archiver le contrat dans les dossiers des clients sélectionnés :</b>" if self.lang == "fr" else "<b>حفظ وأرشفة العقد في مجلدات الحرفاء المحددين :</b>")))
+        right_lay.addWidget(QLabel(("<b>Archiver le contrat dans les dossiers clients :</b>" if self.lang == "fr" else "<b>أرشفة وحفظ العقد في ملفات الحرفاء :</b>")))
         
         self.client_search_input = QLineEdit(right_panel)
         self.client_search_input.setStyleSheet("QLineEdit { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; }")
@@ -897,7 +1052,7 @@ class ScannerPage(QWidget):
         self.client_count_lbl.setStyleSheet("color: #475569; font-size: 11px;")
         right_lay.addWidget(self.client_count_lbl)
 
-        self.add_extra_client_btn = QPushButton("➕ إضافة / اختيار حريف إضافي من الأرشيف", right_panel)
+        self.add_extra_client_btn = QPushButton("➕ إضافة حريف من الأرشيف", right_panel)
         self.add_extra_client_btn.setFixedHeight(34)
         self.add_extra_client_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.add_extra_client_btn.setStyleSheet("""
@@ -924,7 +1079,7 @@ class ScannerPage(QWidget):
         self.archive_list.itemChanged.connect(self.on_archive_item_changed)
         right_lay.addWidget(self.archive_list)
 
-        self.archive_btn = QPushButton("أرشفة العقد المختار في مجلدات الحرفاء المحددين", right_panel)
+        self.archive_btn = QPushButton("💾 أرشفة وحفظ العقد", right_panel)
         self.archive_btn.setProperty("class", "PrimaryButton")
         self.archive_btn.clicked.connect(self.archive_to_clients)
         right_lay.addWidget(self.archive_btn)
@@ -946,7 +1101,7 @@ class ScannerPage(QWidget):
         checked_cids = set()
         for i in range(self.archive_list.count()):
             item = self.archive_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 cid = item.data(Qt.ItemDataRole.UserRole)
                 if cid:
                     checked_cids.add(cid)
@@ -1419,7 +1574,7 @@ class ScannerPage(QWidget):
 
             checked_count = sum(
                 1 for i in range(self.archive_list.count())
-                if self.archive_list.item(i).checkState() == Qt.CheckState.Checked
+                if self.archive_list.item(i) and self.archive_list.item(i).checkState() == Qt.CheckState.Checked
             )
             if hasattr(self, "client_count_lbl"):
                 if checked_count > 0:
@@ -1443,7 +1598,7 @@ class ScannerPage(QWidget):
                 already_in = False
                 for i in range(self.archive_list.count()):
                     item = self.archive_list.item(i)
-                    if str(item.data(Qt.ItemDataRole.UserRole)).strip() == cid:
+                    if item and str(item.data(Qt.ItemDataRole.UserRole)).strip() == cid:
                         item.setCheckState(Qt.CheckState.Checked)
                         already_in = True
                         break
@@ -1460,7 +1615,7 @@ class ScannerPage(QWidget):
 
                 checked_count = sum(
                     1 for i in range(self.archive_list.count())
-                    if self.archive_list.item(i).checkState() == Qt.CheckState.Checked
+                    if self.archive_list.item(i) and self.archive_list.item(i).checkState() == Qt.CheckState.Checked
                 )
                 if hasattr(self, "client_count_lbl"):
                     self.client_count_lbl.setText(f"أطراف العقد والحرفاء المحددين تلقائياً ({checked_count})")
@@ -1800,6 +1955,54 @@ class ScannerPage(QWidget):
             QMessageBox.information(self, "Clipboard", "تم نسخ نص العقد الكامل إلى الحافظة بنجاح!")
 
     # ── Audio Actions ──
+    def update_audio_party_toggle_ui(self):
+        if not hasattr(self, "btn_audio_party_toggle"):
+            return
+        is_on = self.btn_audio_party_toggle.isChecked()
+        if is_on:
+            if self.lang == "fr":
+                text = "🎙️ Extraction identité des parties depuis le vocal : ACTIVÉE"
+            else:
+                text = "🎙️ استخراج معطيات هويات الأطراف من الصوت : مفعّل (الاسم، الهوية، العنوان...)"
+            style = """
+                QPushButton {
+                    background-color: #ecfdf5;
+                    color: #047857;
+                    border: 1.5px solid #10b981;
+                    border-radius: 6px;
+                    padding: 0 12px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    text-align: center;
+                }
+                QPushButton:hover {
+                    background-color: #d1fae5;
+                }
+            """
+        else:
+            if self.lang == "fr":
+                text = "🔇 Extraction identité des parties depuis le vocal : DÉSACTIVÉE (Focus foussoul & propriété)"
+            else:
+                text = "🔇 استخراج معطيات هويات الأطراف من الصوت : معطّل (فقط الفصول والملكية)"
+            style = """
+                QPushButton {
+                    background-color: #f8fafc;
+                    color: #475569;
+                    border: 1.5px solid #cbd5e1;
+                    border-radius: 6px;
+                    padding: 0 12px;
+                    font-size: 12px;
+                    font-weight: bold;
+                    text-align: center;
+                }
+                QPushButton:hover {
+                    background-color: #f1f5f9;
+                    border-color: #94a3b8;
+                }
+            """
+        self.btn_audio_party_toggle.setText(text)
+        self.btn_audio_party_toggle.setStyleSheet(style)
+
     def start_recording(self):
         self.start_mic_btn.setEnabled(False)
         self.stop_mic_btn.setEnabled(True)
@@ -2025,6 +2228,7 @@ class ScannerPage(QWidget):
 
         proc_txt = self.procuration_input.toPlainText().strip() if hasattr(self, "procuration_input") and self.procuration_input else ""
         voice_txt = trans_out.toPlainText() if trans_out else ""
+        include_audio_party = self.btn_audio_party_toggle.isChecked() if hasattr(self, "btn_audio_party_toggle") else False
 
         self.pipeline_thread = UnifiedPipelineThread(
             contract_type=self.selected_contract_type,
@@ -2037,7 +2241,8 @@ class ScannerPage(QWidget):
             api_key=self.ocr_api_key,
             provider=self.ocr_provider,
             model=self.ocr_model,
-            contract_vars=self.contract_vars
+            contract_vars=self.contract_vars,
+            include_audio_party_info=include_audio_party
         )
         self.pipeline_thread.finished.connect(self.on_pipeline_finished)
         self.pipeline_thread.start()
@@ -2063,8 +2268,15 @@ class ScannerPage(QWidget):
 
         ext_vars = res.get("extracted_vars", {})
         if ext_vars:
+            party_keys = {
+                "party1_name", "party1_cin", "party1_job", "party1_addr", "party1_cin_date", "party1_birthplace", "party1_birthdate",
+                "party2_name", "party2_cin", "party2_job", "party2_addr", "party2_cin_date", "party2_birthplace", "party2_birthdate"
+            }
+            include_party = self.btn_audio_party_toggle.isChecked() if hasattr(self, "btn_audio_party_toggle") else False
             for k, v in ext_vars.items():
                 if v:
+                    if not include_party and k in party_keys:
+                        continue
                     self.contract_vars[k] = v
                     
         p1_list = res.get("party1_list", [])
@@ -2213,7 +2425,9 @@ class ScannerPage(QWidget):
         self.extra_foussoul = []
 
         for i in range(self.archive_list.count()):
-            self.archive_list.item(i).setCheckState(Qt.CheckState.Unchecked)
+            item = self.archive_list.item(i)
+            if item:
+                item.setCheckState(Qt.CheckState.Unchecked)
             
         self.rebuild_parties_ui()
         if hasattr(self, "audit_lay") and self.audit_lay:
@@ -2330,7 +2544,7 @@ class ScannerPage(QWidget):
             QMessageBox.warning(
                 self, "المستند",
                 f"لا يوجد نص عقد لـ{action_label}.\n"
-                "يرجى توليد العقد أولاً بالضغط على «توليد وصياغة العقد الرسمي النهائي»."
+                "يرجى الضغط على «رقمنة» أولاً لتوليد العقد."
             )
             return False
 
@@ -2562,7 +2776,7 @@ class ScannerPage(QWidget):
 
         for i in range(self.archive_list.count()):
             item = self.archive_list.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
+            if item and item.checkState() == Qt.CheckState.Checked:
                 cid = item.data(Qt.ItemDataRole.UserRole)
                 if cid and cid not in selected_client_ids:
                     selected_client_ids.append(cid)
@@ -2571,11 +2785,12 @@ class ScannerPage(QWidget):
         if not selected_client_ids and self.archive_list.count() > 0:
             for i in range(self.archive_list.count()):
                 item = self.archive_list.item(i)
-                item.setCheckState(Qt.CheckState.Checked)
-                cid = item.data(Qt.ItemDataRole.UserRole)
-                if cid and cid not in selected_client_ids:
-                    selected_client_ids.append(cid)
-                    selected_client_names.append(item.text())
+                if item:
+                    item.setCheckState(Qt.CheckState.Checked)
+                    cid = item.data(Qt.ItemDataRole.UserRole)
+                    if cid and cid not in selected_client_ids:
+                        selected_client_ids.append(cid)
+                        selected_client_names.append(item.text())
 
         if not selected_client_ids:
             for p in self.p1_parties + self.p2_parties:
@@ -2642,7 +2857,9 @@ class ScannerPage(QWidget):
             )
             
             for i in range(self.archive_list.count()):
-                self.archive_list.item(i).setCheckState(Qt.CheckState.Unchecked)
+                item = self.archive_list.item(i)
+                if item:
+                    item.setCheckState(Qt.CheckState.Unchecked)
                 
         except Exception as e:
             QMessageBox.warning(self, "Archivage", f"حدث خطأ أثناء أرشفة المستند: {str(e)}")
@@ -2671,6 +2888,10 @@ class ScannerPage(QWidget):
             self.sec_vars.title_lbl.setText(
                 "3. Variables du contrat" if is_fr
                 else "3. الحقول التحريرية والتفاصيل المادية للعقد")
+
+    def open_scanner_settings_dialog(self):
+        dlg = ScannerSettingsDialog(self)
+        dlg.exec()
 
     def open_farida_calculator(self):
         from ui.components.farida_dialog import TunisianFaridaDialog

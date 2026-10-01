@@ -173,14 +173,15 @@ def log_system_error(err_title: str, exception_obj: Exception):
                       file=sys.stderr)
 
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        # Redacted BEFORE it reaches the file, so a credential that happened to
-        # appear in an exception message never lands in the log that the
-        # diagnostic export sends out of the office.
         err_msg = redact_secrets(
             f"\n[{timestamp}] ERROR: {err_title}\n{str(exception_obj)}\n"
             f"{traceback.format_exc()}\n{'-'*60}")
         with open(ERROR_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(err_msg)
+
+        # Output directly to PowerShell console as well so user sees all crashes in real time
+        print(f"\n[CRASH LOG / SYSTEM ERROR] {err_title}: {exception_obj}", file=sys.stderr, flush=True)
+        print(traceback.format_exc(), file=sys.stderr, flush=True)
     except Exception as write_err:
         # The logger cannot log its own failure. Without this the office could run
         # for months with an unwritable log directory and never know.

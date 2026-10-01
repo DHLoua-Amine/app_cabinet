@@ -110,13 +110,13 @@ class MainWindow(QMainWindow):
         
         # Format: (Key, Label AR, Label FR, Active)
         self.nav_items = [
-            ("home", "الرئيسية والكاميرا", "Accueil & Caméra", True),
-            ("register", "سجل الملفات", "Registre des Dossiers", True),
-            ("clients", "دليل الحرفاء", "Répertoire des Clients", True),
-            ("presence", "سجل الحضور والزيارات", "Journal de Présence", True), # Enabled
-            ("compta", "المحاسبة والمالية", "Comptabilité", True),
-            ("scanner", "الماسح والتلخيص الذكي", "Scanner IA", True),
-            ("settings", "الإعدادات", "Paramètres", True),
+            ("home", "🏠 الرئيسية", "🏠 Accueil", True),
+            ("register", "📁 العقود والملفات", "📁 Contrats & Dossiers", True),
+            ("clients", "👥 دليل الحرفاء", "👥 Répertoire Clients", True),
+            ("presence", "📋 المواعيد والزيارات", "📋 Rendez-vous & Visites", True),
+            ("compta", "💰 المحاسبة والمالية", "💰 Comptabilité", True),
+            ("scanner", "📄 تحرير العقود والماسح", "📄 Rédaction & Scanner", True),
+            ("settings", "⚙️ الإعدادات", "⚙️ Paramètres", True),
         ]
 
         for key, lbl_ar, lbl_fr, active in self.nav_items:

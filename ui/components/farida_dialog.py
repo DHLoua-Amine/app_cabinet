@@ -21,39 +21,16 @@ except ImportError:
 
 def is_female_name(name: str) -> bool:
     """
-    Determines if a name is female based on:
-    1. Direct patronymic connectors ('بنت' / 'ابنة' / 'زوجة' / 'أرملة' / 'البنت').
-    2. Direct male patronymic connectors ('بن' / 'إبن' / 'ابن' / 'ولد' / 'الابن').
-    3. Arabic morphological feminine endings ('ة', 'ه', 'اء', 'ى'), excluding male exceptions (بوجمعة، حمزة، إلخ).
+    Determines if a name is female using shared deterministic engine rules.
+    Checks explicit female connectors as well as curated female first name dictionary.
     """
     if not name or not isinstance(name, str):
         return False
-    clean_n = name.strip()
-    if not clean_n:
-        return False
-
-    if re.search(r'\b(بنت|ابنة|حرم|أرملة|زوجة|البنت)\b', clean_n):
-        return True
-    if re.search(r'\b(بن|إبن|ابن|ولد|الابن)\b', clean_n):
-        return False
-
-    parts = clean_n.split()
-    first_w = parts[0]
-    first_norm = re.sub(r'[أإآ]', 'ا', first_w)
-
-    male_exceptions = {
-        'حمزة', 'حمزه', 'طلحة', 'طلحه', 'عبيدة', 'عبيده', 'قتادة', 'قتاده', 'أسامة', 'اسامة', 'اسامه',
-        'عكرمة', 'معاوية', 'سلامة', 'سلامه', 'عرفة', 'عمارة', 'عماره', 'ربيعة', 'ربيعه', 'خليفة', 'خليفه',
-        'عطية', 'عطيه', 'حذيفة', 'حذيفه', 'بوجمعة', 'بوجمعه', 'جمعة', 'جمعه', 'طه', 'عروة', 'عروه',
-        'رباح', 'عتبة', 'عتبه', 'شيبة', 'شيبه', 'وجيه', 'عمران', 'عز', 'صلاح', 'زين', 'أمية', 'امية'
-    }
-
-    if first_norm in male_exceptions or first_norm.startswith('بو') or any(first_norm.startswith(p) for p in ['بو', 'عبد', 'ابو']):
-        return False
-
-    if any(first_norm.endswith(e) for e in ['ة', 'ه', 'اء', 'ى']):
-        return True
-    return False
+    try:
+        from farida_engine import _is_female_name
+    except ImportError:
+        from core.farida_engine import _is_female_name
+    return _is_female_name(name)
 
 
 class DatePickerLineEdit(QWidget):
@@ -295,7 +272,7 @@ class HujjaUploadPopupDialog(QDialog):
         grp1_lay = QHBoxLayout(grp1)
         self.lbl_p1 = QLabel("لم يتم اختيار صورة للصفحة الأولى", grp1)
         self.lbl_p1.setStyleSheet("color: #64748b; font-size: 11px;")
-        btn_p1 = QPushButton("📁 رفع الصفحة 1 (Recto)", grp1)
+        btn_p1 = QPushButton("📁 رفع الصفحة 1", grp1)
         btn_p1.setStyleSheet("background: #0284c7; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold;")
         btn_p1.clicked.connect(self.select_page1)
         grp1_lay.addWidget(self.lbl_p1, 1)
@@ -303,11 +280,11 @@ class HujjaUploadPopupDialog(QDialog):
         lay.addWidget(grp1)
 
         # Slot 2: Page 2 (Verso - Optional)
-        grp2 = QGroupBox("📄 الوجه الثاني / الصفحة 2 (الوجه الخلفي - اختياري)", self)
+        grp2 = QGroupBox("📄 الصفحة 2 (الوجه الثاني - اختياري)", self)
         grp2_lay = QHBoxLayout(grp2)
         self.lbl_p2 = QLabel("لم يتم اختيار صفحة ثانية (اختياري)", grp2)
         self.lbl_p2.setStyleSheet("color: #94a3b8; font-size: 11px;")
-        btn_p2 = QPushButton("📁 رفع الصفحة 2 (Verso)", grp2)
+        btn_p2 = QPushButton("📁 رفع الصفحة 2", grp2)
         btn_p2.setStyleSheet("background: #475569; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold;")
         btn_p2.clicked.connect(self.select_page2)
         grp2_lay.addWidget(self.lbl_p2, 1)
@@ -318,7 +295,7 @@ class HujjaUploadPopupDialog(QDialog):
         btn_lay = QHBoxLayout()
         btn_cancel = QPushButton("إلغاء", self)
         btn_cancel.clicked.connect(self.reject)
-        self.btn_submit = QPushButton("🚀 بدء الاستخراج والتفريغ الآلي", self)
+        self.btn_submit = QPushButton("🚀 بدء التفريغ والرقمنة", self)
         self.btn_submit.setStyleSheet("background: #16a34a; color: white; border-radius: 6px; padding: 8px 16px; font-weight: bold; font-size: 12px;")
         self.btn_submit.clicked.connect(self.accept_upload)
         btn_lay.addWidget(btn_cancel)
@@ -353,6 +330,121 @@ class HujjaUploadPopupDialog(QDialog):
         if self.page1_path: paths.append(self.page1_path)
         if self.page2_path: paths.append(self.page2_path)
         return paths
+
+
+class RasmUploadPopupDialog(QDialog):
+    """
+    Dedicated Popup Dialog for Multi-Page Rasm L3akari (وثيقة الرسم العقاري / ترسيم الوفاة).
+    Allows uploading Page 1, Page 2, Page 3 or Multi-Page PDFs/Images.
+    """
+    def __init__(self, parent=None, title="استيراد وتفريغ وثيقة الرسم العقاري (Rasm L3akari)"):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setMinimumWidth(540)
+        self.page1_path = ""
+        self.page2_path = ""
+        self.page3_path = ""
+        self.init_ui()
+
+    def init_ui(self):
+        lay = QVBoxLayout(self)
+        lay.setSpacing(12)
+        lay.setContentsMargins(16, 16, 16, 16)
+
+        header = QLabel("🏛️ نافذة استيراد وثيقة الرسم العقاري (صفحة واحدة أو متعدد الصفحات):", self)
+        header.setStyleSheet("font-weight: bold; font-size: 13px; color: #1e293b;")
+        lay.addWidget(header)
+
+        info = QLabel("يمكنك رفع الصفحة الأولى، وإذا كانت وثيقة الرسم العقاري تتكون من صفحتين أو أكثر، قم برفع بقية الصفحات ليتم دمجها وقراءتها بالكامل بالذكاء الاصطناعي.", self)
+        info.setStyleSheet("color: #475569; font-size: 11px;")
+        info.setWordWrap(True)
+        lay.addWidget(info)
+
+        # Slot 1: Page 1
+        grp1 = QGroupBox("📄 الصفحة 1 (الوجه الأمامي الرئيسي - إجباري)", self)
+        grp1_lay = QHBoxLayout(grp1)
+        self.lbl_p1 = QLabel("لم يتم اختيار الصفحة الأولى", grp1)
+        self.lbl_p1.setStyleSheet("color: #64748b; font-size: 11px;")
+        btn_p1 = QPushButton("📁 رفع الصفحة 1", grp1)
+        btn_p1.setStyleSheet("background: #0f766e; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold;")
+        btn_p1.clicked.connect(self.select_page1)
+        grp1_lay.addWidget(self.lbl_p1, 1)
+        grp1_lay.addWidget(btn_p1)
+        lay.addWidget(grp1)
+
+        # Slot 2: Page 2
+        grp2 = QGroupBox("📄 الصفحة 2 (اختياري)", self)
+        grp2_lay = QHBoxLayout(grp2)
+        self.lbl_p2 = QLabel("لم يتم اختيار صفحة ثانية (اختياري)", grp2)
+        self.lbl_p2.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        btn_p2 = QPushButton("📁 رفع الصفحة 2", grp2)
+        btn_p2.setStyleSheet("background: #475569; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold;")
+        btn_p2.clicked.connect(self.select_page2)
+        grp2_lay.addWidget(self.lbl_p2, 1)
+        grp2_lay.addWidget(btn_p2)
+        lay.addWidget(grp2)
+
+        # Slot 3: Page 3
+        grp3 = QGroupBox("📄 الصفحة 3 (اختياري)", self)
+        grp3_lay = QHBoxLayout(grp3)
+        self.lbl_p3 = QLabel("لم يتم اختيار صفحة ثالثة (اختياري)", grp3)
+        self.lbl_p3.setStyleSheet("color: #94a3b8; font-size: 11px;")
+        btn_p3 = QPushButton("📁 رفع الصفحة 3", grp3)
+        btn_p3.setStyleSheet("background: #475569; color: white; border-radius: 4px; padding: 6px 12px; font-weight: bold;")
+        btn_p3.clicked.connect(self.select_page3)
+        grp3_lay.addWidget(self.lbl_p3, 1)
+        grp3_lay.addWidget(btn_p3)
+        lay.addWidget(grp3)
+
+        # Action Buttons
+        btn_lay = QHBoxLayout()
+        btn_cancel = QPushButton("إلغاء", self)
+        btn_cancel.clicked.connect(self.reject)
+        self.btn_submit = QPushButton("🚀 بدء القراءة والرقمنة الفائقة", self)
+        self.btn_submit.setStyleSheet("background: #16a34a; color: white; border-radius: 6px; padding: 8px 16px; font-weight: bold; font-size: 12px;")
+        self.btn_submit.clicked.connect(self.accept_upload)
+        btn_lay.addWidget(btn_cancel)
+        btn_lay.addStretch()
+        btn_lay.addWidget(self.btn_submit)
+        lay.addLayout(btn_lay)
+
+    def select_page1(self):
+        fp, _ = QFileDialog.getOpenFileName(self, "اختر الصفحة الأولى (Rasm L3akari)", "", "صور أو ملفات (*.png *.jpg *.jpeg *.pdf *.txt)")
+        if fp:
+            self.page1_path = fp
+            from pathlib import Path
+            self.lbl_p1.setText(f"✓ {Path(fp).name}")
+            self.lbl_p1.setStyleSheet("color: #16a34a; font-weight: bold; font-size: 11px;")
+
+    def select_page2(self):
+        fp, _ = QFileDialog.getOpenFileName(self, "اختر الصفحة الثانية (اختياري)", "", "صور أو ملفات (*.png *.jpg *.jpeg *.pdf *.txt)")
+        if fp:
+            self.page2_path = fp
+            from pathlib import Path
+            self.lbl_p2.setText(f"✓ {Path(fp).name}")
+            self.lbl_p2.setStyleSheet("color: #16a34a; font-weight: bold; font-size: 11px;")
+
+    def select_page3(self):
+        fp, _ = QFileDialog.getOpenFileName(self, "اختر الصفحة الثالثة (اختياري)", "", "صور أو ملفات (*.png *.jpg *.jpeg *.pdf *.txt)")
+        if fp:
+            self.page3_path = fp
+            from pathlib import Path
+            self.lbl_p3.setText(f"✓ {Path(fp).name}")
+            self.lbl_p3.setStyleSheet("color: #16a34a; font-weight: bold; font-size: 11px;")
+
+    def accept_upload(self):
+        if not self.page1_path and not self.page2_path and not self.page3_path:
+            QMessageBox.warning(self, "تنبيه", "يرجى اختيار صورة الصفحة الأولى على الأقل.")
+            return
+        self.accept()
+
+    def get_selected_paths(self):
+        paths = []
+        if self.page1_path: paths.append(self.page1_path)
+        if self.page2_path: paths.append(self.page2_path)
+        if self.page3_path: paths.append(self.page3_path)
+        return paths
+
 
 
 class TunisianFaridaDialog(QDialog):
@@ -568,7 +660,8 @@ class TunisianFaridaDialog(QDialog):
         # ── SCAN BUTTONS ROW ──────────────────────────────────────────────────
         scan_btns_row = QHBoxLayout()
 
-        self.btn_import_wafat = QPushButton("📄 استيراد حجة وفاة الهالك الرئيسي (صورة / PDF / نص)", tab1)
+        self.btn_import_wafat = QPushButton("📄 استيراد حجة وفاة (نوع 1)", tab1)
+        self.btn_import_wafat.setToolTip("مسح واستيراد حجة وفاة الهالك الصادرة عن محكمة الناحية")
         self.btn_import_wafat.setStyleSheet("""
             QPushButton {
                 background-color: #0284c7;
@@ -585,7 +678,25 @@ class TunisianFaridaDialog(QDialog):
         """)
         self.btn_import_wafat.clicked.connect(self.import_hujjat_wafat_file)
 
-        self.btn_add_linked_hujja = QPushButton("➕ إضافة حجة وفاة ابن/بنت توفي في حياة الهالك", tab1)
+        self.btn_import_rasm = QPushButton("🏛️ استيراد وثيقة الرسم العقاري (نوع 2 - ترسيم الوفاة)", tab1)
+        self.btn_import_rasm.setToolTip("مسح وثيقة الرسم العقاري (Rasm L3akari) لاستخراج ترسيم الوفاة والمجلد والعدد واسم الهالك والمساحة عند عدم وجود حجة وفاة")
+        self.btn_import_rasm.setStyleSheet("""
+            QPushButton {
+                background-color: #0f766e;
+                color: #ffffff;
+                border: none;
+                border-radius: 6px;
+                padding: 10px 16px;
+                font-weight: bold;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #0d9488;
+            }
+        """)
+        self.btn_import_rasm.clicked.connect(self.import_rasm_akari_form2_file)
+
+        self.btn_add_linked_hujja = QPushButton("➕ إضافة حجة وفاة ابن متوفى", tab1)
         self.btn_add_linked_hujja.setToolTip("امسح حجة وفاة أحد أبناء الهالك الذين توفوا قبله — سيتم الربط التلقائي وإضافة أبنائهم (الأحفاد) لقائمة الورثة")
         self.btn_add_linked_hujja.setStyleSheet("""
             QPushButton {
@@ -603,7 +714,7 @@ class TunisianFaridaDialog(QDialog):
         """)
         self.btn_add_linked_hujja.clicked.connect(self.add_linked_hujja)
 
-        self.btn_link_hujaj = QPushButton("🔗 ربط الحجج وتعبئة الفريضة تلقائياً", tab1)
+        self.btn_link_hujaj = QPushButton("🔗 ربط الحجج تلقائياً", tab1)
         self.btn_link_hujaj.setToolTip("يقوم بمطابقة أسماء المتوفين في الحجج الإضافية مع قائمة الورثة، ويعبئ أعداد الأحفاد تلقائياً")
         self.btn_link_hujaj.setEnabled(False)
         self.btn_link_hujaj.setStyleSheet("""
@@ -627,6 +738,7 @@ class TunisianFaridaDialog(QDialog):
         self.btn_link_hujaj.clicked.connect(self.link_and_merge_hujaj)
 
         scan_btns_row.addWidget(self.btn_import_wafat, 3)
+        scan_btns_row.addWidget(self.btn_import_rasm, 3)
         scan_btns_row.addWidget(self.btn_add_linked_hujja, 3)
         scan_btns_row.addWidget(self.btn_link_hujaj, 2)
         tab1_lay.addLayout(scan_btns_row)
@@ -714,20 +826,88 @@ class TunisianFaridaDialog(QDialog):
         grp_deceased_lay.addLayout(dec_lay)
         form_lay1.addWidget(grp_deceased)
 
-        # Box 4: Death Certificate Reference Meta
-        grp_hujja = QGroupBox("معطيات حجة الوفاة الرسمية", scroll_w1)
+        # Box 4: Death Certificate / Proof of Death Meta
+        grp_hujja = QGroupBox("مصدر إثبات وفاة الهالك ومعطيات الترسيم (صياغة الفريضة)", scroll_w1)
         grp_hujja_lay = QVBoxLayout(grp_hujja)
-        hujja_lay = QHBoxLayout()
-        self.txt_hujja_num = QLineEdit(grp_hujja)
+        grp_hujja_lay.setSpacing(10)
+
+        # Radio Selector for Form 1 vs Form 2
+        radio_lay = QHBoxLayout()
+        from PySide6.QtWidgets import QRadioButton, QButtonGroup
+        self.bg_proof_source = QButtonGroup(grp_hujja)
+        self.radio_hujja_wafat = QRadioButton("حسب حجة وفاة صانعة الإرث (محكمة الناحية - صيغة 1)", grp_hujja)
+        self.radio_property_title = QRadioButton("حسب ترسيم وفاة مدرجة بإدارة الملكية العقارية (الرسم العقاري - صيغة 2)", grp_hujja)
+        self.radio_hujja_wafat.setChecked(True)
+        self.bg_proof_source.addButton(self.radio_hujja_wafat, 1)
+        self.bg_proof_source.addButton(self.radio_property_title, 2)
+        radio_lay.addWidget(self.radio_hujja_wafat)
+        radio_lay.addWidget(self.radio_property_title)
+        grp_hujja_lay.addLayout(radio_lay)
+
+        # Form 1 Widgets (Hujjat Wafat Court Info)
+        self.w_form1 = QWidget(grp_hujja)
+        hujja_lay = QHBoxLayout(self.w_form1)
+        hujja_lay.setContentsMargins(0, 0, 0, 0)
+        self.txt_hujja_num = QLineEdit(self.w_form1)
         self.txt_hujja_num.setPlaceholderText("عدد حجة الوفاة")
-        self.txt_hujja_date = DatePickerLineEdit(grp_hujja, placeholder="تاريخ حجة الوفاة")
-        self.txt_hujja_court = QLineEdit(grp_hujja)
-        self.txt_hujja_court.setPlaceholderText("المحكمة الصادرة عنها")
-        hujja_lay.addWidget(QLabel("عدد الحجة:", grp_hujja))
+        self.txt_hujja_date = DatePickerLineEdit(self.w_form1, placeholder="تاريخ حجة الوفاة")
+        self.txt_hujja_court = QLineEdit(self.w_form1)
+        self.txt_hujja_court.setPlaceholderText("المحكمة الصادرة عنها (مثل: محكمة ناحية زغوان)")
+        hujja_lay.addWidget(QLabel("عدد الحجة:", self.w_form1))
         hujja_lay.addWidget(self.txt_hujja_num)
         hujja_lay.addWidget(self.txt_hujja_date)
         hujja_lay.addWidget(self.txt_hujja_court)
-        grp_hujja_lay.addLayout(hujja_lay)
+        grp_hujja_lay.addWidget(self.w_form1)
+
+        # Form 2 Widgets (Property Title / CPF Death Registration Info)
+        self.w_form2 = QWidget(grp_hujja)
+        self.w_form2.setVisible(False)
+        cpf_lay = QHBoxLayout(self.w_form2)
+        cpf_lay.setContentsMargins(0, 0, 0, 0)
+        cpf_lay.setSpacing(6)
+
+        self.btn_scan_form2_rasm = QPushButton("🏛️ مسح الرسم العقاري / شهادة الملكية", self.w_form2)
+        self.btn_scan_form2_rasm.setToolTip("مسح شهادة الملكية / الرسم العقاري لاستخراج معطيات ترسيم الوفاة والمجلد والعدد واسم الهالك والمساحات تلقائياً عند عدم وجود حجة وفاة")
+        self.btn_scan_form2_rasm.setStyleSheet("""
+            QPushButton {
+                background-color: #0f766e;
+                color: #ffffff;
+                border: none;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: bold;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #0d9488;
+            }
+        """)
+        self.btn_scan_form2_rasm.clicked.connect(self.import_rasm_akari_form2_file)
+
+        self.txt_cpf_death_date = DatePickerLineEdit(self.w_form2, placeholder="تاريخ ترسيم الوفاة بالرسم")
+        self.txt_cpf_vol_num = QLineEdit(self.w_form2)
+        self.txt_cpf_vol_num.setPlaceholderText("رقم المجلد")
+        self.txt_cpf_entry_num = QLineEdit(self.w_form2)
+        self.txt_cpf_entry_num.setPlaceholderText("عدد الإدراج / الترسيم")
+
+        cpf_lay.addWidget(self.btn_scan_form2_rasm)
+        cpf_lay.addWidget(QLabel("تاريخ الترسيم:", self.w_form2))
+        cpf_lay.addWidget(self.txt_cpf_death_date)
+        cpf_lay.addWidget(QLabel("مجلد عدد:", self.w_form2))
+        cpf_lay.addWidget(self.txt_cpf_vol_num)
+        cpf_lay.addWidget(QLabel("عدد:", self.w_form2))
+        cpf_lay.addWidget(self.txt_cpf_entry_num)
+        grp_hujja_lay.addWidget(self.w_form2)
+
+        def toggle_proof_source():
+            is_form2 = self.radio_property_title.isChecked()
+            self.w_form1.setVisible(not is_form2)
+            self.w_form2.setVisible(is_form2)
+            self.on_calculate_clicked()
+
+        self.radio_hujja_wafat.toggled.connect(toggle_proof_source)
+        self.radio_property_title.toggled.connect(toggle_proof_source)
+
         form_lay1.addWidget(grp_hujja)
 
         # Box 5: Real Estate Certificate (For Partial Farida)
@@ -745,6 +925,37 @@ class TunisianFaridaDialog(QDialog):
         title_lay.addWidget(self.txt_property_name)
         grp_prop_lay.addLayout(title_lay)
 
+        type_lay = QHBoxLayout()
+        lbl_type = QLabel("وصف العقار / نوعه:", grp_prop)
+        lbl_type.setStyleSheet("color: #334155; font-size: 11px; font-weight: bold;")
+        self.combo_property_type = QComboBox(grp_prop)
+        self.combo_property_type.addItems([
+            "أرض فلاحية",
+            "أرض معدة للبناء",
+            "دار سكنية / فيلا",
+            "محل تجاري / دكان",
+            "مقسم عقاري",
+            "رسم عقاري (شياع)",
+            "نوع / وصف آخر..."
+        ])
+        self.combo_property_type.setStyleSheet("QComboBox { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; font-size: 11px; }")
+        self.txt_custom_property_type = QLineEdit(grp_prop)
+        self.txt_custom_property_type.setPlaceholderText("اكتب وصف العقار بالتفصيل...")
+        self.txt_custom_property_type.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; font-size: 11px;")
+        self.txt_custom_property_type.setVisible(False)
+
+        def _on_prop_type_changed(idx):
+            self.txt_custom_property_type.setVisible(idx == self.combo_property_type.count() - 1)
+            self.on_calculate_clicked()
+
+        self.combo_property_type.currentIndexChanged.connect(_on_prop_type_changed)
+        self.txt_custom_property_type.textChanged.connect(self.on_calculate_clicked)
+
+        type_lay.addWidget(lbl_type)
+        type_lay.addWidget(self.combo_property_type, 2)
+        type_lay.addWidget(self.txt_custom_property_type, 3)
+        grp_prop_lay.addLayout(type_lay)
+
         loc_lay = QHBoxLayout()
         self.txt_location = QLineEdit(grp_prop)
         self.txt_location.setPlaceholderText("موقع العقار الكائن بـ...")
@@ -753,25 +964,44 @@ class TunisianFaridaDialog(QDialog):
         grp_prop_lay.addLayout(loc_lay)
 
         m2_lay = QHBoxLayout()
-        m2_lbl = QLabel("مساحة العقار بالأمتار المربعة:", grp_prop)
+        m2_lbl = QLabel("المساحة الجملية للعقار (م²):", grp_prop)
         self.spin_m2 = NoWheelDoubleSpinBox(grp_prop)
         self.spin_m2.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-        self.spin_m2.setRange(0, 1000000)
+        self.spin_m2.setRange(0, 10000000)
         self.spin_m2.setValue(0)
+        self.spin_m2.valueChanged.connect(self.on_calculate_clicked)
+
+        dec_m2_lbl = QLabel("المساحة المملوكة للهالك (م²):", grp_prop)
+        dec_m2_lbl.setStyleSheet("color: #0369a1; font-weight: bold;")
+        self.spin_deceased_m2 = NoWheelDoubleSpinBox(grp_prop)
+        self.spin_deceased_m2.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+        self.spin_deceased_m2.setRange(0, 10000000)
+        self.spin_deceased_m2.setValue(0)
+        self.spin_deceased_m2.valueChanged.connect(self.on_calculate_clicked)
+
         m2_lay.addWidget(m2_lbl)
-        m2_lay.addStretch()
         m2_lay.addWidget(self.spin_m2)
+        m2_lay.addWidget(dec_m2_lbl)
+        m2_lay.addWidget(self.spin_deceased_m2)
         grp_prop_lay.addLayout(m2_lay)
 
         parts_lay = QHBoxLayout()
-        parts_lbl = QLabel("عدد أجزاء التجزئة (مثال: 4608000):", grp_prop)
+        parts_lbl = QLabel("عدد التجزئة ووحدتها (أجزاء / أسهم):", grp_prop)
         self.spin_parts = NoWheelDoubleSpinBox(grp_prop)
         self.spin_parts.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
-        self.spin_parts.setRange(0, 10000000)
+        self.spin_parts.setRange(0, 100000000)
         self.spin_parts.setValue(0)
+        self.spin_parts.valueChanged.connect(self.on_calculate_clicked)
+
+        self.cmb_parts_unit = QComboBox(grp_prop)
+        self.cmb_parts_unit.addItems(["أجزاء / جزءاً", "أسهم / سهماً"])
+        self.cmb_parts_unit.setStyleSheet("font-weight: bold; padding: 4px; border-radius: 4px;")
+        self.cmb_parts_unit.currentIndexChanged.connect(self.on_calculate_clicked)
+
         parts_lay.addWidget(parts_lbl)
         parts_lay.addStretch()
         parts_lay.addWidget(self.spin_parts)
+        parts_lay.addWidget(self.cmb_parts_unit)
         grp_prop_lay.addLayout(parts_lay)
 
         form_lay1.addWidget(grp_prop)
@@ -1090,9 +1320,9 @@ class TunisianFaridaDialog(QDialog):
         self.text_output.hide()
 
         # Add 3 tabs to self.tab_widget
-        self.tab_widget.addTab(tab1, "📄 1. معطيات الفريضة وطرفي الإشهاد والعقار والوصية الواجبة")
-        self.tab_widget.addTab(tab2, "👥 2. شجرة الورثة والأسماء وبطاقات التعريف")
-        self.tab_widget.addTab(tab3, "📜 3. جدول حساب الفريضة ومناب كل وارث")
+        self.tab_widget.addTab(tab1, "📄 1. المعطيات والوصية الواجبة")
+        self.tab_widget.addTab(tab2, "👥 2. الورثة والأسماء")
+        self.tab_widget.addTab(tab3, "📜 3. جدول حساب الفريضة والأنصبة")
 
         master_layout.addWidget(self.tab_widget, stretch=1)
 
@@ -1100,11 +1330,11 @@ class TunisianFaridaDialog(QDialog):
         bottom_bar = QHBoxLayout()
         bottom_bar.setSpacing(10)
 
-        calc_btn = QPushButton("🔄 إعادة الحساب التلقائي", self)
+        calc_btn = QPushButton("🔄 حساب الفريضة", self)
         calc_btn.setProperty("class", "PrimaryBtn")
         calc_btn.clicked.connect(self.on_calculate_clicked)
 
-        insert_editor_btn = QPushButton("📥 إدراج في محرر العقود (Scanner IA)", self)
+        insert_editor_btn = QPushButton("📥 إدراج في المحرر", self)
         insert_editor_btn.setStyleSheet("""
             QPushButton {
                 background-color: #15803d;
@@ -1284,7 +1514,10 @@ class TunisianFaridaDialog(QDialog):
                 if key in self.cached_heir_names:
                     txt_name.setText(self.cached_heir_names[key])
                 elif hasattr(self, "main_parsed") and self.main_parsed:
-                    if key.startswith("wife") and self.main_parsed.get("wife_name"):
+                    h_details = self.main_parsed.get("heir_details", {})
+                    if key in h_details and isinstance(h_details[key], dict) and h_details[key].get("name"):
+                        txt_name.setText(h_details[key]["name"])
+                    elif key.startswith("wife") and self.main_parsed.get("wife_name"):
                         txt_name.setText(self.main_parsed["wife_name"])
                     elif key == "husband" and self.main_parsed.get("husband_name"):
                         txt_name.setText(self.main_parsed["husband_name"])
@@ -1417,7 +1650,47 @@ class TunisianFaridaDialog(QDialog):
 
         return names
 
-    def _pick_predeceased_from_hujja_full(self, txt_name, txt_date, txt_spouse, spin_sons, spin_daug, txt_gc, gc_edits, combo_status, combo_gender):
+    def _extract_linked_hujja_children(self, hujja: dict):
+        """
+        Extracts categorized male (sons) and female (daughters) children names
+        for a linked predeceased child hujja.
+        Returns (c_sons_names, c_daughters_names).
+        """
+        if not isinstance(hujja, dict):
+            return [], []
+
+        from core.farida_engine import sanitize_and_validate_heirs_graph, _are_same_person
+        
+        # Always run deterministic graph sanitizer on linked hujja dict
+        clean_hujja = sanitize_and_validate_heirs_graph(dict(hujja))
+        
+        dec_name = str(clean_hujja.get("deceased_name", "")).strip()
+        w_sp = str(clean_hujja.get("wife_name") or clean_hujja.get("husband_name") or "").strip()
+        m_sp = str(clean_hujja.get("mother_name", "")).strip()
+        f_sp = str(clean_hujja.get("father_name", "")).strip()
+        
+        ref_parents_spouses = [n for n in [dec_name, w_sp, m_sp, f_sp] if n and len(str(n).strip()) > 1]
+        
+        c_sons = []
+        for s in clean_hujja.get("sons_names", []):
+            if s and str(s).strip():
+                s_str = str(s).strip()
+                if not any(_are_same_person(s_str, ref) for ref in ref_parents_spouses):
+                    c_sons.append(s_str)
+                    
+        c_daughters = []
+        for d in clean_hujja.get("daughters_names", []):
+            if d and str(d).strip():
+                d_str = str(d).strip()
+                if not any(_are_same_person(d_str, ref) for ref in ref_parents_spouses):
+                    c_daughters.append(d_str)
+                    
+        c_daughters = list(dict.fromkeys(c_daughters))
+        c_sons = [s for s in dict.fromkeys(c_sons) if s not in set(c_daughters)]
+        
+        return c_sons, c_daughters
+
+    def _pick_predeceased_from_hujja_full(self, txt_name, txt_date, txt_spouse, spin_sons, spin_daug, txt_gc, gc_edits, combo_status, combo_gender, txt_hn=None, txt_hd=None, txt_hc=None):
         """Shows a popup menu with full details from scanned Hujjat Wafat."""
         menu = QMenu(self)
         menu.setStyleSheet("""
@@ -1434,6 +1707,8 @@ class TunisianFaridaDialog(QDialog):
             for lh in self.linked_hujaj:
                 d_name = lh.get("deceased_name", "").strip()
                 d_date = lh.get("hujja_date", "").strip()
+                d_num = lh.get("hujja_num", "").strip()
+                d_court = lh.get("hujja_court", "").strip()
                 w_name = lh.get("wife_name", "").strip() or lh.get("husband_name", "").strip()
                 s_cnt = lh.get("sons_count", 0)
                 d_cnt = lh.get("daughters_count", 0)
@@ -1443,8 +1718,8 @@ class TunisianFaridaDialog(QDialog):
                     label = f"⚰️ {d_name}" + (f" (وفاة: {d_date})" if d_date else "") + (f" — ذكور:{s_cnt} إناث:{d_cnt}" if (s_cnt or d_cnt) else "")
                     action = menu.addAction(label)
                     action.triggered.connect(
-                        lambda _, n=d_name, d=d_date, w=w_name, sn=s_cnt, dn=d_cnt, g=gc_names:
-                            self._apply_predeceased_full_choice(txt_name, txt_date, txt_spouse, spin_sons, spin_daug, txt_gc, gc_edits, combo_status, combo_gender, n, d, w, sn, dn, g)
+                        lambda _, n=d_name, d=d_date, w=w_name, sn=s_cnt, dn=d_cnt, g=gc_names, hn=d_num, hd=d_date, hc=d_court, lh_dict=lh:
+                            self._apply_predeceased_full_choice(txt_name, txt_date, txt_spouse, spin_sons, spin_daug, txt_gc, gc_edits, combo_status, combo_gender, txt_hn, txt_hd, txt_hc, n, d, w, sn, dn, g, hn, hd, hc, lh=lh_dict)
                     )
 
         if hasattr(self, "main_parsed") and self.main_parsed:
@@ -1461,7 +1736,7 @@ class TunisianFaridaDialog(QDialog):
                         action = menu.addAction(f"👤 {nm.strip()}")
                         action.triggered.connect(
                             lambda _, n=nm.strip():
-                                self._apply_predeceased_full_choice(txt_name, txt_date, txt_spouse, spin_sons, spin_daug, txt_gc, gc_edits, combo_status, combo_gender, n, "", "", 0, 0, "")
+                                self._apply_predeceased_full_choice(txt_name, txt_date, txt_spouse, spin_sons, spin_daug, txt_gc, gc_edits, combo_status, combo_gender, txt_hn, txt_hd, txt_hc, n, "", "", 0, 0, "", "", "", "")
                         )
 
         if not options_found:
@@ -1474,7 +1749,7 @@ class TunisianFaridaDialog(QDialog):
         else:
             menu.exec(QCursor.pos())
 
-    def _apply_predeceased_full_choice(self, txt_name, txt_date, txt_spouse, spin_sons, spin_daug, txt_gc, gc_edits, combo_status, combo_gender, n, d, w, sn, dn, g):
+    def _apply_predeceased_full_choice(self, txt_name, txt_date, txt_spouse, spin_sons, spin_daug, txt_gc, gc_edits, combo_status, combo_gender, txt_hn=None, txt_hd=None, txt_hc=None, n="", d="", w="", sn=0, dn=0, g="", hn="", hd="", hc="", lh=None):
         if n:
             txt_name.setText(n)
             if is_female_name(n):
@@ -1483,17 +1758,36 @@ class TunisianFaridaDialog(QDialog):
                 combo_gender.setCurrentIndex(0)
         if d: txt_date.setText(d)
         if w: txt_spouse.setText(w)
+        if hn and txt_hn: txt_hn.setText(hn)
+        if hd and txt_hd: txt_hd.setText(hd)
+        if hc and txt_hc: txt_hc.setText(hc)
+
+        c_sons_names, c_daughters_names = [], []
+        if lh:
+            c_sons_names, c_daughters_names = self._extract_linked_hujja_children(lh)
+
+        if c_sons_names or c_daughters_names:
+            sn = max(sn, len(c_sons_names))
+            dn = max(dn, len(c_daughters_names))
+
         if sn > 0 or dn > 0 or w:
             combo_status.setCurrentIndex(0)
             spin_sons.setValue(sn)
             spin_daug.setValue(dn)
-        if g:
-            txt_gc.setText(g)
-            if gc_edits:
-                names_list = [nx.strip() for nx in re.split(r'[,،\n;/]+', g) if nx.strip()]
-                for idx_n, n_val in enumerate(names_list):
-                    if idx_n < len(gc_edits):
-                        gc_edits[idx_n].setText(n_val)
+
+        if c_sons_names or c_daughters_names:
+            for s_idx, s_name in enumerate(c_sons_names):
+                if s_idx < sn and s_idx < len(gc_edits):
+                    gc_edits[s_idx].setText(s_name)
+            for d_idx, d_name in enumerate(c_daughters_names):
+                target_idx = sn + d_idx
+                if d_idx < dn and target_idx < len(gc_edits):
+                    gc_edits[target_idx].setText(d_name)
+        elif g and gc_edits:
+            names_list = [nx.strip() for nx in re.split(r'[,،\n;/]+', g) if nx.strip()]
+            for idx_n, n_val in enumerate(names_list):
+                if idx_n < len(gc_edits):
+                    gc_edits[idx_n].setText(n_val)
 
     def refresh_predeceased_widgets(self):
         """Dynamically builds detailed name, gender (male/female), death date, marriage status, spouse, and children fields for each predeceased child."""
@@ -1572,18 +1866,54 @@ class TunisianFaridaDialog(QDialog):
             top_lay.addWidget(txt_date, 2)
             card_lay.addLayout(top_lay)
 
-            # --- Row 2: Marital & Family Status ---
+            # --- Row 1.5: Hujjat Wafat Sub-row (Num, Date, Court) ---
+            hujja_sub_lay = QHBoxLayout()
+            hujja_sub_lay.setSpacing(6)
+
+            lbl_hujja_t = QLabel("حجة وفاة الابن(ة):", row_card)
+            lbl_hujja_t.setStyleSheet("color: #475569; font-size: 11px; font-weight: bold;")
+
+            txt_p_hujja_num = QLineEdit(row_card)
+            txt_p_hujja_num.setPlaceholderText("رقم حجة وفاة الابن(ة)")
+            txt_p_hujja_num.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 6px; font-size: 11px;")
+            txt_p_hujja_num.textChanged.connect(self.on_calculate_clicked)
+
+            txt_p_hujja_date = DatePickerLineEdit(row_card, placeholder="تاريخ حجة الوفاة")
+            txt_p_hujja_date.textChanged.connect(self.on_calculate_clicked)
+
+            txt_p_hujja_court = QLineEdit(row_card)
+            txt_p_hujja_court.setPlaceholderText("المحكمة الصادرة عنها")
+            txt_p_hujja_court.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 6px; font-size: 11px;")
+            txt_p_hujja_court.textChanged.connect(self.on_calculate_clicked)
+
+            hujja_sub_lay.addWidget(lbl_hujja_t)
+            hujja_sub_lay.addWidget(txt_p_hujja_num, 2)
+            hujja_sub_lay.addWidget(txt_p_hujja_date, 2)
+            hujja_sub_lay.addWidget(txt_p_hujja_court, 3)
+            card_lay.addLayout(hujja_sub_lay)
+
             family_bar = QHBoxLayout()
-            family_bar.setSpacing(8)
+            lbl_timing = QLabel("زمن الوفاة:", row_card)
+            lbl_timing.setStyleSheet("color: #1e3a8a; font-size: 11px; font-weight: bold;")
+
+            combo_timing = QComboBox(row_card)
+            combo_timing.addItems([
+                "توفي في حياة الهالك الأصلي (قبل وفاته) — وصية واجبة (الفصل 191)",
+                "توفي بعد الهالك الأصلي — (مناسخة وتوزيع تركات متتالية)"
+            ])
+            combo_timing.setStyleSheet("QComboBox { background: #eff6ff; border: 1px solid #93c5fd; border-radius: 4px; padding: 3px 6px; font-size: 11px; color: #1e40af; font-weight: bold; }")
+            combo_timing.currentIndexChanged.connect(self.on_calculate_clicked)
 
             lbl_status = QLabel("الحالة العائلية:", row_card)
             lbl_status.setStyleSheet("color: #334155; font-size: 11px; font-weight: bold;")
 
             combo_status = QComboBox(row_card)
-            combo_status.addItems(["متزوج(ة) / ترك أفراد عائلة (أولاد/زوجة)", "أعزب(ة) / غير متزوج(ة)"])
+            combo_status.addItems(["متزوج(ة) / ترك أفراد عائلة (أولاد/زوجة)", "أعزب(ة) / غير متزوج(ة)", "مطلق(ة) / بدون أبناء (لا زوج/زوجة ولا أولاد)"])
             combo_status.setStyleSheet("QComboBox { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; font-size: 11px; }")
             combo_status.currentIndexChanged.connect(self.on_calculate_clicked)
 
+            family_bar.addWidget(lbl_timing)
+            family_bar.addWidget(combo_timing, 2)
             family_bar.addWidget(lbl_status)
             family_bar.addWidget(combo_status, 2)
             family_bar.addStretch()
@@ -1667,8 +1997,15 @@ class TunisianFaridaDialog(QDialog):
                     txt_m.setPlaceholderText(f"الاسم الكامل للحفيد الذكر {si}")
                     txt_m.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; font-size: 11px;")
                     txt_m.textChanged.connect(self.on_calculate_clicked)
+
+                    btn_del_m = QPushButton("❌ حذف", frame)
+                    btn_del_m.setToolTip("حذف هذا الحفيد الذكر وتخفيض العدد")
+                    btn_del_m.setStyleSheet("background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold;")
+                    btn_del_m.clicked.connect(lambda _, sp=s_sp: sp.setValue(max(0, sp.value() - 1)))
+
                     r_lay.addWidget(lbl_m)
                     r_lay.addWidget(txt_m, 1)
+                    r_lay.addWidget(btn_del_m)
                     lay.addLayout(r_lay)
                     edits.append(txt_m)
 
@@ -1683,14 +2020,21 @@ class TunisianFaridaDialog(QDialog):
                     txt_f.setPlaceholderText(f"الاسم الكامل للحفيدة الأنثى {di}")
                     txt_f.setStyleSheet("background: #ffffff; border: 1px solid #cbd5e1; border-radius: 4px; padding: 3px 6px; font-size: 11px;")
                     txt_f.textChanged.connect(self.on_calculate_clicked)
+
+                    btn_del_f = QPushButton("❌ حذف", frame)
+                    btn_del_f.setToolTip("حذف هذه الحفيدة الأنثى وتخفيض العدد")
+                    btn_del_f.setStyleSheet("background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: bold;")
+                    btn_del_f.clicked.connect(lambda _, sp=d_sp: sp.setValue(max(0, sp.value() - 1)))
+
                     r_lay.addWidget(lbl_f)
                     r_lay.addWidget(txt_f, 1)
+                    r_lay.addWidget(btn_del_f)
                     lay.addLayout(r_lay)
                     edits.append(txt_f)
 
-            spin_sons.valueChanged.connect(lambda _: _update_gc_inputs())
-            spin_daug.valueChanged.connect(lambda _: _update_gc_inputs())
-            combo_gender.currentIndexChanged.connect(lambda _: _update_gc_inputs())
+            spin_sons.valueChanged.connect(lambda _, fn=_update_gc_inputs: fn())
+            spin_daug.valueChanged.connect(lambda _, fn=_update_gc_inputs: fn())
+            combo_gender.currentIndexChanged.connect(lambda _, fn=_update_gc_inputs: fn())
             _update_gc_inputs()
 
             # Hidden single QLineEdit fallback for compatibility
@@ -1719,8 +2063,8 @@ class TunisianFaridaDialog(QDialog):
             combo_status.currentIndexChanged.connect(lambda idx, p=sub_panel: p.setVisible(idx == 0))
 
             btn_from_hujja.clicked.connect(
-                lambda _, n=txt_name, d=txt_date, s=txt_spouse, sn=spin_sons, dn=spin_daug, g=txt_gc, g_edits=gc_name_edits, cs=combo_status, cg=combo_gender:
-                    self._pick_predeceased_from_hujja_full(n, d, s, sn, dn, g, g_edits, cs, cg)
+                lambda _, n=txt_name, d=txt_date, s=txt_spouse, sn=spin_sons, dn=spin_daug, g=txt_gc, g_edits=gc_name_edits, cs=combo_status, cg=combo_gender, hn=txt_p_hujja_num, hd=txt_p_hujja_date, hc=txt_p_hujja_court:
+                    self._pick_predeceased_from_hujja_full(n, d, s, sn, dn, g, g_edits, cs, cg, hn, hd, hc)
             )
 
             # Auto-prefill if linked_hujaj entries exist at index i - 1
@@ -1744,25 +2088,45 @@ class TunisianFaridaDialog(QDialog):
                 if w_name:
                     txt_spouse.setText(w_name)
 
-                s_num = lh.get("sons_count", 0)
-                d_num = lh.get("daughters_count", 0)
+                if lh.get("hujja_num"): txt_p_hujja_num.setText(str(lh["hujja_num"]).strip())
+                if lh.get("hujja_date"): txt_p_hujja_date.setText(str(lh["hujja_date"]).strip())
+                if lh.get("hujja_court"): txt_p_hujja_court.setText(str(lh["hujja_court"]).strip())
+
+                c_sons_names, c_daughters_names = self._extract_linked_hujja_children(lh)
+                s_num = max(lh.get("sons_count", 0), len(c_sons_names))
+                d_num = max(lh.get("daughters_count", 0), len(c_daughters_names))
+
                 if s_num > 0 or d_num > 0 or w_name or lh.get("wife") or lh.get("husband"):
                     combo_status.setCurrentIndex(0)
                     spin_sons.setValue(s_num)
                     spin_daug.setValue(d_num)
-                gc_n = "، ".join(lh.get("names", []))
-                if gc_n:
-                    txt_gc.setText(gc_n)
-                    names_list = [nx.strip() for nx in re.split(r'[,،\n;/]+', gc_n) if nx.strip()]
-                    for idx_n, n_val in enumerate(names_list):
-                        if idx_n < len(gc_name_edits):
-                            gc_name_edits[idx_n].setText(n_val)
+
+                if c_sons_names or c_daughters_names:
+                    for s_idx, s_name in enumerate(c_sons_names):
+                        if s_idx < s_num and s_idx < len(gc_name_edits):
+                            gc_name_edits[s_idx].setText(s_name)
+                    for d_idx, d_name in enumerate(c_daughters_names):
+                        target_idx = s_num + d_idx
+                        if d_idx < d_num and target_idx < len(gc_name_edits):
+                            gc_name_edits[target_idx].setText(d_name)
+                else:
+                    gc_n = "، ".join(lh.get("names", []))
+                    if gc_n:
+                        txt_gc.setText(gc_n)
+                        names_list = [nx.strip() for nx in re.split(r'[,،\n;/]+', gc_n) if nx.strip()]
+                        for idx_n, n_val in enumerate(names_list):
+                            if idx_n < len(gc_name_edits):
+                                gc_name_edits[idx_n].setText(n_val)
 
             self.predeceased_children_layout.addWidget(row_card)
             self.predeceased_inputs[i] = {
                 "name": txt_name,
                 "date": txt_date,
+                "hujja_num": txt_p_hujja_num,
+                "hujja_date": txt_p_hujja_date,
+                "hujja_court": txt_p_hujja_court,
                 "combo_gender": combo_gender,
+                "combo_timing": combo_timing,
                 "combo_status": combo_status,
                 "spouse_name": txt_spouse,
                 "sons_spin": spin_sons,
@@ -1897,15 +2261,23 @@ class TunisianFaridaDialog(QDialog):
                 }
 
         predeceased_list = []
+        successive_deaths_list = []
         predeceased_details_list = []
         for idx, pdata in getattr(self, "predeceased_inputs", {}).items():
             name_val = pdata["name"].text().strip()
             date_val = pdata["date"].text().strip()
+            hn_val = pdata.get("hujja_num", QLineEdit()).text().strip()
+            hd_val = pdata.get("hujja_date", QLineEdit()).text().strip()
+            hc_val = pdata.get("hujja_court", QLineEdit()).text().strip()
             combo_g = pdata.get("combo_gender")
             is_female = (combo_g.currentIndex() == 1) if combo_g else False
 
+            combo_tm = pdata.get("combo_timing")
+            death_timing = "after" if (combo_tm and combo_tm.currentIndex() == 1) else "before"
+
             combo_st = pdata.get("combo_status")
             is_married = (combo_st.currentIndex() == 0) if combo_st else True
+            is_divorced = (combo_st.currentIndex() == 2) if combo_st else False
 
             sp_val = pdata.get("spouse_name", QLineEdit()).text().strip()
             s_spin = pdata.get("sons_spin")
@@ -1921,17 +2293,33 @@ class TunisianFaridaDialog(QDialog):
                 parts = re.split(r'[,،\n;/]+', gc_txt)
                 raw_gc_names = [p.strip() for p in parts if p.strip()]
 
-            predeceased_list.append({
+            entry_item = {
                 "index": idx,
                 "parent_name": name_val if name_val else f"رقم {idx}",
+                "deceased_name": name_val if name_val else f"رقم {idx}",
                 "parent_gender": "female" if is_female else "male",
                 "death_date": date_val,
+                "hujja_num": hn_val,
+                "hujja_date": hd_val,
+                "hujja_court": hc_val,
                 "is_married": is_married,
+                "is_divorced": is_divorced,
                 "spouse_name": sp_val,
+                "wife_name": sp_val if not is_female else "",
+                "husband_name": sp_val if is_female else "",
+                "wife": is_married and not is_female and bool(sp_val),
+                "husband": is_married and is_female and bool(sp_val),
                 "sons_count": s_cnt,
                 "daughters_count": d_cnt,
-                "grandchildren_names": raw_gc_names
-            })
+                "grandchildren_names": raw_gc_names,
+                "names": raw_gc_names,
+                "death_timing": death_timing
+            }
+
+            if death_timing == "after":
+                successive_deaths_list.append(entry_item)
+            else:
+                predeceased_list.append(entry_item)
 
             child_title = "البنت المتوفاة" if is_female else "الابن المتوفى"
             verb_died = "توفيت" if is_female else "توفي"
@@ -1958,6 +2346,11 @@ class TunisianFaridaDialog(QDialog):
                         m_parts.append(f"من الأبناء {' و'.join(ch_info)}")
                     if m_parts:
                         item_str += f" و{verb_left} " + " و".join(m_parts)
+                elif is_divorced:
+                    divorced_label = "المطلقة" if is_female else "المطلق"
+                    item_str = f"{child_title} سابقاً {divorced_label} {p_name}"
+                    if date_clean:
+                        item_str += f" {verb_died} بتاريخ {date_clean}"
                 else:
                     unmarried_label = "غير المتزوجة" if is_female else "غير المتزوج"
                     item_str = f"{child_title} سابقاً {unmarried_label} {p_name}"
@@ -1966,6 +2359,16 @@ class TunisianFaridaDialog(QDialog):
                 predeceased_details_list.append(item_str)
         predeceased_str = "؛ ".join(predeceased_details_list)
         heirs_input['predeceased_list'] = predeceased_list
+        heirs_input['successive_deaths_list'] = successive_deaths_list
+
+        prop_type_val = ""
+        if hasattr(self, "combo_property_type"):
+            if self.combo_property_type.currentIndex() == self.combo_property_type.count() - 1:
+                prop_type_val = self.txt_custom_property_type.text().strip()
+            else:
+                prop_type_val = self.combo_property_type.currentText().strip()
+
+        dec_m2_val = self.spin_deceased_m2.value() if hasattr(self, "spin_deceased_m2") else 0.0
 
         res = self.engine.calculate_farida(
             heirs_dict=heirs_input,
@@ -1980,10 +2383,16 @@ class TunisianFaridaDialog(QDialog):
             property_name=self.txt_property_name.text().strip(),
             location=self.txt_location.text().strip(),
             property_area_m2=self.spin_m2.value(),
+            deceased_m2=dec_m2_val,
             property_parts=self.spin_parts.value(),
-            property_type=getattr(self, "combo_property_type", None).currentText() if hasattr(self, "combo_property_type") else "",
+            property_type=prop_type_val,
             predeceased_death_date=predeceased_str,
-            heir_details=heir_details
+            heir_details=heir_details,
+            parts_unit="جزءاً" if (hasattr(self, 'cmb_parts_unit') and self.cmb_parts_unit.currentIndex() == 0) else "سهماً",
+            proof_of_death_source="property_title" if (hasattr(self, 'radio_property_title') and self.radio_property_title.isChecked()) else "hujja_wafat",
+            cpf_death_date=self.txt_cpf_death_date.text().strip() if hasattr(self, 'txt_cpf_death_date') else "",
+            cpf_volume_num=self.txt_cpf_vol_num.text().strip() if hasattr(self, 'txt_cpf_vol_num') else "",
+            cpf_entry_num=self.txt_cpf_entry_num.text().strip() if hasattr(self, 'txt_cpf_entry_num') else ""
         )
         self.last_result = res
 
@@ -2211,7 +2620,8 @@ class TunisianFaridaDialog(QDialog):
             if r_item.get("area_m2", 0) > 0:
                 prop_str += f"{r_item['area_m2']} م²"
             if r_item.get("parts", 0) > 0:
-                prop_str += f" | {r_item['parts']} جزء"
+                unit_name = "جزء" if (hasattr(self, 'cmb_parts_unit') and self.cmb_parts_unit.currentIndex() == 0) else "سهم"
+                prop_str += f" | {r_item['parts']} {unit_name}"
             self.table.setItem(row, 5, QTableWidgetItem(prop_str if prop_str else "—"))
 
         final_text = res.get("legal_notarial_text", "")
@@ -2426,12 +2836,24 @@ class TunisianFaridaDialog(QDialog):
             sons_names = parsed.get('sons_names', [])
             daughters_names = parsed.get('daughters_names', [])
 
+            sp_names = {wife_name_parsed.strip(), str(parsed.get('husband_name') or '').strip()} - {""}
+            extracted_names = [n for n in extracted_names if n.strip() not in sp_names]
+
             if not sons_names and not daughters_names and extracted_names:
                 for n in extracted_names:
-                    if is_female_name(n):
+                    if is_female_name(n) or _is_female_name(n):
                         daughters_names.append(n)
                     else:
                         sons_names.append(n)
+
+            max_s_count = max(parsed.get('sons_count', 0), len(sons_names))
+            max_d_count = max(parsed.get('daughters_count', 0), len(daughters_names))
+            if max_s_count > 0 or max_d_count > 0:
+                self.spin_sons.setValue(max_s_count)
+                self.spin_daug.setValue(max_d_count)
+                parsed['sons_count'] = max_s_count
+                parsed['daughters_count'] = max_d_count
+                self.refresh_heir_details_widgets()
 
             # Populate sons into son_X inputs
             s_idx = 0
@@ -2466,12 +2888,215 @@ class TunisianFaridaDialog(QDialog):
                 f"اسم الهالك(ة): {parsed.get('deceased_name') or 'غير محدد'}\n"
                 f"اسم طالب الإشهاد: {parsed.get('applicant_name') or 'غير محدد'}\n"
                 f"حجة الوفاة: عدد {parsed.get('hujja_num') or 'غير محدد'} بتاريخ {parsed.get('hujja_date') or 'غير محدد'} ({parsed.get('hujja_court') or 'غير محدد'})\n"
-                f"عدد الذكور (الأبناء): {parsed.get('sons_count', 0)}\n"
-                f"عدد الإناث (البنات): {parsed.get('daughters_count', 0)}\n"
+                f"عدد الذكور (الأبناء): {self.spin_sons.value()}\n"
+                f"عدد الإناث (البنات): {self.spin_daug.value()}\n"
                 f"أسماء الورثة المستخرجين: {heir_names_str}\n\n"
                 f"💡 لمسح حجج الأبناء المتوفين قبله، استخدم زر 'إضافة حجة وفاة ابن/بنت'."
             )
             QMessageBox.information(self, "نجاح الاستيراد التلقائي", msg)
+
+    def import_rasm_akari_form2_file(self):
+        """Scans Real Estate Title Certificate / Death Registration (الرسم العقاري / ترسيم وفاة - صفحة واحدة أو متعدد الصفحات) for Form 2 Farida when Hujjat Wafat is missing."""
+        dlg = RasmUploadPopupDialog(self, title="استيراد وتفريغ وثيقة الرسم العقاري (Rasm L3akari)")
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        file_paths = dlg.get_selected_paths()
+        if not file_paths:
+            return
+
+        progress = QProgressDialog("🤖 جاري مسح وقراءة كافة صفحات وثيقة الرسم العقاري بواسطة الذكاء الاصطناعي...\nالمرجو الانتظار لحظات لإنهاء المعالجة.", None, 0, 0, self)
+        progress.setWindowTitle("مسح ترسيم الوفاة العقاري (AI Multi-Page Reading...)")
+        progress.setWindowModality(Qt.WindowModality.WindowModal)
+        progress.show()
+        QApplication.processEvents()
+
+        try:
+            from pathlib import Path
+            extracted_texts = []
+            image_bytes_list = []
+            for fp in file_paths:
+                p = Path(fp)
+                if p.suffix.lower() in [".png", ".jpg", ".jpeg"]:
+                    image_bytes_list.append(p.read_bytes())
+                elif p.suffix.lower() == ".txt":
+                    txt = p.read_text(encoding="utf-8", errors="ignore")
+                    if txt.strip(): extracted_texts.append(txt.strip())
+                elif p.suffix.lower() == ".pdf":
+                    try:
+                        import pypdf
+                        reader = pypdf.PdfReader(fp)
+                        txt = "\n".join([page.extract_text() or "" for page in reader.pages])
+                        if txt.strip(): extracted_texts.append(txt.strip())
+                        if len(txt.strip()) < 50:
+                            for page in reader.pages:
+                                for img in page.images:
+                                    if img.data and len(img.data) > 1000:
+                                        image_bytes_list.append(img.data)
+                    except Exception:
+                        pass
+
+            title_num = ""
+            prop_name = ""
+            location = ""
+            total_m2 = 0.0
+            parts_num = 0.0
+            vol_num = ""
+            entry_num = ""
+            reg_date = ""
+            dec_name = ""
+            death_date = ""
+            wife_name = ""
+            husband_name = ""
+            sons_names = []
+            daughters_names = []
+            sons_cnt = 0
+            daug_cnt = 0
+            extracted_text = "\n\n".join(extracted_texts).strip()
+
+            parsed_data = {}
+            if image_bytes_list:
+                try:
+                    try:
+                        import ocr_engine
+                    except ImportError:
+                        import core.ocr_engine as ocr_engine
+                    payload = image_bytes_list if len(image_bytes_list) > 1 else image_bytes_list[0]
+                    res_t = ocr_engine.extract_title_document_data(payload)
+                    if res_t.get("success"):
+                        if res_t.get("data"): parsed_data = res_t["data"]
+                        if res_t.get("raw_text"): extracted_text += "\n" + res_t["raw_text"]
+                except Exception:
+                    pass
+
+            if not parsed_data and extracted_text:
+                try:
+                    from farida_engine import parse_title_document_text
+                except ImportError:
+                    from core.farida_engine import parse_title_document_text
+                parsed_data = parse_title_document_text(extracted_text)
+
+            if parsed_data:
+                title_num = str(parsed_data.get("title_num") or "").strip()
+                prop_name = str(parsed_data.get("property_name") or "").strip()
+                location = str(parsed_data.get("location") or "").strip()
+                total_m2 = float(parsed_data.get("property_area_m2") or 0.0)
+                parts_num = float(parsed_data.get("property_parts") or 0.0)
+                vol_num = str(parsed_data.get("vol_num") or "").strip()
+                entry_num = str(parsed_data.get("entry_num") or "").strip()
+                reg_date = str(parsed_data.get("reg_date") or "").strip()
+                dec_name = str(parsed_data.get("deceased_name") or "").strip()
+                death_date = str(parsed_data.get("death_date") or "").strip()
+                wife_name = str(parsed_data.get("wife_name") or "").strip()
+                husband_name = str(parsed_data.get("husband_name") or "").strip()
+                sons_names = parsed_data.get("sons_names") or []
+                daughters_names = parsed_data.get("daughters_names") or []
+                sons_cnt = int(parsed_data.get("sons_count") or len(sons_names))
+                daug_cnt = int(parsed_data.get("daughters_count") or len(daughters_names))
+
+            # Helper to clean volume numbers (e.g. 2026/1z or 2026/1x -> 2026/1)
+            def _clean_vol(v_str):
+                if not v_str: return ""
+                v = str(v_str).strip()
+                v = re.sub(r"(\d+/\d+)[a-zA-Zأ-ي]+$", r"\1", v)
+                v = re.sub(r"[a-zA-Zأ-ي]+$", "", v)
+                return v.strip()
+
+            vol_num = _clean_vol(vol_num)
+
+            # Smart regex fallback if any field is still missing from raw text
+            if extracted_text:
+                if not title_num:
+                    m_t = re.search(r"(?:الرسم\s*العقاري|معرف\s+الرسم)\s*[:：]?\s*([\d\s\wأ-ي]+)", extracted_text)
+                    if m_t: title_num = m_t.group(1).strip()
+
+                if not vol_num:
+                    m_vol = re.search(r"(?:المجلد|مجلد)\s*[:：]?\s*([\d\/a-zA-Z]+)", extracted_text)
+                    if m_vol: vol_num = _clean_vol(m_vol.group(1))
+
+                if not entry_num:
+                    m_ent = re.search(r"(?:عدد|العدد)\s*[:：]?\s*(\d+)", extracted_text)
+                    if m_ent: entry_num = m_ent.group(1).strip()
+
+                if not reg_date:
+                    m_dt = re.search(r"(?:التاريخ|بتاريخ|تاريخ\s*الترسيم)\s*[:：]?\s*(\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{1,2}[-/.]\d{1,2}[-/.]\d{4})", extracted_text)
+                    if m_dt: reg_date = m_dt.group(1).strip()
+
+                if not dec_name:
+                    m_dec = re.search(r"(?:أن\s+السيد|المرحوم|المتوفى|الهالك)\s*[:：]?\s*([^\n،,]{5,50}?)(?:قد\s+توفي|توفي)", extracted_text)
+                    if m_dec: dec_name = m_dec.group(1).strip()
+
+                if not wife_name:
+                    m_w = re.search(r"زوجته\s+([^\n،,]{5,50}?)(?:مولودة|قد|وإليك)", extracted_text)
+                    if m_w: wife_name = m_w.group(1).strip()
+
+            # 1. Fill Registration & Property Info
+            if reg_date: self.txt_cpf_death_date.setText(reg_date)
+            if vol_num: self.txt_cpf_vol_num.setText(vol_num)
+            if entry_num: self.txt_cpf_entry_num.setText(entry_num)
+            if title_num: self.txt_title_num.setText(title_num)
+            if prop_name: self.txt_property_name.setText(prop_name)
+            if location: self.txt_location.setText(location)
+            if total_m2 > 0: self.spin_m2.setValue(total_m2)
+            if parts_num > 0: self.spin_parts.setValue(parts_num)
+
+            # 2. Fill Deceased Name
+            if dec_name:
+                self.txt_deceased_name.setText(dec_name)
+
+            # 3. Fill Spouse & Children in Heirs Engine
+            if wife_name or (parsed_data and parsed_data.get("wife")):
+                self.cb_wife.setChecked(True)
+            if husband_name or (parsed_data and parsed_data.get("husband")):
+                self.cb_husband.setChecked(True)
+
+            max_sons = max(sons_cnt, len(sons_names))
+            max_daugs = max(daug_cnt, len(daughters_names))
+            if max_sons > 0: self.spin_sons.setValue(max_sons)
+            if max_daugs > 0: self.spin_daug.setValue(max_daugs)
+
+            self.refresh_heir_details_widgets()
+
+            if wife_name and "wife_1" in self.heir_inputs:
+                self.heir_inputs["wife_1"]["name"].setText(wife_name)
+            if husband_name and "husband" in self.heir_inputs:
+                self.heir_inputs["husband"]["name"].setText(husband_name)
+
+            for s_idx, s_n in enumerate(sons_names, 1):
+                hk = f"son_{s_idx}"
+                if hk in self.heir_inputs:
+                    self.heir_inputs[hk]["name"].setText(s_n)
+
+            for d_idx, d_n in enumerate(daughters_names, 1):
+                hk = f"daughter_{d_idx}"
+                if hk in self.heir_inputs:
+                    self.heir_inputs[hk]["name"].setText(d_n)
+
+            self.radio_property_title.setChecked(True)
+            self.on_calculate_clicked()
+
+            heir_summary = []
+            if wife_name: heir_summary.append(f"الزوجة: {wife_name}")
+            if husband_name: heir_summary.append(f"الزوج: {husband_name}")
+            if sons_names: heir_summary.append(f"الأبناء الذكور: {', '.join(sons_names)}")
+            if daughters_names: heir_summary.append(f"البنات الإناث: {', '.join(daughters_names)}")
+            heirs_str = " | ".join(heir_summary) if heir_summary else "تم إدخالهم في شجرة الورثة"
+
+            msg = (
+                f"✅ تم تفريغ معطيات ترسيم الوفاة بالرسم العقاري (Rasm L3akari) بنجاح:\n\n"
+                f"• اسم الهالك: {dec_name if dec_name else 'تم الاستخراج'}\n"
+                f"• تاريخ الوفاة: {death_date if death_date else 'مذكورة بالنص'}\n"
+                f"• الورثة المستخرجون: {heirs_str}\n"
+                f"• مراجع الترسيم: مجلد {vol_num or '—'} عدد {entry_num or '—'} (بتاريخ {reg_date or '—'})\n"
+                f"• الرسم العقاري: {title_num if title_num else 'غير محدد'}\n\n"
+                f"💡 تم ملء اسم الهالك والزوجة والورثة وأعدادهم ومراجع الترسيم وحساب الأنصبة الشرعية تلقائياً!"
+            )
+            QMessageBox.information(self, "نجاح مسح ترسيم الوفاة العقاري (النوع الثاني)", msg)
+
+        except Exception as e:
+            QMessageBox.warning(self, "خطأ في القراءة", f"تعذر قراءة الرسم العقاري: {e}")
+        finally:
+            progress.close()
 
     def scan_applicant_cin_card(self):
         """Scans Applicant CIN Card (بطاقة تعريف طالب الإشهاد) using Vision OCR and auto-fills name & CIN number."""
@@ -2586,6 +3211,16 @@ class TunisianFaridaDialog(QDialog):
             if parsed.get("location"): self.txt_location.setText(parsed["location"])
             if parsed.get("property_area_m2", 0) > 0: self.spin_m2.setValue(parsed["property_area_m2"])
             if parsed.get("property_parts", 0) > 0: self.spin_parts.setValue(parsed["property_parts"])
+
+            if parsed.get("cpf_death_date") or parsed.get("cpf_volume_num") or parsed.get("cpf_entry_num"):
+                if hasattr(self, "radio_property_title"):
+                    self.radio_property_title.setChecked(True)
+                if parsed.get("cpf_death_date") and hasattr(self, "txt_cpf_death_date"):
+                    self.txt_cpf_death_date.setText(parsed["cpf_death_date"])
+                if parsed.get("cpf_volume_num") and hasattr(self, "txt_cpf_vol_num"):
+                    self.txt_cpf_vol_num.setText(parsed["cpf_volume_num"])
+                if parsed.get("cpf_entry_num") and hasattr(self, "txt_cpf_entry_num"):
+                    self.txt_cpf_entry_num.setText(parsed["cpf_entry_num"])
 
             self.on_calculate_clicked()
             t_str = parsed.get('title_num') or 'غير محدد'
@@ -2761,13 +3396,14 @@ class TunisianFaridaDialog(QDialog):
             }
 
         parsed = parsed_data
-        dec_name = parsed.get("deceased_name") or ""
-        main_dec_name = (self.main_parsed.get("deceased_name", "") if self.main_parsed else self.txt_deceased_name.text()).strip()
-        main_heir_names = list(self.main_parsed.get("names", [])) if self.main_parsed else [h.get("name", "") for k, h in self.heir_inputs.items() if h.get("name")]
+        dec_name = (str(parsed.get("deceased_name") or "")).strip()
+        main_dec_val = (self.main_parsed.get("deceased_name") if self.main_parsed else None) or self.txt_deceased_name.text()
+        main_dec_name = (str(main_dec_val or "")).strip()
+        main_heir_names = [str(h) for h in (list(self.main_parsed.get("names", [])) if self.main_parsed else [h.get("name", "") for k, h in self.heir_inputs.items() if h.get("name")]) if h]
 
         # If deceased_name is still generic or unassigned, auto-assign from available unlinked heirs in main tree
         if not dec_name or dec_name == "غير محدد" or "حجة إضافية" in dec_name:
-            already_linked_names = {lh.get("deceased_name") for lh in self.linked_hujaj if lh.get("deceased_name")}
+            already_linked_names = {str(lh.get("deceased_name")) for lh in self.linked_hujaj if lh.get("deceased_name")}
             unlinked_heirs = [h for h in main_heir_names if h and h not in already_linked_names]
             if unlinked_heirs:
                 dec_name = unlinked_heirs[0]
@@ -2790,19 +3426,8 @@ class TunisianFaridaDialog(QDialog):
         self._refresh_linked_panel()
         self.btn_link_hujaj.setEnabled(True)
 
-        # Trigger automatic link and merge immediately
+        # Trigger automatic link and merge immediately (displays single summary popup)
         self.link_and_merge_hujaj()
-
-        sons = parsed.get("sons_count", 0)
-        daughters = parsed.get("daughters_count", 0)
-        QMessageBox.information(
-            self, "تم ربط الحجة بنجاح",
-            f"✅ تم الربط الآلي لحجة الوفاة بنجاح:\n"
-            f"• اسم الابن/البنت المتوفى: {dec_name}\n"
-            f"• الموروث الأصلي: {main_dec_name or 'الموروث الرئيسي'}\n"
-            f"• عدد أبنائه الذكور: {sons} | عدد بناته الإناث: {daughters}\n\n"
-            f"تم تصفية وتحديث منابات التركة التوثيقية آلياً."
-        )
 
     def _refresh_linked_panel(self):
         """Refreshes the linked hujaj panel with current entries."""
@@ -2818,10 +3443,10 @@ class TunisianFaridaDialog(QDialog):
             row_lay = QHBoxLayout(row_frame)
             row_lay.setContentsMargins(6, 3, 6, 3)
 
-            dec_name = hujja.get("deceased_name") or "غير محدد"
+            dec_name = (str(hujja.get("deceased_name") or "غير محدد")).strip()
             sons = hujja.get("sons_count", 0)
             daughters = hujja.get("daughters_count", 0)
-            names_str = "، ".join(hujja.get("names", [])) or "—"
+            names_str = "، ".join([str(n) for n in hujja.get("names", []) if n]) or "—"
 
             info_lbl = QLabel(
                 f"⚰️ <b>{dec_name}</b>  —  ذكور: {sons} | إناث: {daughters}  |  أبناؤه: {names_str}",
@@ -2853,6 +3478,8 @@ class TunisianFaridaDialog(QDialog):
     @staticmethod
     def _normalize_arabic(text: str) -> str:
         """Normalize Arabic text: strip tashkeel, unify alef, remove tatweel."""
+        if not text or not isinstance(text, str):
+            return ""
         import re
         text = re.sub(r'[\u064b-\u065f\u0670]', '', text)   # remove tashkeel
         text = re.sub(r'[أإآٱ]', 'ا', text)                  # unify alef
@@ -2868,8 +3495,10 @@ class TunisianFaridaDialog(QDialog):
         name_a and name_b (Arabic-normalized, case-insensitive).
         """
         norm = TunisianFaridaDialog._normalize_arabic
-        tokens_a = [t for t in norm(name_a).split() if len(t) > 1 and t not in {'بن', 'بنت', 'ابن', 'ولد', 'بنا'}]
-        tokens_b = [t for t in norm(name_b).split() if len(t) > 1 and t not in {'بن', 'bنت', 'ابن', 'ولد', 'bنا'}]
+        str_a = str(name_a or "")
+        str_b = str(name_b or "")
+        tokens_a = [t for t in norm(str_a).split() if len(t) > 1 and t not in {'بن', 'بنت', 'ابن', 'ولد', 'بنا'}]
+        tokens_b = [t for t in norm(str_b).split() if len(t) > 1 and t not in {'بن', 'bنت', 'ابن', 'ولد', 'bنا'}]
         if not tokens_a or not tokens_b:
             return False
         common = set(tokens_a[:3]) & set(tokens_b[:3])
@@ -2880,8 +3509,8 @@ class TunisianFaridaDialog(QDialog):
         Flexible & comprehensive relationship verification across multi-generational succession chains (المناسخات وتتابع التركات).
         """
         norm = TunisianFaridaDialog._normalize_arabic
-        nd = norm(d_name)
-        nm = norm(m_name) if m_name else ""
+        nd = norm(str(d_name or ""))
+        nm = norm(str(m_name or "")) if m_name else ""
         if not nd or any(w in nd for w in ['المتوفى', 'المتوفاة', 'غير محدد', 'حجة اضافية', 'تتابع التركات', 'الهالك', 'المرحوم']):
             return True, "تتابع التركات"
 
@@ -2892,15 +3521,15 @@ class TunisianFaridaDialog(QDialog):
         # 1. Match against primary heir names list
         d_first = nd.split()[0] if nd.split() else ""
         for h in heirs_list:
-            nh = norm(h)
+            nh = norm(str(h or ""))
             h_first = nh.split()[0] if nh.split() else ""
-            if d_first and h_first and (d_first == h_first or TunisianFaridaDialog._names_overlap(d_name, h, min_tokens=1)):
+            if d_first and h_first and (d_first == h_first or TunisianFaridaDialog._names_overlap(str(d_name), str(h), min_tokens=1)):
                 return True, h
 
         # 2. Match father/parent name token in deceased name against main deceased or any previous deceased in chain
         all_deceased_names = [m_name] + [h.get("deceased_name", "") for h in (existing_linked_hujaj or []) if h.get("deceased_name")]
         for prev_dec in all_deceased_names:
-            np = norm(prev_dec)
+            np = norm(str(prev_dec or ""))
             p_first = np.split()[0] if np.split() else ""
             if p_first and len(p_first) > 2 and p_first in nd:
                 return True, prev_dec
@@ -2910,7 +3539,7 @@ class TunisianFaridaDialog(QDialog):
         if len(d_parts) > 1:
             family_lakab = d_parts[-1]
             for prev_dec in all_deceased_names:
-                np = norm(prev_dec)
+                np = norm(str(prev_dec or ""))
                 p_parts = np.split()
                 if len(p_parts) > 1 and family_lakab == p_parts[-1]:
                     return True, prev_dec
@@ -2918,9 +3547,9 @@ class TunisianFaridaDialog(QDialog):
         # 4. Check if any previously loaded Hujja's heirs list contains d_name
         for prev_hujja in (existing_linked_hujaj or []):
             for h in prev_hujja.get("names", []):
-                nh = norm(h)
+                nh = norm(str(h or ""))
                 h_first = nh.split()[0] if nh.split() else ""
-                if d_first and h_first and (d_first == h_first or TunisianFaridaDialog._names_overlap(d_name, h, min_tokens=1)):
+                if d_first and h_first and (d_first == h_first or TunisianFaridaDialog._names_overlap(str(d_name), str(h), min_tokens=1)):
                     return True, h
 
         return False, None
@@ -2952,19 +3581,19 @@ class TunisianFaridaDialog(QDialog):
         unmatched_names = []
 
         for hujja in self.linked_hujaj:
-            dec_name = hujja.get('deceased_name', '').strip()
+            dec_name = (str(hujja.get('deceased_name') or '')).strip()
             if not dec_name:
                 continue
 
             # Try to find this name in main heirs list (min 1 matching name token)
             matched_heir = None
             for heir_name in main_names:
-                if self._names_overlap(dec_name, heir_name, min_tokens=1):
+                if heir_name and self._names_overlap(dec_name, str(heir_name), min_tokens=1):
                     matched_heir = heir_name
                     break
 
             if not matched_heir:
-                main_dec_name = self.txt_deceased_name.text().strip()
+                main_dec_name = (str(self.txt_deceased_name.text() or '')).strip()
                 if main_dec_name and self._names_overlap(dec_name, main_dec_name, min_tokens=1):
                     matched_heir = main_dec_name
                 elif dec_name:
@@ -2995,9 +3624,31 @@ class TunisianFaridaDialog(QDialog):
                 surviving_sons_names = []
                 for hk, h_data in list(self.heir_inputs.items()):
                     if hk.startswith("son_"):
-                        sn = h_data["name"].text().strip()
+                        w = h_data.get("name")
+                        sn = (str(w.text() if hasattr(w, "text") else "")).strip()
                         if sn and not self._names_overlap(dec_name, sn, min_tokens=1):
                             surviving_sons_names.append(sn)
+
+                # Clear cached_heir_names for sons to prevent stale name restoration
+                if hasattr(self, "cached_heir_names"):
+                    for k in list(self.cached_heir_names.keys()):
+                        if k.startswith("son_"):
+                            self.cached_heir_names.pop(k, None)
+
+                # Update main_parsed sons_names & heir_details
+                if self.main_parsed:
+                    self.main_parsed["sons_names"] = surviving_sons_names
+                    if "heir_details" in self.main_parsed:
+                        new_h_details = {}
+                        s_c = 1
+                        for hk, hv in self.main_parsed["heir_details"].items():
+                            if hk.startswith("son_"):
+                                if hv.get("name") and not self._names_overlap(dec_name, hv["name"], min_tokens=1):
+                                    new_h_details[f"son_{s_c}"] = hv
+                                    s_c += 1
+                            else:
+                                new_h_details[hk] = hv
+                        self.main_parsed["heir_details"] = new_h_details
 
                 curr_s = self.spin_sons.value()
                 if curr_s > 0:
@@ -3010,23 +3661,10 @@ class TunisianFaridaDialog(QDialog):
                     if target_hk in self.heir_inputs:
                         self.heir_inputs[target_hk]["name"].setText(sn_val)
 
-                c_sons_names = hujja.get('sons_names', [])
-                c_daughters_names = hujja.get('daughters_names', [])
-                
-                if not c_sons_names and not c_daughters_names and hujja.get('names'):
-                    for n in hujja['names']:
-                        if is_female_name(n):
-                            c_daughters_names.append(n)
-                        else:
-                            c_sons_names.append(n)
+                c_sons_names, c_daughters_names = self._extract_linked_hujja_children(hujja)
 
-                child_sons = int(hujja.get('sons_count', 0) or 0)
-                child_daughters = int(hujja.get('daughters_count', 0) or 0)
-
-                if child_sons == 0 and c_sons_names:
-                    child_sons = len(c_sons_names)
-                if child_daughters == 0 and c_daughters_names:
-                    child_daughters = len(c_daughters_names)
+                child_sons = len(c_sons_names)
+                child_daughters = len(c_daughters_names)
 
                 total_grandsons += child_sons
                 total_granddaughters += child_daughters

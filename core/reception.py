@@ -907,7 +907,7 @@ def enrol_face_from_photo(client_id: str, photo_path: str) -> Tuple[bool, str]:
             return False, ENROL_UNREADABLE
         from face_engine import FaceEngine
         fe = FaceEngine()
-        dets = fe.detect_and_extract(img_bgr)
+        dets = fe.detect_and_extract(img_bgr, extract_embedding=True)
         if not dets:
             return False, ENROL_NO_FACE
         emb_blob = serialize_embedding(dets[0]["embedding"])

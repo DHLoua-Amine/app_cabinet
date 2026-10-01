@@ -5,7 +5,7 @@ import time
 import cv2
 import numpy as np
 
-def check_ip_reachable(ip_url: str, timeout: float = 1.5) -> bool:
+def check_ip_reachable(ip_url: str, timeout: float = 2.5) -> bool:
     """Socket test to prevent OpenCV network freezes on offline IP cameras."""
     if not isinstance(ip_url, str):
         return True
@@ -36,6 +36,73 @@ def check_ip_reachable(ip_url: str, timeout: float = 1.5) -> bool:
         return True
     except Exception:
         return False
+
+
+def discover_ip_camera_on_subnet(saved_source: str, target_port: int = 8080) -> str:
+    """
+    Scans the local Wi-Fi subnet (e.g. 192.168.0.1..254) for an active IP webcam
+    if the phone's IP address changed on Wi-Fi (DHCP reassignment).
+    Returns the discovered stream URL if found, else original saved_source.
+    """
+    if not isinstance(saved_source, str) or not saved_source.strip():
+        return saved_source
+    src_str = saved_source.strip()
+    if src_str.isdigit():
+        return saved_source  # USB Camera
+    
+    # Extract port & host if available
+    port = target_port
+    clean = src_str
+    for proto in ("http://", "https://", "rtsp://"):
+        if clean.lower().startswith(proto):
+            clean = clean[len(proto):]
+            break
+    host_port = clean.split("/")[0].split("?")[0]
+    if ":" in host_port:
+        h, p_s = host_port.split(":")
+        try:
+            port = int(p_s)
+        except Exception:
+            pass
+        clean_host = h
+    else:
+        clean_host = host_port
+
+    parts = clean_host.split(".")
+    if len(parts) != 4:
+        return saved_source
+    subnet_prefix = ".".join(parts[:3])
+
+    import concurrent.futures
+    def _probe_host(i):
+        host_ip = f"{subnet_prefix}.{i}"
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.15)
+            res = s.connect_ex((host_ip, port))
+            s.close()
+            if res == 0:
+                # Test if it returns valid camera stream/image
+                test_url = f"http://{host_ip}:{port}/video"
+                if probe_camera_stream(test_url, timeout=0.8):
+                    return test_url
+        except Exception:
+            pass
+        return None
+
+    try:
+        ips_to_scan = range(1, 255)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=60) as ex:
+            results = ex.map(_probe_host, ips_to_scan)
+            for res_url in results:
+                if res_url:
+                    # Found live camera on subnet! Update saved configuration automatically
+                    set_saved_camera_source(res_url)
+                    return res_url
+    except Exception:
+        pass
+
+    return saved_source
 
 
 def probe_camera_stream(source, timeout: float = 2.5) -> bool:
@@ -153,74 +220,172 @@ class VideoCaptureThread:
 
     def _update(self):
         src = self.source
-        if isinstance(src, str):
-            src = src.strip()
-            while src.startswith("/"):
-                src = src[1:].strip()
-            if not src.startswith("http://") and not src.startswith("https://") and not src.startswith("rtsp://"):
-                src = "http://" + src
-            if not src.endswith("/video") and not src.startswith("rtsp") and not src.endswith("/shot.jpg") and not src.endswith("/mjpeg"):
-                src = src.rstrip("/") + "/video"
 
-        is_http = isinstance(src, str) and (
-            src.startswith("http://") or src.startswith("https://")
-        )
-        is_network = is_http or (isinstance(src, str) and (
-            src.startswith("rtsp://") or src.startswith("rtp://")
-        ))
-
-        # Fast non-blocking socket test to prevent OpenCV 30s network locks
-        if is_network and not check_ip_reachable(src, timeout=1.5):
-            self.running = False
-            self.failed = True
+        # 1. Local USB Camera (e.g. 0, 1)
+        if isinstance(src, int) or (isinstance(src, str) and str(src).strip().isdigit()):
+            dev_idx = int(src)
+            try:
+                self.cap = cv2.VideoCapture(dev_idx, cv2.CAP_ANY)
+                if self.cap and self.cap.isOpened():
+                    self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            except Exception:
+                pass
+            
+            if self.cap and self.cap.isOpened():
+                while self.running and self.cap and self.cap.isOpened():
+                    try:
+                        ret, frame = self.cap.read()
+                        if ret and frame is not None and frame.size > 0:
+                            h, w = frame.shape[:2]
+                            if w > 640:
+                                frame = cv2.resize(frame, (640, int(h * 640 / w)), interpolation=cv2.INTER_NEAREST)
+                            self.frame = frame
+                            self.ret = True
+                            time.sleep(0.001)
+                        else:
+                            time.sleep(0.02)
+                    except Exception:
+                        time.sleep(0.02)
+                if self.cap:
+                    try:
+                        self.cap.release()
+                    except Exception:
+                        pass
             return
 
-        # Engine 1: Try OpenCV VideoCapture first with FFMPEG nobuffer & low_delay flags
+        # 2. Network IP Camera (HTTP or RTSP)
+        src_str = str(src).strip()
+        while src_str.startswith("/"):
+            src_str = src_str[1:].strip()
+        if not src_str.startswith("http://") and not src_str.startswith("https://") and not src_str.startswith("rtsp://"):
+            src_str = "http://" + src_str
+
+        is_http = src_str.startswith("http://") or src_str.startswith("https://")
+
+        # Fast non-blocking socket reachability check
+        if not check_ip_reachable(src_str, timeout=1.5):
+            discovered = discover_ip_camera_on_subnet(src_str)
+            if discovered != src_str and check_ip_reachable(discovered, timeout=1.5):
+                src_str = discovered
+            else:
+                self.running = False
+                self.failed = True
+                return
+
+        # ENGINE A: Native High-Speed Zero-Latency Auto-Reconnecting MJPEG Stream Engine for IP Webcams
+        if is_http:
+            mjpeg_url = src_str
+            if not mjpeg_url.endswith("/video") and not mjpeg_url.endswith("/mjpeg") and not mjpeg_url.endswith("/shot.jpg"):
+                mjpeg_url = mjpeg_url.rstrip("/") + "/video"
+            
+            import urllib.request
+            reconnect_attempts = 0
+            last_frame_time = time.time()
+            engine_a_success = False
+
+            while self.running:
+                try:
+                    print(f"[🌐 CAMERA CONNECTING] Opening HTTP MJPEG stream at {mjpeg_url}...", flush=True)
+                    req = urllib.request.urlopen(mjpeg_url, timeout=3.0)
+                    if req.status == 200:
+                        print(f"[🌐 CAMERA CONNECTED] Connected to stream: {mjpeg_url}", flush=True)
+                        stream_bytes = b''
+                        consecutive_errs = 0
+                        reconnect_attempts = 0
+                        while self.running:
+                            try:
+                                chunk = req.read(16384)
+                                if not chunk:
+                                    break
+                                stream_bytes += chunk
+                                
+                                # Cap buffer size to 256KB max to prevent memory queuing
+                                if len(stream_bytes) > 262144:
+                                    stream_bytes = stream_bytes[-65536:]
+
+                                # Instant Buffer Drain: Jump straight to the LATEST complete frame
+                                last_end = stream_bytes.rfind(b'\xff\xd9')
+                                if last_end != -1:
+                                    start_idx = stream_bytes.rfind(b'\xff\xd8', 0, last_end)
+                                    if start_idx != -1:
+                                        jpg_data = stream_bytes[start_idx : last_end + 2]
+                                        stream_bytes = stream_bytes[last_end + 2:]
+                                        
+                                        img_arr = np.frombuffer(jpg_data, dtype=np.uint8)
+                                        frame = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
+                                        if frame is not None and frame.size > 0:
+                                            h, w = frame.shape[:2]
+                                            if w > 640:
+                                                frame = cv2.resize(frame, (640, int(h * 640 / w)), interpolation=cv2.INTER_NEAREST)
+                                            self.frame = frame
+                                            self.ret = True
+                                            self.last_frame_time = time.time()
+                                            last_frame_time = self.last_frame_time
+                                            engine_a_success = True
+                                            consecutive_errs = 0
+                                    else:
+                                        stream_bytes = stream_bytes[last_end + 2:]
+                                time.sleep(0.001)
+                            except Exception:
+                                consecutive_errs += 1
+                                if consecutive_errs > 15:
+                                    break
+                                time.sleep(0.02)
+                        req.close()
+                except Exception:
+                    reconnect_attempts += 1
+                    # If stream fails to connect/reconnect after 4 attempts or frame stale for 2.0s
+                    if reconnect_attempts > 4:
+                        self.ret = False
+                        if engine_a_success or (time.time() - last_frame_time > 2.0):
+                            break
+                    time.sleep(0.3)
+            
+            if engine_a_success and not self.running:
+                self.ret = False
+                self.frame = None
+                return
+
+        # ENGINE B: OpenCV VideoCapture with Buffer Flushing for RTSP / Fallback video streams
+        if is_http and not src_str.endswith("/video") and not src_str.endswith("/shot.jpg"):
+            src_str = src_str.rstrip("/") + "/video"
+
         try:
             import os
-            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;0"
-            self.cap = cv2.VideoCapture(src, cv2.CAP_FFMPEG if is_network else cv2.CAP_ANY)
+            os.environ["OPENCV_FFMPEG_CAPTURE_OPTIONS"] = "rtsp_transport;tcp|fflags;nobuffer|flags;low_delay|max_delay;0|probedelay;0|reorder_queue_size;0"
+            self.cap = cv2.VideoCapture(src_str, cv2.CAP_FFMPEG if is_http else cv2.CAP_ANY)
             if self.cap:
                 self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
         except Exception as e:
-            print(f"[Camera] OpenCV open failed for {src}: {e}")
+            print(f"[Camera] OpenCV VideoCapture open failed for {src_str}: {e}")
 
-        cv_worked = False
-        # Wait for the first frame for up to FIRST_FRAME_TIMEOUT_S rather than the old
-        # five attempts over 150 ms. Some cameras (and most phone/IP streams) open
-        # instantly but need a couple of seconds before they hand over a picture, and
-        # giving up in 150 ms declared those dead. Interruptible, so stopping the camera
-        # during the wait still takes effect immediately.
         if self.cap and self.cap.isOpened():
-            probe_deadline = time.time() + self.FIRST_FRAME_TIMEOUT_S
-            while self.running and time.time() < probe_deadline:
-                ret, frame = self.cap.read()
-                if ret and frame is not None:
-                    cv_worked = True
-                    self.ret = True
-                    # Downscale high-res mobile camera streams (1080p/4K) to 640px for ultra-fast 30 FPS rendering
-                    h, w = frame.shape[:2]
-                    if w > 640:
-                        frame = cv2.resize(frame, (640, int(h * 640 / w)), interpolation=cv2.INTER_NEAREST)
-                    self.frame = frame
-                    break
-                time.sleep(0.03)
-
-        if cv_worked:
-            # OpenCV is streaming cleanly
             consecutive_failures = 0
             while self.running and self.cap and self.cap.isOpened():
-                ret, frame = self.cap.read()
-                if ret and frame is not None:
-                    h, w = frame.shape[:2]
-                    if w > 640:
-                        frame = cv2.resize(frame, (640, int(h * 640 / w)), interpolation=cv2.INTER_NEAREST)
-                    self.ret = True
-                    self.frame = frame
-                    consecutive_failures = 0
-                    time.sleep(0.01)  # Smooth 30-60 FPS real-time stream
-                else:
-                    self.ret = False
+                try:
+                    # Flush extra queued frames from OpenCV internal FFmpeg buffer
+                    for _ in range(2):
+                        self.cap.grab()
+                    ret, frame = self.cap.retrieve()
+                    if not ret or frame is None:
+                        ret, frame = self.cap.read()
+                    
+                    if ret and frame is not None and frame.size > 0:
+                        h, w = frame.shape[:2]
+                        if w > 640:
+                            frame = cv2.resize(frame, (640, int(h * 640 / w)), interpolation=cv2.INTER_NEAREST)
+                        self.frame = frame
+                        self.ret = True
+                        self.last_frame_time = time.time()
+                        consecutive_failures = 0
+                        time.sleep(0.001)
+                    else:
+                        self.ret = False
+                        consecutive_failures += 1
+                        if consecutive_failures > 30:
+                            break
+                        time.sleep(0.03)
+                except Exception:
                     consecutive_failures += 1
                     if consecutive_failures > 30:
                         break
@@ -229,46 +394,15 @@ class VideoCaptureThread:
                 try:
                     self.cap.release()
                 except Exception:
-                    # (c) Safe. Releasing a capture that has already gone away -
-                    # unplugged, or released by the other exit path below.
                     pass
-
-        # If OpenCV failed or lost stream and source is HTTP, switch to Snapshot Engine (/shot.jpg)
-        if self.running and is_http:
-            base_url = src.rsplit('/', 1)[0]
-            shot_url = f"{base_url}/shot.jpg"
-            print(f"[Camera] Switching to Ultra-Fast HTTP Snapshot Engine: {shot_url}")
-            import urllib.request
-            import numpy as np
-
-            while self.running:
-                try:
-                    req = urllib.request.urlopen(shot_url, timeout=1)
-                    img_bytes = req.read()
-                    img_arr = np.frombuffer(img_bytes, dtype=np.uint8)
-                    frame = cv2.imdecode(img_arr, cv2.IMREAD_COLOR)
-                    if frame is not None:
-                        h, w = frame.shape[:2]
-                        if w > 1280:
-                            frame = cv2.resize(frame, (1280, int(h * 1280 / w)), interpolation=cv2.INTER_NEAREST)
-                        self.frame = frame
-                        self.ret = True
-                    time.sleep(0.03)
-                except Exception as e:
-                    self.ret = False
-                    time.sleep(0.2)
 
         if self.cap:
             try:
                 self.cap.release()
             except Exception:
-                # (c) Safe, same reason as above.
                 pass
 
-        # The capture loop has ended, so this device is finished. Without this the
-        # thread left running=True and ret=True with the last frame still in hand, so
-        # read_frame() kept serving that frozen image forever: an unplugged camera went
-        # on "recognising" whoever happened to be in view when it died.
+        # Complete teardown: mark thread as not running so CameraThread immediately notices stream termination
         self.ret = False
         self.frame = None
         self.running = False
@@ -280,8 +414,8 @@ class VideoCaptureThread:
         if self.ret and self.frame is not None:
             frame = self.frame
             try:
-                # Digital vertical ROI crop: crops ceiling out and shifts camera view down to face level
-                v_crop = 0.20
+                # Digital vertical ROI crop: disabled by default (0.0) to prevent chopping off forehead/eyes
+                v_crop = 0.0
                 if v_crop > 0.0:
                     h, w = frame.shape[:2]
                     top_cut = int(h * v_crop)

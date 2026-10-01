@@ -501,124 +501,80 @@ def _call_gemini_vision_dual(front_bytes: bytes, back_bytes: bytes, api_key: str
     return {"success": False, "transcription": "", "error": _render_failure(last_failure, len(keys))}
 
 
-def _call_openai_vision(image_bytes: bytes, api_key: str, model_name: str, prompt: str = TUNISIAN_NOTARY_PROMPT) -> dict:
-    """Calls OpenAI GPT-4o Vision API with payload optimization and robust SSL fallback."""
-    import urllib3
-    import requests
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-    # OpenAI takes exactly one key; a pasted multi-key pool would be sent as one
-    # invalid bearer token, so use the first entry and ignore the rest.
-    clean_key = ""
-    if api_key:
-        parts = [k.strip().strip("'").strip('"') for k in api_key.replace('\n', ',').replace(';', ',').split(',')]
-        clean_key = next((p for p in parts if p), "")
-
-    if not image_bytes or not clean_key:
-        return {
-            "success": False,
-            "transcription": "",
-            "error": "يرجى توفير صورة ومفتاح OpenAI API الخاص بك في لوحة إعدادات الذكاء الاصطناعي."
-        }
-
-    try:
-        opt_bytes = optimize_image_for_api(image_bytes, max_dim=1600)
-    except ValueError as ex_img:
-        return {"success": False, "transcription": "", "error": f" {ex_img}"}
-
-    b64_img = base64.b64encode(opt_bytes).decode('utf-8')
-    headers = {
-        "Authorization": f"Bearer {clean_key}",
-        "Content-Type": "application/json"
-    }
+def _call_openai_vision(image_bytes: bytes, api_key: str, model_name: str = "gpt-4o", prompt: str = "") -> dict:
+    """Helper for calling OpenAI Vision API."""
+    import base64
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
+    b64_img = base64.b64encode(image_bytes).decode('utf-8')
+    p_text = prompt or "قم بتفريغ وتحليل هذه الوثيقة التونسية التوثيقية."
     payload = {
-        "model": model_name if "gpt" in model_name else "gpt-4o",
+        "model": model_name,
         "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}
-                    }
-                ]
-            }
+            {"role": "user", "content": [
+                {"type": "text", "text": p_text},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}}
+            ]}
         ],
-        "max_tokens": 2500
+        "max_tokens": 4000
     }
-
     try:
         r = _post_json("https://api.openai.com/v1/chat/completions", headers, payload, timeout=120)
-    except Exception as ex:
-        return {
-            "success": False,
-            "transcription": "",
-            "error": _render_failure(_classify_network_failure(ex), 1)
-        }
-
-    if r.status_code == 200:
-        try:
+        if r.status_code == 200:
             text = r.json()['choices'][0]['message']['content']
-        except Exception:
-            return {
-                "success": False,
-                "transcription": "",
-                "error": "ردّ خادم OpenAI بصيغة غير متوقعة. يرجى إعادة المحاولة."
-            }
-        return {"success": True, "transcription": text, "error": None}
-
-    if r.status_code == 401:
-        msg = ("مفتاح OpenAI غير صالح — الخادم رفض المفتاح المُدخل."
-               "يرجى التأكد من نسخه كاملاً من platform.openai.com.")
-    elif r.status_code == 429:
-        msg = ("تم استهلاك حصة مفتاح OpenAI أو تجاوز حد الطلبات."
-               "يرجى التحقق من رصيد حسابك على platform.openai.com.")
-    else:
-        msg = f" خطأ من خادم OpenAI (HTTP {r.status_code})."
-
-    return {"success": False, "transcription": "", "error": msg}
+            return {"success": True, "transcription": text, "error": None}
+        return {"success": False, "transcription": "", "error": f"OpenAI error {r.status_code}"}
+    except Exception as ex:
+        return {"success": False, "transcription": "", "error": str(ex)}
 
 
 TUNISIAN_HOJJAT_WAFAT_PROMPT = """
-أنت خبير محلف وفائق الدقة في قراءة وتفريغ حجج الوفاة الصادرة عن المحاكم التونسية (محاكم الناحية والمحاكم الابتدائية).
-أمامك صورة (وثيقة من صفحة واحدة، أو صور مقسمة وجه وظهر Recto-Verso) لوثيقة حجة وفاة تونسية رسمية.
+أنت خبير توثيقي وقانوني متخصص في قراءة حجج الوفاة الصادرة عن المحاكم التونسية.
+أمامك صورة لوثيقة حجة وفاة رسمية تونسية. قد تكون الوثيقة من صفحة أو أكثر.
 
-قم بتحليل الوثيقة والصفحات بدقة متناهية وإرجاع كود JSON في بداية إجابتك متبوعاً بالنص التفريغي الكامل.
+مهمتك: اقرأ الوثيقة بكاملها بنفس الدقة التي يقرأها بها عدل إشهاد خبير، واستخرج المعطيات التالية بدقة تامة.
 
-يجب أن يكون كود JSON بالصيغة التالية تماماً وبدون أي أخطاء:
+قواعد صارمة يجب اتباعها:
+1. sons_names: مصفوفة تحتوي فقط على أسماء الأبناء الذكور الأحياء للمرحوم — اسم واحد منفصل لكل عنصر.
+2. daughters_names: مصفوفة تحتوي فقط على أسماء البنات الإناث الأحياء للمرحوم — اسم واحد منفصل لكل عنصر.
+3. يمنع منعاً باتاً: خلط الأبناء والبنات في نفس المصفوفة، أو كتابة أسماء متعددة في عنصر واحد مفصولة بشرطة أو مائلة.
+4. لا تضع في المصفوفات: أي تواريخ، أرقام ملفات، أرقام بطاقات تعريف، أسماء شهود، أسماء طالب الإشهاد.
+5. sons_count يجب أن يساوي بالضبط عدد عناصر sons_names.
+6. daughters_count يجب أن يساوي بالضبط عدد عناصر daughters_names.
+7. استخرج الأسماء النظيفة: بدون (لا غير، الرشداء، الأبناء، ابن، بنت).
+8. names: مصفوفة تجمع كل أسماء الورثة (ذكور وإناث معاً) بنفس الترتيب الوارد في الوثيقة.
+
+صيغة JSON المطلوب إرجاعها:
 ```json
 {
-  "hujja_num": "عدد ملف الحجة التوثيقي (مثال: 8250)",
-  "hujja_date": "تاريخ صدور الحجة بالكامل (مثال: 03-10-1983)",
-  "hujja_court": "اسم المحكمة الصادرة عنها (مثال: محكمة ناحية زغوان)",
-  "applicant_name": "الاسم الكامل واللقب لطالب الإشهاد أو المصرح أو طالب الإذن (مثال: المختار بن الطيب الرياحي المذكور بعد 'حضر لدينا ... السيد المختار بن الطيب الرياحي ... وطلب بوصفه ابن الهالك الاذن له باخراج حجة وفاة')",
-  "deceased_name": "الاسم الكامل والنسب واللقب للهالك/المرحوم بعد عبارة 'الهالك المرحوم :' (مثال: الطيب بن محمد العكرمي الرياحي)",
-  "deceased_lakab": "اللقب العائلي للهالك فقط (مثال: الرياحي)",
+  "hujja_num": "عدد ملف الحجة",
+  "hujja_date": "تاريخ صدور الحجة بالأرقام",
+  "hujja_court": "اسم المحكمة الصادرة عنها",
+  "applicant_name": "الاسم الكامل لطالب الإشهاد",
+  "deceased_name": "الاسم الكامل والنسب واللقب للمرحوم",
+  "deceased_lakab": "اللقب العائلي للمرحوم فقط",
+  "wife_alive": true,
+  "wife_name": "الاسم الكامل للزوجة إن وُجدت",
   "husband_alive": false,
   "husband_name": "",
-  "wife_alive": true,
-  "wife_name": "الاسم واللقب الكامل للزوجة الحية إن وجدت (مثال: مبروكة بنت صالح المثلوثي)",
   "father_alive": false,
   "mother_alive": false,
-  "sons_count": 4,
+  "sons_count": 0,
   "daughters_count": 0,
-  "sons_names": ["بوجمعة الرياحي", "المختار الرياحي", "خميس الرياحي", "رمضان الرياحي"],
-  "daughters_names": [],
-  "names": ["بوجمعة الرياحي", "المختار الرياحي", "خميس الرياحي", "رمضان الرياحي"]
+  "sons_names": ["اسم الابن الأول", "اسم الابن الثاني"],
+  "daughters_names": ["اسم البنت الأولى"],
+  "names": ["كل أسماء الورثة بالترتيب"]
 }
 ```
 
-تعليمات صارمة جداً واستثنائية:
-1. اسم الهالك (Deceased Name): هو الاسم الكامل المكتوب بعد عبارة 'الهالك المرحوم :' أو 'وفاة الهالك المرحوم :' أو 'المتوفى المرحوم :'. 
-   - يمنع منعاً باتاً استخراج الكلمات الإجرائية مثل "الاذن له باخراج حجة وفاة" كاسم للهالك! اسم الهالك شخصي (مثل: الطيب بن محمد العكرمي الرياحي).
-2. طالب الإشهاد/الإذن (Applicant Name): هو الشخص المذكور في بداية الوثيقة بعد عبارة 'حضر لدينا ... السيد(ة): [الاسم] ... وطلب بوصفه ابن الهالك الاذن له باخراج حجة وفاة' (مثل: المختار بن الطيب الرياحي).
-3. تاريخ الحجة: هو تاريخ جلسة القاضي أو صدور الحجة (مثل: 3 أكتوبر 1983). يمنع استخدام تاريخ بطاقة تعريف طالب الإذن كـ تاريخ للحجة!
-4. الأبناء والبنات (Sons & Daughters): سواء كانت الوثيقة من صفحة واحدة أو صفحتين، اقرأ بتمعن شديد عند عبارة '(2) أبناؤه الرشداء :' أو 'ترك من الأبناء :' أو 'وانحصر إرثه في :' أو أي مكان تذكر فيه قائمة الورثة والأبناء.
-   - استخرج جميع الأسماء واقرن بكل اسم لقب الأب الهالك (مثال: بوجمعة – المختار – خميس – رمضان -> بوجمعة الرياحي، المختار الرياحي، خميس الرياحي، رمضان الرياحي).
-5. تنظيف الأسماء: يمنع إبقاء كلمات توثيقية مثل 'لا غير' أو 'الرشداء' أو رموز داخل الأسماء.
+مثال صحيح:
+إذا كان في الوثيقة: "أبناؤه الرشداء: بوجمعة - المختار - خميس - رمضان لا غير"
+يجب أن يكون:
+- sons_names: ["بوجمعة", "المختار", "خميس", "رمضان"]
+- sons_count: 4
+- daughters_names: []
+- daughters_count: 0
 
-ثم قم بكتابة النص التفريغي الكامل للحجة كلمة بكلمة بدقة 100%.
+بعد JSON، اكتب التفريغ الحرفي الكامل للوثيقة كلمة بكلمة.
 """
 
 
@@ -649,130 +605,98 @@ def extract_hojjat_wafat_document_data(image_bytes, api_key: str = "", provider:
 
     raw_text = res.get("transcription", "")
 
-    # Parse JSON from AI response
+    # Parse JSON from Gemini's response — trust it directly, minimal post-processing
     parsed_json = {}
     import json, re
     json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
     if not json_match:
+        json_match = re.search(r'(\{[^{}]*"deceased_name"[^{}]*\})', raw_text, re.DOTALL)
+    if not json_match:
         json_match = re.search(r'(\{.*?\})', raw_text, re.DOTALL)
-    
+
     if json_match:
         try:
             parsed_json = json.loads(json_match.group(1))
         except Exception:
             parsed_json = {}
 
-    # Clean & sanitize parsed JSON fields
-    if parsed_json and isinstance(parsed_json, dict):
-        dec_n = str(parsed_json.get("deceased_name") or "").strip()
-        forbidden = ["الاذن له باخراج حجة وفاة", "الاذن باخراج حجة", "إقامة حجة وفاة", "طلب الإذن", "طالب الإذن", "الاذن"]
-        for f in forbidden:
-            if dec_n == f or dec_n.startswith(f):
-                dec_n = dec_n.replace(f, "").strip()
+    if not parsed_json or not isinstance(parsed_json, dict):
+        # Last resort: regex fallback
+        try:
+            from farida_engine import parse_hujjat_wafat_text
+        except ImportError:
+            from core.farida_engine import parse_hujjat_wafat_text
+        parsed = parse_hujjat_wafat_text(raw_text)
+        return {"success": True, "data": parsed, "transcription": raw_text}
+
+    # ── Step 1: Clean deceased_name ──────────────────────────────────────────
+    dec_n = str(parsed_json.get("deceased_name") or "").strip()
+    forbidden_prefixes = ["الاذن له باخراج حجة وفاة", "الاذن باخراج حجة", "إقامة حجة وفاة", "طلب الإذن", "طالب الإذن", "الاذن"]
+    for f in forbidden_prefixes:
+        if dec_n == f or dec_n.startswith(f):
+            dec_n = dec_n.replace(f, "").strip()
+    if not dec_n:
+        try:
+            from farida_engine import _extract_deceased_name_smart_fallback
+        except ImportError:
+            from core.farida_engine import _extract_deceased_name_smart_fallback
+        dec_n = _extract_deceased_name_smart_fallback(raw_text, str(parsed_json.get("deceased_lakab") or ""))
         if not dec_n:
-            try:
-                from farida_engine import _extract_deceased_name_smart_fallback
-            except ImportError:
-                from core.farida_engine import _extract_deceased_name_smart_fallback
-            dec_n = _extract_deceased_name_smart_fallback(raw_text, str(parsed_json.get("deceased_lakab") or ""))
-            if not dec_n:
-                m_dec = re.search(r'(?:الهالك|المتوفى|المرحوم)(?:\s+المرحوم)?\s*[:：\-\s\n\r]*([^\n\.,؛]+)', raw_text)
-                if m_dec:
-                    dec_n = m_dec.group(1).strip()
-        parsed_json["deceased_name"] = dec_n
+            m_dec = re.search(r'(?:الهالك|المتوفى|المرحوم)(?:\s+المرحوم)?\s*[::\-\s\n\r]*([^\n\.,؛]{5,60})', raw_text)
+            if m_dec:
+                dec_n = m_dec.group(1).strip()
+    parsed_json["deceased_name"] = dec_n
 
-        # Clean sons
-        sons = parsed_json.get("sons_names") or []
-        clean_sons = []
-        for s in sons:
-            sc = re.sub(r'[\(\)\[\]\./\\]', '', str(s)).strip()
-            sc = re.sub(r'\b(لا غير|الرشداء|الأبناء|الأبن|ابن)\b', '', sc).strip()
-            if sc: clean_sons.append(sc)
-        parsed_json["sons_names"] = clean_sons
-        if clean_sons and not parsed_json.get("sons_count"):
-            parsed_json["sons_count"] = len(clean_sons)
+    # ── Step 2: Clean sons_names — trust Gemini's list, only strip noise words ─
+    _noise = re.compile(r'\b(لا غير|الرشداء|الأبناء|ابن|بنت|المتوفى|المرحوم|المتوفاة|المرحومة)\b')
 
-        # Clean daughters
-        daughters = parsed_json.get("daughters_names") or []
-        clean_daughters = []
-        for d in daughters:
-            dc = re.sub(r'[\(\)\[\]\./\\]', '', str(d)).strip()
-            dc = re.sub(r'\b(لا غير|الرشداء|البنات|بنت)\b', '', dc).strip()
-            if dc: clean_daughters.append(dc)
-        parsed_json["daughters_names"] = clean_daughters
-        if clean_daughters and not parsed_json.get("daughters_count"):
-            parsed_json["daughters_count"] = len(clean_daughters)
+    def _clean_name(raw):
+        """Remove procedural noise from a single heir name returned by Gemini."""
+        s = re.sub(r'[()\[\]]', '', str(raw)).strip()
+        s = _noise.sub('', s).strip()
+        # Reject if what remains looks like a date, a CIN number, or is empty
+        if not s or re.match(r'^[\d/\-\.]+$', s):
+            return None
+        return s
 
-        # Handle slash-separated heir strings (e.g. "رفيقه/جمال/أحمد/اميرة/منصور/عزة")
-        all_raw_names = (parsed_json.get("sons_names") or []) + (parsed_json.get("daughters_names") or []) + (parsed_json.get("names") or [])
-        has_slashes = any("/" in str(n) for n in all_raw_names) or "/" in raw_text
-        if (has_slashes or not clean_sons and not clean_daughters):
-            slash_tokens = []
-            for n in all_raw_names:
-                for p in str(n).split("/"):
-                    clean_p = p.strip()
-                    if clean_p and clean_p not in slash_tokens:
-                        slash_tokens.append(clean_p)
-            
-            if not slash_tokens:
-                m_heirs = re.search(r'(?:وهم|وهي|وههم|الأبناء|الرشداء)\s*[:\-]\s*([^\n\.,؛]+)', raw_text)
-                if m_heirs:
-                    slash_tokens = [t.strip() for t in m_heirs.group(1).split("/") if t.strip()]
+    raw_sons = parsed_json.get("sons_names") or []
+    clean_sons = [n for n in (_clean_name(x) for x in raw_sons) if n]
+    parsed_json["sons_names"] = clean_sons
+    parsed_json["sons_count"] = len(clean_sons)  # always match the actual list length
 
-            if slash_tokens:
-                try:
-                    from farida_engine import _is_female_name
-                except ImportError:
-                    from core.farida_engine import _is_female_name
+    # ── Step 3: Clean daughters_names ───────────────────────────────────────
+    raw_daughters = parsed_json.get("daughters_names") or []
+    clean_daughters = [n for n in (_clean_name(x) for x in raw_daughters) if n]
+    parsed_json["daughters_names"] = clean_daughters
+    parsed_json["daughters_count"] = len(clean_daughters)
 
-                dec_lakab = parsed_json.get("deceased_lakab") or ""
-                new_sons = []
-                new_daughters = []
-                for tok in slash_tokens:
-                    tok_clean = re.sub(r'[\(\)\[\]\./\\]', '', tok).strip()
-                    tok_clean = re.sub(r'\b(لا غير|الرشداء|الأبناء|الأبن|ابن|بنت)\b', '', tok_clean).strip()
-                    if not tok_clean: continue
-                    
-                    full_name_tok = tok_clean if (len(tok_clean.split()) > 1 or not dec_lakab) else f"{tok_clean} {dec_lakab}"
-                    
-                    if _is_female_name(tok_clean):
-                        new_daughters.append(full_name_tok)
-                    else:
-                        new_sons.append(full_name_tok)
-                
-                if new_sons:
-                    parsed_json["sons_names"] = new_sons
-                    parsed_json["sons_count"] = len(new_sons)
-        # Additional safeguard: run smart heirs fallback if 0 heirs extracted from JSON
-        if not parsed_json.get("sons_count") and not parsed_json.get("daughters_count") and not parsed_json.get("names"):
-            try:
-                from farida_engine import _extract_heirs_smart_fallback
-            except ImportError:
-                from core.farida_engine import _extract_heirs_smart_fallback
-            smart_h = _extract_heirs_smart_fallback(raw_text, str(parsed_json.get("deceased_lakab") or ""))
-            if smart_h.get("names"):
-                parsed_json["sons_count"] = smart_h["sons_count"]
-                parsed_json["daughters_count"] = smart_h["daughters_count"]
-                parsed_json["names"] = smart_h["names"]
+    # ── Step 4: Only if BOTH lists are empty, try smart regex fallback ────────
+    if not clean_sons and not clean_daughters and not parsed_json.get("names"):
+        try:
+            from farida_engine import _extract_heirs_smart_fallback
+        except ImportError:
+            from core.farida_engine import _extract_heirs_smart_fallback
+        smart_h = _extract_heirs_smart_fallback(raw_text, str(parsed_json.get("deceased_lakab") or ""))
+        if smart_h.get("names"):
+            parsed_json["sons_count"] = smart_h["sons_count"]
+            parsed_json["daughters_count"] = smart_h["daughters_count"]
+            parsed_json["sons_names"] = smart_h.get("sons_names", [])
+            parsed_json["daughters_names"] = smart_h.get("daughters_names", [])
+            parsed_json["names"] = smart_h["names"]
 
-        return {
-            "success": True,
-            "data": parsed_json,
-            "transcription": raw_text
-        }
+    return {
+        "success": True,
+        "data": parsed_json,
+        "transcription": raw_text
+    }
 
-    # Fallback to regex parsing if JSON not present
+    # (unreachable — kept for safety)
     try:
         from farida_engine import parse_hujjat_wafat_text
     except ImportError:
         from core.farida_engine import parse_hujjat_wafat_text
-    
     parsed = parse_hujjat_wafat_text(raw_text)
-    return {
-        "success": True,
-        "data": parsed,
-        "transcription": raw_text
-    }
+    return {"success": True, "data": parsed, "transcription": raw_text}
 
 
 def extract_handwritten_notary_script(image_bytes, api_key: str = "", provider: str = "", model: str = "") -> dict:
@@ -784,27 +708,59 @@ def extract_handwritten_notary_script(image_bytes, api_key: str = "", provider: 
 
 
 TUNISIAN_TITLE_DOC_PROMPT = """
-أنت خبير محلف في قراءة وتفريغ شهادات الملكية والرسوم العقارية الصادرة عن الإدارة الجهوية للملكية العقارية بالجمهورية التونسية.
-تنبيه هـام جداً: الصورة المرفقة قد تكون مستديرة أو مقلوبة رأساً على عقب (مثلاً تدوير 180 درجة). يرجى التحديق جيداً وقراءتها بالاتجاه الصحيح 100%.
+أنت خبير فائق الدقة في التفريغ التوثيقي لشهادات الملكية ومستخرجات الرسوم العقارية الصادرة عن الإدارة الجهوية للملكية العقارية بالجمهورية التونسية (CPF).
+أمامك صورة لوثيقة الرسم العقاري أو نص ترسيم وفاة بالرسم العقاري.
 
-قم باستخراج البيانات الرسمية الدقيقة المكتوبة في شهادة الملكية التالية:
-1. معرف الرسم العقاري (مثال: معرف الرسم العقاري: 56733 بن عروس)
-2. إسم العقار (مثال: إسم العقار : حدائق الحي الرياضي)
-3. محتوى العقار (مثال: محتوى العقار : أرض صالحة للبناء)
-4. موقع العقار (مثال: موقع العقار : فندق الشوشة)
-5. المساحة الجملية بالمتر المربع (مثال: المساحة : 3190 م.م)
-6. التجزئة / عدد الأجزاء (مثال: التجزئة : 3190)
-7. الرسم الأصلي (مثال: الرسم(و.م) الأصلي(ة): 50208 بن عروس)
-8. هوية المالكين وحصصهم وأرقام بطاقات تعريفهم الوطنية (مثال: 1/1 زين العابدين بن محمد... صاحب بطاقة تعريف... موضوع الملكية: 212.66 جزء).
+تعليمات دقيقة واستخراج إجباري:
+1. نوع الوثيقة: قد تكون شهادة ملكية أو "ترسيم وفاة بالرسم العقاري" (حيث يذكر: ترسيم وفاة، يتضح من مضمون وفاة أو حجة وفاة أن السيد... قد توفي... وأحاط بأرثه زوجته وأبناؤه).
+2. استخراج اسم الهالك/المتوفى كاملاً: (مثال: أن السيد: لطفي بن المولدي بن عمار إسماعيل قد توفي... -> الهالك: لطفي بن المولدي بن عمار إسماعيل).
+3. استخراج أسماء وصفت كافة الورثة:
+   - الزوج أو الزوجة (مثال: زوجته هندة بنت الطاهر بن محمد بنصالح -> زوجة).
+   - الأبناء الذكور وأسماؤهم الصريحة (مثال: نذير، ساجد -> ذكور).
+   - البنات والإناث وأسماؤهم الصريحة (مثال: نور -> إناث).
+4. استخراج مراجع الترسيم والرسم العقاري:
+   - الرسم العقاري (مثال: الرسم العقاري: 9101 زغوان).
+   - التاريخ (مثال: 22 أفريل 2026 / 2026-04-22).
+   - المجلد (مثال: 2026/1x).
+   - العدد (مثال: 861).
 
-قم بكتابة نص التفريغ بالكامل ودقيق جداً.
+قم بتفريغ كامل النص المكتوب في الوثيقة، وأدرج المعطيات المستخرجة في النهاية داخل كود JSON محدد بالشكل التالي:
+
+```json
+{
+  "document_type": "ترسيم وفاة بالرسم العقاري",
+  "title_num": "9101 زغوان",
+  "reg_date": "2026-04-22",
+  "vol_num": "2026/1",
+  "entry_num": "861",
+  "deceased_name": "اسم الهالك الكامل",
+  "death_date": "تاريخ الوفاة",
+  "wife": true,
+  "wife_name": "اسم الزوجة الكامل",
+  "husband": false,
+  "husband_name": "",
+  "sons_count": 2,
+  "sons_names": ["اسم الابن 1", "اسم الابن 2"],
+  "daughters_count": 1,
+  "daughters_names": ["اسم البنت 1"],
+  "names": ["اسم الزوجة", "اسم الابن 1", "اسم الابن 2", "اسم البنت 1"],
+  "property_name": "اسم العقار إن وجد",
+  "location": "موقع العقار",
+  "property_area_m2": 0.0,
+  "owners": []
+}
+```
 """
 
 
-def extract_title_document_data(image_bytes: bytes, api_key: str = "", provider: str = "", model_name: str = "gemini-3.6-flash") -> dict:
-    """Extracts structured fields from a Property Title Certificate image using AI Vision OCR."""
+def extract_title_document_data(image_bytes, api_key: str = "", provider: str = "", model_name: str = "gemini-3.6-flash") -> dict:
+    """Extracts structured fields from single or multi-page Property Title / Rasm L3akari images using AI Vision OCR."""
     if not image_bytes:
-        return {"success": False, "error": "لم يتم تقديم صورة لشهادة الملكية."}
+        return {"success": False, "error": "لم يتم تقديم صورة لشهادة/وثيقة الرسم العقاري."}
+
+    payload = image_bytes
+    if isinstance(image_bytes, list) and len(image_bytes) == 1:
+        payload = image_bytes[0]
 
     if not provider or not api_key:
         try:
@@ -818,20 +774,36 @@ def extract_title_document_data(image_bytes: bytes, api_key: str = "", provider:
             provider = provider or "google"
 
     if provider == "openai":
-        res = _call_openai_vision(image_bytes, api_key, model_name or "gpt-4o", prompt=TUNISIAN_TITLE_DOC_PROMPT)
+        res = _call_openai_vision(payload, api_key, model_name or "gpt-4o", prompt=TUNISIAN_TITLE_DOC_PROMPT)
     else:
-        res = _call_gemini_vision(image_bytes, api_key, model_name or "gemini-3.6-flash", prompt=TUNISIAN_TITLE_DOC_PROMPT)
+        res = _call_gemini_vision(payload, api_key, model_name or "gemini-3.6-flash", prompt=TUNISIAN_TITLE_DOC_PROMPT)
 
     if not res.get("success"):
         return res
 
     raw_text = res.get("transcription", "")
+
+    parsed_json = {}
+    import json, re
+    json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', raw_text, re.DOTALL)
+    if json_match:
+        try:
+            parsed_json = json.loads(json_match.group(1))
+        except Exception:
+            parsed_json = {}
+
     try:
         from farida_engine import parse_title_document_text
     except ImportError:
         from core.farida_engine import parse_title_document_text
 
     parsed = parse_title_document_text(raw_text)
+
+    if parsed_json and isinstance(parsed_json, dict):
+        for k, v in parsed_json.items():
+            if v and (not parsed.get(k) or k == "owners"):
+                parsed[k] = v
+
     return {
         "success": True,
         "data": parsed,

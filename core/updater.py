@@ -305,6 +305,14 @@ def download_and_verify_update(download_url: str, sha256_url: str = "", asset_ap
     downloaded_hash = hasher.hexdigest().lower()
     log_startup_event(f"Téléchargement terminé. SHA256 calculé : {downloaded_hash}")
 
+    # Check for valid zip format before proceeding
+    if ext == ".zip":
+        import zipfile
+        if not zipfile.is_zipfile(file_path):
+            file_path.unlink(missing_ok=True)
+            log_startup_event("ERREUR CRITIQUE : Le fichier téléchargé n'est pas une archive ZIP valide (accès refusé au dépôt privé ou réseau interrompu).")
+            raise ValueError("Erreur de téléchargement : archive corrompue ou accès au dépôt restreint.")
+
     # Checksum verification
     target_sha_url = sha256_api_url if (sha256_api_url and get_github_token()) else sha256_url
     if target_sha_url:
@@ -356,8 +364,6 @@ def prepare_clean_app_shutdown():
         from camera import stop_active_camera
         stop_active_camera()
     except Exception as cam_err:
-        # (b) A camera still holding the device across a restart makes the new
-        # instance report "no camera", which is a confusing way to learn this.
         log_startup_event(f"could not stop the camera before shutdown: {cam_err}")
 
 
@@ -389,12 +395,15 @@ def apply_update_and_restart(zip_path: str, install_dir: str = None, current_pid
     target_exe_name = Path(sys.executable).name if getattr(sys, 'frozen', False) else "DATLY.exe"
     
     stage_dir = temp_dir / "stage"
+    zip_p_str = str(file_p).replace('\\', '/')
+    stage_p_str = str(stage_dir).replace('\\', '/')
+    
     if is_exe:
-        integrity_cmd = f'if exist "{file_p}" ( exit 0 ) else ( exit 1 )'
+        integrity_cmd = f'if exist "{file_p}" ( exit /b 0 ) else ( exit /b 1 )'
         install_cmd = f'copy /Y "{file_p}" "{install_dir}\\{target_exe_name}"'
     else:
-        integrity_cmd = f'powershell -Command "try {{ Add-Type -AssemblyName System.IO.Compression.FileSystem; $z = [System.IO.Compression.ZipFile]::OpenRead(\'{file_p}\'); $z.Dispose(); exit 0 }} catch {{ exit 1 }}"'
-        install_cmd = f'if exist "{stage_dir}" rmdir /S /Q "{stage_dir}" & powershell -Command "Expand-Archive -Path \'{file_p}\' -DestinationPath \'{stage_dir}\' -Force" & if exist "{stage_dir}\\DATLY" ( xcopy /E /I /Y /Q "{stage_dir}\\DATLY\\*" "{install_dir}" ) else ( xcopy /E /I /Y /Q "{stage_dir}\\*" "{install_dir}" )'
+        integrity_cmd = f'powershell -NoProfile -Command "try {{ Add-Type -AssemblyName System.IO.Compression.FileSystem; $z = [System.IO.Compression.ZipFile]::OpenRead(\'{zip_p_str}\'); $z.Dispose(); exit 0 }} catch {{ exit 1 }}"'
+        install_cmd = f'if exist "{stage_dir}" rmdir /S /Q "{stage_dir}" & powershell -NoProfile -Command "Expand-Archive -Path \'{zip_p_str}\' -DestinationPath \'{stage_p_str}\' -Force" & if exist "{stage_dir}\\DATLY" ( xcopy /E /I /Y /Q "{stage_dir}\\DATLY\\*" "{install_dir}" ) else ( xcopy /E /I /Y /Q "{stage_dir}\\*" "{install_dir}" )'
 
     log_startup_event(f"Préparation du script d'installation helper (Cible : '{install_dir}', Mode : {'EXE' if is_exe else 'ZIP'})...")
 

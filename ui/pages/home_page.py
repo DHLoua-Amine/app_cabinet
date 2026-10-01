@@ -157,6 +157,7 @@ class HomePage(QWidget):
             }
         """)
         self.video_viewport.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.video_viewport.setScaledContents(True)
         self.show_camera_disconnected_message()
         camera_col.addWidget(self.video_viewport)
 
@@ -495,7 +496,7 @@ class HomePage(QWidget):
     def on_frame_received(self, qimg, detected_list):
         # 1. Update Viewport image if valid preview qimg was sent
         if qimg and not qimg.isNull():
-            self.video_viewport.setPixmap(QPixmap.fromImage(qimg).scaled(640, 420, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation))
+            self.video_viewport.setPixmap(QPixmap.fromImage(qimg))
 
         # 2. Accumulate all detected faces into persistent session storage
         changed = False
@@ -565,45 +566,55 @@ class HomePage(QWidget):
                 self._unknown_widgets[cid] = item_widget
 
     def on_face_selected(self, client_id):
-        self.selected_face_id = client_id
-        if client_id not in self.session_faces:
-            return
+        try:
+            self.selected_face_id = client_id
+            if client_id not in self.session_faces:
+                return
 
-        face = self.session_faces[client_id]
-        is_known = face.get("status") == "known"
-        is_fr = self.lang == "fr"
+            face = self.session_faces[client_id]
+            is_known = face.get("status") == "known"
+            is_fr = self.lang == "fr"
 
-        self.inst_lbl.setVisible(False)
-        self.fiche_content.setVisible(True)
+            self.inst_lbl.setVisible(False)
+            self.fiche_content.setVisible(True)
 
-        # Avatar
-        qimg = face.get("crop_qimg")
-        if qimg and not qimg.isNull():
-            self.quick_avatar.setPixmap(QPixmap.fromImage(qimg).scaled(90, 90, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation))
+            # Avatar
+            qimg = face.get("crop_qimg")
+            if qimg and not qimg.isNull():
+                self.quick_avatar.setPixmap(QPixmap.fromImage(qimg).scaled(90, 90, Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation))
 
-        # Status & Details
-        if is_known:
-            self.quick_status.setText("Client Enregistré" if is_fr else "حريف مسجل معروف")
-            self.quick_status.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12px;")
-            self.quick_name.setText(face.get("name", ""))
-            
-            c_info = reception.get_client_by_id(client_id)
-            phone = c_info.get("phone", "—") if c_info else "—"
-            cin = c_info.get("cin_number", "—") if c_info else "—"
-            self.quick_details.setText(f" Tél: {phone}\n CIN: {cin}")
-            
-            self.quick_action_btn.setText("Fiche Client / فتح الملف" if is_fr else "فتح بطاقة الحريف")
-            self.quick_delete_btn.setVisible(False)
-        else:
-            self.quick_status.setText("Visiteur Nouveau" if is_fr else "زائر جديد بالاستقبال")
-            self.quick_status.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 12px;")
-            self.quick_name.setText("Nouveau Client" if is_fr else "زائر جديد")
-            self.quick_details.setText("Aucune donnée disponible" if is_fr else "لا توجد معطيات بالملف")
-            
-            self.quick_action_btn.setText("Créer une fiche / تسجيل" if is_fr else "إنشاء بطاقة حريف")
-            self.quick_delete_btn.setText("Supprimer de la liste" if is_fr
-                                          else "حذف الزائر من القائمة")
-            self.quick_delete_btn.setVisible(True)
+            # Status & Details
+            if is_known:
+                self.quick_status.setText("Client Enregistré" if is_fr else "حريف مسجل معروف")
+                self.quick_status.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12px;")
+                self.quick_name.setText(face.get("name", ""))
+                
+                c_info = None
+                try:
+                    c_info = reception.get_client_by_id(client_id)
+                except Exception:
+                    pass
+                phone = c_info.get("phone", "—") if isinstance(c_info, dict) else "—"
+                cin = c_info.get("cin_number", "—") if isinstance(c_info, dict) else "—"
+                self.quick_details.setText(f" Tél: {phone}\n CIN: {cin}")
+                
+                self.quick_action_btn.setText("Fiche Client / فتح الملف" if is_fr else "فتح بطاقة الحريف")
+                self.quick_delete_btn.setVisible(False)
+            else:
+                self.quick_status.setText("Visiteur Nouveau" if is_fr else "زائر جديد بالاستقبال")
+                self.quick_status.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 12px;")
+                self.quick_name.setText("Nouveau Client" if is_fr else "زائر جديد")
+                self.quick_details.setText("Aucune donnée disponible" if is_fr else "لا توجد معطيات بالملف")
+                
+                self.quick_action_btn.setText("Créer une fiche / تسجيل" if is_fr else "إنشاء بطاقة حريف")
+                self.quick_delete_btn.setText("Supprimer de la liste" if is_fr else "حذف الزائر من القائمة")
+                self.quick_delete_btn.setVisible(True)
+        except Exception as e_sel:
+            try:
+                from system_guardian import log_system_error
+                log_system_error("on_face_selected error", e_sel)
+            except Exception:
+                pass
 
     def on_quick_action_clicked(self):
         if not self.selected_face_id:

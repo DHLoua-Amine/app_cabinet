@@ -33,9 +33,8 @@ class CameraService(QObject):
     client_detected = Signal(str, str, float)   # client_id, name, score
     unknown_purged = Signal(list)               # fiches « inconnu » annulees
 
-    # A camera that disappears mid-session (unplugged, or grabbed by another program)
-    # should be retried, but not in a tight loop that pins the CPU.
-    RETRY_BACKOFF_S = [5, 15, 60]
+    # Fast 2-5s retry backoff for instant camera stream recovery
+    RETRY_BACKOFF_S = [2, 3, 5]
 
     def __init__(self, parent=None):
         super().__init__(parent)
